@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-parqueadero}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-parqueadero}
+      POSTGRES_DB: ${POSTGRES_DB:-parqueadero}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-parqueadero}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # No se publica un puerto al host: en la arquitectura confirmada, backend-vision solo es
+  # alcanzable por backend-core dentro de la red interna de docker-compose (no expone
+  # credenciales de BD ni logica de negocio). Para depurar localmente, agregar temporalmente
+  # `ports: ["8001:8001"]`.
+  backend-vision:
+    build: ./backend-vision
+    restart: unless-stopped
+    environment:
+      CONFIANZA_MINIMA: ${CONFIANZA_MINIMA_ALPR:-0.5}
+
+  backend-core:
+    build: ./backend-core
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      backend-vision:
+        condition: service_started
+    ports:
+      - "${BACKEND_CORE_PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-parqueadero}:${POSTGRES_PASSWORD:-parqueadero}@db:5432/${POSTGRES_DB:-parqueadero}
+      SECRET_KEY: ${SECRET_KEY:-cambiar-esta-clave-en-produccion}
+      BACKEND_VISION_URL: http://backend-vision:8001
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:5173"]}
+    volumes:
+      - ./backend-core:/code
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend-core
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+      VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:8000/ws/zonas}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  db_data:

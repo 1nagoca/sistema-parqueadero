@@ -1,0 +1,31 @@
+# Entornos y secretos
+.env
+*/.env
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Node / frontend
+node_modules/
+dist/
+frontend/dist/
+*.tsbuildinfo
+
+# Docker
+*.log
+
+# Editores/SO
+.DS_Store
+.idea/
+.vscode/
+
+# Notas internas / herramientas locales (no se publican)
+CLAUDE-v2.md
+README.md
+.claude/
+graphify-out/
