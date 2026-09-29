@@ -29,6 +29,9 @@ services:
   backend-core:
     build: ./backend-core
     restart: unless-stopped
+    # --reload solo para desarrollo: como ./backend-core esta montado en /code, uvicorn reinicia
+    # solo al guardar un .py. El CMD del Dockerfile (sin --reload) queda para produccion.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       db:
         condition: service_healthy
