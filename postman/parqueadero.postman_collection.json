@@ -1,0 +1,1289 @@
+{
+  "info": {
+    "_postman_id": "e156daca-b185-52b4-8df7-00845caba5dc",
+    "name": "Parqueadero - backend-core",
+    "description": "API REST del parqueadero universitario (backend-core).\n\n1. Levantar el proyecto: `docker compose up --build -d`\n2. Importar esta colección en Postman.\n3. Correr la colección completa con el Collection Runner (en orden): el login guarda los tokens y cada paso guarda los ids que usa el siguiente.\n\nPor defecto las peticiones usan el token de admin; las carpetas de vehículos y accesos usan el de vigilante.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token_admin}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "00 - Salud",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"status ok\", () => pm.expect(pm.response.json().status).to.eql(\"ok\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Verifica que backend-core esté arriba (docker compose up)."
+    },
+    {
+      "name": "01 - Auth",
+      "item": [
+        {
+          "name": "Login admin",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "admin@uni.edu.co",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "admin123",
+                  "type": "text"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Devuelve access_token\", () => pm.expect(json.access_token).to.be.a(\"string\"));",
+                  "pm.collectionVariables.set(\"token_admin\", json.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login vigilante",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "vigilante@uni.edu.co",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "vigilante123",
+                  "type": "text"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Devuelve access_token\", () => pm.expect(json.access_token).to.be.a(\"string\"));",
+                  "pm.collectionVariables.set(\"token_vigilante\", json.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login estudiante",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "estudiante@uni.edu.co",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "estudiante123",
+                  "type": "text"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Devuelve access_token\", () => pm.expect(json.access_token).to.be.a(\"string\"));",
+                  "pm.collectionVariables.set(\"token_estudiante\", json.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login con clave incorrecta (401)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "admin@uni.edu.co",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "clave-incorrecta",
+                  "type": "text"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Guarda un token por rol en las variables de la colección. Correr esta carpeta primero."
+    },
+    {
+      "name": "02 - Usuarios",
+      "item": [
+        {
+          "name": "Mi perfil (me)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/usuarios/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Rol admin\", () => pm.expect(json.rol).to.eql(\"admin\"));",
+                  "pm.collectionVariables.set(\"admin_id\", json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar usuarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/usuarios"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Es una lista\", () => pm.expect(pm.response.json()).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear usuario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/usuarios",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre_completo\": \"Usuario Postman\",\n  \"correo_institucional\": \"{{nuevo_correo}}\",\n  \"documento_identidad\": \"{{nuevo_documento}}\",\n  \"telefono\": \"3001234567\",\n  \"rol\": \"estudiante\",\n  \"password\": \"postman123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Correo y documento son UNIQUE: se generan distintos en cada ejecución.",
+                  "const n = Date.now();",
+                  "pm.collectionVariables.set(\"nuevo_correo\", `postman${n}@uni.edu.co`);",
+                  "pm.collectionVariables.set(\"nuevo_documento\", `${n}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Correo guardado\", () => pm.expect(json.correo_institucional).to.eql(pm.collectionVariables.get(\"nuevo_correo\")));",
+                  "pm.test(\"No expone la contraseña\", () => pm.expect(json).to.not.have.property(\"hashed_password\"));",
+                  "pm.collectionVariables.set(\"nuevo_usuario_id\", json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Obtener usuario por id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/usuarios/{{nuevo_usuario_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Mismo id\", () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"nuevo_usuario_id\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear usuario con correo repetido (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/usuarios",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre_completo\": \"Duplicado\",\n  \"correo_institucional\": \"{{nuevo_correo}}\",\n  \"documento_identidad\": \"dup-{{nuevo_documento}}\",\n  \"rol\": \"estudiante\",\n  \"password\": \"x\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estudiante no puede listar usuarios (403)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/usuarios",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_estudiante}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Zonas",
+      "item": [
+        {
+          "name": "Listar zonas (cualquier rol)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/zonas",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_estudiante}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Es una lista\", () => pm.expect(pm.response.json()).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear zona de prueba (capacidad 1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/zonas",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"{{zona_nombre}}\",\n  \"ubicacion_descripcion\": \"Creada desde Postman\",\n  \"capacidad_total\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// El nombre de zona es UNIQUE. Capacidad 1 para poder probar RN-01 (zona llena).",
+                  "pm.collectionVariables.set(\"zona_nombre\", `Zona Postman ${Date.now()}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Cupos = capacidad al crear\", () => pm.expect(json.cupos_disponibles).to.eql(json.capacidad_total));",
+                  "pm.collectionVariables.set(\"zona_id\", json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estudiante no puede crear zonas (403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/zonas",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"No deberia crearse\",\n  \"capacidad_total\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_estudiante}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Espacios",
+      "item": [
+        {
+          "name": "Crear espacio en la zona de prueba",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/espacios",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"P-01\",\n  \"tipo_espacio\": \"carro\",\n  \"zona_id\": \"{{zona_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Nace libre\", () => pm.expect(json.estado).to.eql(\"libre\"));",
+                  "pm.collectionVariables.set(\"espacio_id\", json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar espacios de la zona",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/espacios?zona_id={{zona_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Contiene el espacio creado\", () => pm.expect(json.map(e => e.id)).to.include(pm.collectionVariables.get(\"espacio_id\")));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Vehículos",
+      "item": [
+        {
+          "name": "Registrar vehículo 1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/vehiculos",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"placa\": \"{{placa_1}}\",\n  \"tipo_vehiculo\": \"carro\",\n  \"marca\": \"Mazda\",\n  \"modelo\": \"2\",\n  \"color\": \"Rojo\",\n  \"usuario_id\": \"{{nuevo_usuario_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// La placa es UNIQUE (máx. 10 caracteres): se generan dos placas nuevas por ejecución.",
+                  "// Un vehículo debe tener dueño (usuario_id) o ser visitante: este es del usuario creado en 02.",
+                  "const s = String(Date.now()).slice(-6);",
+                  "pm.collectionVariables.set(\"placa_1\", `PA${s}`);",
+                  "pm.collectionVariables.set(\"placa_2\", `PB${s}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Placa en mayúsculas\", () => pm.expect(json.placa).to.eql(pm.collectionVariables.get(\"placa_1\")));",
+                  "pm.collectionVariables.set(\"vehiculo_id\", json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar vehículo 2 (visitante)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/vehiculos",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"placa\": \"{{placa_2}}\",\n  \"tipo_vehiculo\": \"moto\",\n  \"es_visitante\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"vehiculo2_id\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar vehículo por placa",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/vehiculos/placa/{{placa_1}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Mismo vehículo\", () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"vehiculo_id\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vehículo sin dueño ni visitante (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/vehiculos",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"placa\": \"SINDUENO\",\n  \"tipo_vehiculo\": \"carro\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar placa repetida (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/vehiculos",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"placa\": \"{{placa_1}}\",\n  \"tipo_vehiculo\": \"carro\",\n  \"es_visitante\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Se ejecuta como vigilante.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{token_vigilante}}",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "06 - Accesos (reglas de negocio)",
+      "item": [
+        {
+          "name": "RN-03: visitante sin justificación (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accesos/entrada",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehiculo_id\": \"{{vehiculo2_id}}\",\n  \"zona_id\": \"{{zona_id}}\",\n  \"tipo_acceso\": \"visitante\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RN-01: registrar entrada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accesos/entrada",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehiculo_id\": \"{{vehiculo_id}}\",\n  \"zona_id\": \"{{zona_id}}\",\n  \"espacio_id\": \"{{espacio_id}}\",\n  \"tipo_acceso\": \"normal\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Acceso abierto\", () => pm.expect(json.fecha_hora_salida).to.be.null);",
+                  "pm.collectionVariables.set(\"acceso_id\", json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RN-01: la zona queda sin cupos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/zonas"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const zona = pm.response.json().find(z => z.id === pm.collectionVariables.get(\"zona_id\"));",
+                  "pm.test(\"cupos_disponibles = 0\", () => pm.expect(zona.cupos_disponibles).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RN-01: entrada con zona llena (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accesos/entrada",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehiculo_id\": \"{{vehiculo2_id}}\",\n  \"zona_id\": \"{{zona_id}}\",\n  \"tipo_acceso\": \"normal\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar vehículos adentro de la zona",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accesos?zona_id={{zona_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Aparece la placa con su espacio\", () => {",
+                  "    const fila = json.find(a => a.id === pm.collectionVariables.get(\"acceso_id\"));",
+                  "    pm.expect(fila.placa).to.eql(pm.collectionVariables.get(\"placa_1\"));",
+                  "    pm.expect(fila.espacio_codigo).to.eql(\"P-01\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar acceso activo por placa",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accesos/buscar?placa={{placa_1}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Mismo acceso\", () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"acceso_id\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RN-02: registrar salida",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accesos/{{acceso_id}}/salida"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Tiene fecha de salida\", () => pm.expect(json.fecha_hora_salida).to.be.a(\"string\"));",
+                  "pm.test(\"Tiene duración\", () => pm.expect(json.duracion_minutos).to.be.a(\"number\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RN-02: salida repetida (404)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accesos/{{acceso_id}}/salida"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RN-03: entrada de visitante autorizada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accesos/entrada",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehiculo_id\": \"{{vehiculo2_id}}\",\n  \"zona_id\": \"{{zona_id}}\",\n  \"tipo_acceso\": \"visitante\",\n  \"autorizado_por_id\": \"{{admin_id}}\",\n  \"justificacion\": \"Proveedor de mantenimiento\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Tipo visitante\", () => pm.expect(json.tipo_acceso).to.eql(\"visitante\"));",
+                  "pm.collectionVariables.set(\"acceso_visitante_id\", json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Salida del visitante",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accesos/{{acceso_visitante_id}}/salida"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Flujo completo en orden: correr con el Collection Runner para que las variables se encadenen.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{token_vigilante}}",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "07 - Auditoría",
+      "item": [
+        {
+          "name": "RN-04: auditoría de accesos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auditoria?tabla_afectada=accesos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "const trazas = json.filter(t => t.registro_id === pm.collectionVariables.get(\"acceso_id\"));",
+                  "pm.test(\"Entrada y salida quedaron auditadas\", () => {",
+                  "    pm.expect(trazas.map(t => t.accion)).to.include.members([\"creacion\", \"actualizacion\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vigilante no puede ver auditoría (403)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auditoria",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_vigilante}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 - Reportes",
+      "item": [
+        {
+          "name": "Ocupación por zona",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/reportes/ocupacion"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const zona = pm.response.json().find(z => z.zona_id === pm.collectionVariables.get(\"zona_id\"));",
+                  "pm.test(\"Zona de prueba al 0% (ya salieron todos)\", () => pm.expect(zona.porcentaje_ocupacion).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "09 - Seguridad",
+      "item": [
+        {
+          "name": "Sin token (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/usuarios/me",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token inválido (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/usuarios/me",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_falso}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "token_falso",
+      "value": "esto.no.es-un-jwt",
+      "type": "string"
+    },
+    {
+      "key": "token_admin",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token_vigilante",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token_estudiante",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "nuevo_correo",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "nuevo_documento",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "nuevo_usuario_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "zona_nombre",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "zona_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "espacio_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "placa_1",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "placa_2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "vehiculo_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "vehiculo2_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "acceso_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "acceso_visitante_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

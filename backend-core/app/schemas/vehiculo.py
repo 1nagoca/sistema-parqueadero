@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.enums import TipoVehiculo
 
@@ -22,6 +22,14 @@ class VehiculoBase(BaseModel):
 class VehiculoCreate(VehiculoBase):
     usuario_id: uuid.UUID | None = None
     es_visitante: bool = False
+
+    @model_validator(mode="after")
+    def validar_propietario_o_visitante(self) -> "VehiculoCreate":
+        """Espejo del CHECK de BD ck_vehiculos_propietario_o_visitante: sin esto la violacion
+        llega hasta Postgres y la API responde 500 en vez de 422."""
+        if self.usuario_id is None and not self.es_visitante:
+            raise ValueError("el vehiculo requiere usuario_id o es_visitante=true")
+        return self
 
 
 class VehiculoRead(VehiculoBase):
