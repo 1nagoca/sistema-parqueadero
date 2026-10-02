@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_role
 from app.models.acceso import Acceso
-from app.models.enums import RolUsuario
+from app.models.enums import EstadoVerificacion, RolUsuario, TipoAcceso
 from app.models.espacio import Espacio
 from app.models.usuario import Usuario
 from app.models.vehiculo import Vehiculo
@@ -74,6 +74,7 @@ def registrar_entrada(
     db: Session = Depends(get_db),
     vigilante: Usuario = Depends(require_role(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
 ):
+    _exigir_vehiculo_verificado(db, datos)
     try:
         acceso = acceso_service.registrar_entrada(db, datos, realizado_por_id=vigilante.id)
     except (SinCuposDisponiblesError, EspacioNoDisponibleError) as exc:
@@ -81,6 +82,24 @@ def registrar_entrada(
 
     _programar_broadcast(background_tasks, db, acceso)
     return acceso
+
+
+def _exigir_vehiculo_verificado(db: Session, datos: AccesoEntradaCreate) -> None:
+    """Un acceso normal exige vehiculo y propietario aprobados por el administrador; el
+    visitante ya pasa por su propio flujo de autorizacion + justificacion."""
+    if datos.tipo_acceso != TipoAcceso.NORMAL:
+        return
+    vehiculo = db.get(Vehiculo, datos.vehiculo_id)
+    if vehiculo is None:
+        return
+    propietario = db.get(Usuario, vehiculo.usuario_id) if vehiculo.usuario_id is not None else None
+    if vehiculo.estado_verificacion != EstadoVerificacion.APROBADO or (
+        propietario is not None and propietario.estado_verificacion != EstadoVerificacion.APROBADO
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El vehiculo o su propietario aun no estan verificados por el administrador",
+        )
 
 
 @router.post("/{acceso_id}/salida", response_model=AccesoRead)

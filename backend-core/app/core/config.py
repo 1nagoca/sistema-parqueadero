@@ -14,6 +14,15 @@ class Settings(BaseSettings):
 
     BACKEND_VISION_URL: str = "http://backend-vision:8001"
 
+    # Almacenamiento privado de los documentos de verificacion (carnet, placa, tarjeta de
+    # propiedad). No se sirve como estatico: solo se entrega via endpoint autenticado.
+    UPLOAD_DIR: str = "/code/uploads"
+    MAX_UPLOAD_BYTES: int = 5 * 1024 * 1024
+
+    # Universidad habilitada para autorregistro y dominios de correo aceptados para ella.
+    UNIVERSIDAD_NOMBRE: str = "Universidad Francisco de Paula Santander"
+    UNIVERSIDAD_DOMINIOS_CORREO: list[str] = ["ufps.edu.co"]
+
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

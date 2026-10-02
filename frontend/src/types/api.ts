@@ -2,6 +2,8 @@ export type RolUsuario = "estudiante" | "docente" | "administrativo" | "vigilant
 export type TipoVehiculo = "carro" | "moto" | "bicicleta" | "otro";
 export type EstadoEspacio = "libre" | "ocupado" | "reservado" | "mantenimiento";
 export type TipoAcceso = "normal" | "visitante";
+export type EstadoVerificacion = "pendiente" | "aprobado" | "rechazado";
+export type TipoDocumento = "carnet" | "foto_placa" | "tarjeta_propiedad";
 export type AccionAuditoria = "creacion" | "actualizacion" | "eliminacion";
 
 export interface Usuario {
@@ -11,6 +13,9 @@ export interface Usuario {
   documento_identidad: string;
   telefono: string | null;
   rol: RolUsuario;
+  universidad: string | null;
+  estado_verificacion: EstadoVerificacion;
+  motivo_rechazo: string | null;
   activo: boolean;
   creado_en: string;
   actualizado_en: string;
@@ -25,7 +30,39 @@ export interface Vehiculo {
   color: string | null;
   usuario_id: string | null;
   es_visitante: boolean;
+  estado_verificacion: EstadoVerificacion;
+  motivo_rechazo: string | null;
   creado_en: string;
+}
+
+export interface Documento {
+  id: string;
+  tipo: TipoDocumento;
+  content_type: string;
+  tamano_bytes: number;
+  creado_en: string;
+}
+
+export interface VehiculoConDocumentos extends Vehiculo {
+  documentos: Documento[];
+}
+
+export interface UsuarioConDocumentos extends Usuario {
+  documentos: Documento[];
+}
+
+export interface SolicitudVerificacion {
+  usuario: UsuarioConDocumentos;
+  vehiculos: VehiculoConDocumentos[];
+}
+
+export interface RegistroEstudiantePayload {
+  nombre_completo: string;
+  correo_institucional: string;
+  documento_identidad: string;
+  telefono?: string | null;
+  password: string;
+  acepta_tratamiento_datos: boolean;
 }
 
 export interface Zona {

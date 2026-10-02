@@ -4,10 +4,12 @@ from app.api.v1.routers import (
     accesos,
     auditoria,
     auth,
+    documentos,
     espacios,
     reportes,
     usuarios,
     vehiculos,
+    verificaciones,
     zonas,
 )
 
@@ -17,6 +19,8 @@ api_router = APIRouter()
 api_router.include_router(auth.router)
 api_router.include_router(usuarios.router)
 api_router.include_router(vehiculos.router)
+api_router.include_router(documentos.router)
+api_router.include_router(verificaciones.router)
 api_router.include_router(zonas.router)
 api_router.include_router(espacios.router)
 api_router.include_router(accesos.router)

@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.models.enums import TipoVehiculo
+from app.models.enums import EstadoVerificacion, TipoVehiculo
 
 
 class VehiculoBase(BaseModel):
@@ -38,4 +38,6 @@ class VehiculoRead(VehiculoBase):
     id: uuid.UUID
     usuario_id: uuid.UUID | None
     es_visitante: bool
+    estado_verificacion: EstadoVerificacion
+    motivo_rechazo: str | None
     creado_en: datetime

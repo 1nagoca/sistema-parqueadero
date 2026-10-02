@@ -2,17 +2,21 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import SpaceCell from "@/components/map/SpaceCell";
 import Button from "@/components/common/Button";
+import DocumentoVisor from "@/components/verificacion/DocumentoVisor";
+import EstadoBadge from "@/components/verificacion/EstadoBadge";
 import { useAuth } from "@/context/AuthContext";
 import { listarAuditoria } from "@/services/api/auditoria";
 import { ApiError } from "@/services/api/client";
 import { crearEspacio, listarEspacios } from "@/services/api/espacios";
 import { crearUsuario, listarUsuarios } from "@/services/api/usuarios";
+import { listarPendientes, resolverUsuario, resolverVehiculo } from "@/services/api/verificaciones";
 import { crearZona, listarZonas } from "@/services/api/zonas";
-import type { AuditoriaAcceso, Espacio, RolUsuario, Usuario, Zona } from "@/types/api";
+import type { AuditoriaAcceso, Espacio, RolUsuario, SolicitudVerificacion, Usuario, Zona } from "@/types/api";
 
-type Pestana = "usuarios" | "zonas" | "espacios" | "auditoria";
+type Pestana = "verificaciones" | "usuarios" | "zonas" | "espacios" | "auditoria";
 
 const ETIQUETAS: Record<Pestana, string> = {
+  verificaciones: "Verificaciones",
   usuarios: "Usuarios",
   zonas: "Zonas",
   espacios: "Espacios",
@@ -23,7 +27,7 @@ const campo = "min-h-12 rounded-lg border border-gray-300 px-3";
 
 export default function AdminDashboard() {
   const { usuario, cerrarSesion } = useAuth();
-  const [pestana, setPestana] = useState<Pestana>("usuarios");
+  const [pestana, setPestana] = useState<Pestana>("verificaciones");
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 pb-24 sm:p-6">
@@ -51,10 +55,128 @@ export default function AdminDashboard() {
         ))}
       </nav>
 
+      {pestana === "verificaciones" && <SeccionVerificaciones />}
       {pestana === "usuarios" && <SeccionUsuarios />}
       {pestana === "zonas" && <SeccionZonas />}
       {pestana === "espacios" && <SeccionEspacios />}
       {pestana === "auditoria" && <SeccionAuditoria />}
+    </div>
+  );
+}
+
+function SeccionVerificaciones() {
+  const [solicitudes, setSolicitudes] = useState<SolicitudVerificacion[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [mensaje, setMensaje] = useState<string | null>(null);
+  const [procesando, setProcesando] = useState(false);
+
+  useEffect(() => {
+    cargar();
+  }, []);
+
+  async function cargar() {
+    try {
+      setSolicitudes(await listarPendientes());
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo cargar la bandeja");
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  /** Aprobar no pide nada; rechazar pide el motivo para que el estudiante sepa que corregir. */
+  async function resolver(tipo: "usuario" | "vehiculo", id: string, aprobar: boolean) {
+    let motivo: string | undefined;
+    if (!aprobar) {
+      const respuesta = window.prompt("Motivo del rechazo (el estudiante lo vera):");
+      if (!respuesta?.trim()) return;
+      motivo = respuesta.trim();
+    }
+    setProcesando(true);
+    setError(null);
+    setMensaje(null);
+    try {
+      if (tipo === "usuario") await resolverUsuario(id, aprobar, motivo);
+      else await resolverVehiculo(id, aprobar, motivo);
+      setMensaje(aprobar ? "Aprobado" : "Rechazado");
+      await cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo registrar la decision");
+    } finally {
+      setProcesando(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {mensaje && <p className="rounded-xl bg-emerald-100 p-3 text-emerald-800">{mensaje}</p>}
+      {error && <p className="rounded-xl bg-red-100 p-3 text-red-800">{error}</p>}
+      {cargando && <p className="text-center text-gray-400">Cargando...</p>}
+      {!cargando && solicitudes.length === 0 && (
+        <p className="rounded-2xl bg-white p-6 text-center text-gray-400 shadow-sm">No hay solicitudes pendientes.</p>
+      )}
+
+      {solicitudes.map(({ usuario, vehiculos }) => (
+        <section key={usuario.id} className="space-y-4 rounded-2xl bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h2 className="font-semibold text-gray-900">{usuario.nombre_completo}</h2>
+              <p className="text-sm text-gray-500">
+                {usuario.correo_institucional} · Doc. {usuario.documento_identidad}
+              </p>
+              {usuario.universidad && <p className="text-sm text-gray-500">{usuario.universidad}</p>}
+            </div>
+            <EstadoBadge estado={usuario.estado_verificacion} />
+          </div>
+
+          {usuario.estado_verificacion === "pendiente" && usuario.documentos.length > 0 && (
+            <div className="space-y-2 rounded-xl border border-gray-200 p-3">
+              <p className="text-sm font-medium text-gray-700">
+                Identidad: verifica que el carnet o Divisist muestre su nombre y que estudia en la universidad
+              </p>
+              <div className="flex flex-wrap gap-4">
+                {usuario.documentos.map((doc) => (
+                  <DocumentoVisor key={doc.id} documento={doc} />
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Button disabled={procesando} onClick={() => resolver("usuario", usuario.id, true)}>
+                  Aprobar estudiante
+                </Button>
+                <Button variante="peligro" disabled={procesando} onClick={() => resolver("usuario", usuario.id, false)}>
+                  Rechazar
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {vehiculos.map((vehiculo) => (
+            <div key={vehiculo.id} className="space-y-2 rounded-xl border border-gray-200 p-3">
+              <p className="text-sm font-medium text-gray-700">
+                Vehiculo <span className="font-mono text-base font-semibold">{vehiculo.placa}</span>{" "}
+                <span className="capitalize text-gray-500">
+                  ({[vehiculo.tipo_vehiculo, vehiculo.marca, vehiculo.color].filter(Boolean).join(", ")})
+                </span>
+              </p>
+              <p className="text-xs text-gray-500">La placa de la foto y de la tarjeta de propiedad deben coincidir.</p>
+              <div className="flex flex-wrap gap-4">
+                {vehiculo.documentos.map((doc) => (
+                  <DocumentoVisor key={doc.id} documento={doc} />
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Button disabled={procesando} onClick={() => resolver("vehiculo", vehiculo.id, true)}>
+                  Aprobar vehiculo
+                </Button>
+                <Button variante="peligro" disabled={procesando} onClick={() => resolver("vehiculo", vehiculo.id, false)}>
+                  Rechazar
+                </Button>
+              </div>
+            </div>
+          ))}
+        </section>
+      ))}
     </div>
   );
 }
@@ -68,7 +190,7 @@ function SeccionUsuarios() {
   const [nombreCompleto, setNombreCompleto] = useState("");
   const [correo, setCorreo] = useState("");
   const [documento, setDocumento] = useState("");
-  const [rol, setRol] = useState<RolUsuario>("estudiante");
+  const [rol, setRol] = useState<RolUsuario>("vigilante");
   const [password, setPassword] = useState("");
 
   useEffect(() => {
@@ -112,7 +234,11 @@ function SeccionUsuarios() {
   return (
     <div className="space-y-4">
       <form onSubmit={crear} className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="font-semibold text-gray-900">Crear usuario</h2>
+        <h2 className="font-semibold text-gray-900">Crear usuario del personal</h2>
+        <p className="text-xs text-gray-500">
+          Los estudiantes se registran ellos mismos desde la pagina de registro: asi el administrador nunca conoce su
+          contraseña.
+        </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <input
             required
@@ -137,7 +263,6 @@ function SeccionUsuarios() {
             className={campo}
           />
           <select value={rol} onChange={(evento) => setRol(evento.target.value as RolUsuario)} className={campo}>
-            <option value="estudiante">Estudiante</option>
             <option value="docente">Docente</option>
             <option value="administrativo">Administrativo</option>
             <option value="vigilante">Vigilante</option>
@@ -167,6 +292,7 @@ function SeccionUsuarios() {
               <th className="px-4 py-2">Nombre</th>
               <th className="px-4 py-2">Correo</th>
               <th className="px-4 py-2">Rol</th>
+              <th className="px-4 py-2">Verificacion</th>
               <th className="px-4 py-2">Activo</th>
             </tr>
           </thead>
@@ -176,6 +302,9 @@ function SeccionUsuarios() {
                 <td className="px-4 py-2">{u.nombre_completo}</td>
                 <td className="px-4 py-2">{u.correo_institucional}</td>
                 <td className="px-4 py-2 capitalize">{u.rol}</td>
+                <td className="px-4 py-2">
+                  <EstadoBadge estado={u.estado_verificacion} />
+                </td>
                 <td className="px-4 py-2">{u.activo ? "Si" : "No"}</td>
               </tr>
             ))}

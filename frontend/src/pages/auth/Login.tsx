@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import Button from "@/components/common/Button";
 import { useAuth } from "@/context/AuthContext";
@@ -67,6 +67,12 @@ export default function Login() {
         <Button type="submit" className="w-full" disabled={enviando}>
           {enviando ? "Ingresando..." : "Ingresar"}
         </Button>
+        <p className="text-center text-sm text-gray-500">
+          ¿Eres estudiante y no tienes cuenta?{" "}
+          <Link to="/registro" className="text-emerald-700 underline">
+            Regístrate
+          </Link>
+        </p>
       </form>
     </div>
   );

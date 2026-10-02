@@ -4,7 +4,9 @@ import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-d
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import Login from "@/pages/auth/Login";
+import Registro from "@/pages/auth/Registro";
 import GuardDashboard from "@/pages/guard/GuardDashboard";
+import EstudiantePanel from "@/pages/user/EstudiantePanel";
 import ParkingMapPage from "@/pages/user/ParkingMapPage";
 import type { RolUsuario } from "@/types/api";
 import { rutaInicioPara } from "@/utils/rutas";
@@ -42,6 +44,15 @@ function Rutas() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/registro" element={<Registro />} />
+      <Route
+        path="/estudiante"
+        element={
+          <RutaProtegida rolesPermitidos={["estudiante"]}>
+            <EstudiantePanel />
+          </RutaProtegida>
+        }
+      />
       <Route
         path="/vigilante"
         element={

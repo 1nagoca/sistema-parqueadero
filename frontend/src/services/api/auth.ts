@@ -1,4 +1,5 @@
-import { BASE_URL, ApiError } from "./client";
+import type { RegistroEstudiantePayload, Usuario } from "@/types/api";
+import { apiPost, BASE_URL, ApiError } from "./client";
 
 export interface TokenRespuesta {
   access_token: string;
@@ -21,4 +22,8 @@ export async function login(correo: string, password: string): Promise<TokenResp
     throw new ApiError(respuesta.status, cuerpoError.detail ?? "No se pudo iniciar sesion");
   }
   return respuesta.json();
+}
+
+export function registrarEstudiante(datos: RegistroEstudiantePayload): Promise<Usuario> {
+  return apiPost<Usuario>("/auth/registro", datos);
 }
