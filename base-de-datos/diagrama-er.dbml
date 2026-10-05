@@ -1,6 +1,9 @@
 // Diagrama entidad-relación — Parqueadero UFPS
 // Pegar en https://dbdiagram.io/d para verlo y exportarlo a PostgreSQL, MySQL, SQL Server u otro (menú Export).
-// Fuente de verdad: las migraciones de backend-core/alembic/versions (0001 y 0002).
+// Hay una base de datos por microservicio: zonas y espacios viven en la base `parqueadero_zonas`
+// (backend-parqueadero); el resto, en la base `parqueadero` (backend-core). accesos.zona_id y
+// accesos.espacio_id cruzan de una base a otra, por eso no son llaves foraneas.
+// Fuente de verdad: backend-core/alembic/versions y backend-parqueadero/alembic/versions.
 
 Enum usuario_rol_enum {
   estudiante
@@ -112,8 +115,8 @@ Table accesos {
   id uuid [pk, default: `gen_random_uuid()`]
   vehiculo_id uuid [not null, ref: > vehiculos.id]
   usuario_id uuid [ref: > usuarios.id]
-  zona_id uuid [not null, ref: > zonas.id]
-  espacio_id uuid [ref: > espacios.id]
+  zona_id uuid [not null, note: 'Id de zonas en la base parqueadero_zonas (sin FK)']
+  espacio_id uuid [note: 'Id de espacios en la base parqueadero_zonas (sin FK)']
   tipo_acceso acceso_tipo_enum [not null, default: 'normal']
   fecha_hora_entrada timestamptz [not null, default: `now()`]
   fecha_hora_salida timestamptz [note: 'CHECK: posterior a la entrada. Un vehículo solo puede tener un acceso sin salida']

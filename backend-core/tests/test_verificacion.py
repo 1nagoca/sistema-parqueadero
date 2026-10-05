@@ -15,7 +15,9 @@ from app.core.config import settings  # noqa: E402
 from app.core.security import hashear_password  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.main import app  # noqa: E402
+from app.models.acceso import Acceso  # noqa: E402
 from app.models.enums import RolUsuario  # noqa: E402
+from app.parqueadero_client import client as parqueadero_client  # noqa: E402
 from app.models.usuario import Usuario  # noqa: E402
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
@@ -33,6 +35,32 @@ def carpeta_uploads(tmp_path, monkeypatch):
 @pytest.fixture
 def client():
     return TestClient(app)
+
+
+@pytest.fixture
+def parqueadero(monkeypatch):
+    """Sustituye al microservicio de parqueadero: anota los movimientos de cupo que le piden
+    y, si ``sin_cupos`` es True, rechaza ocupar como lo haria una zona llena."""
+
+    class Doble:
+        sin_cupos = False
+
+        def __init__(self):
+            self.movimientos = []
+
+        def ocupar_cupo(self, zona_id, espacio_id):
+            if self.sin_cupos:
+                raise parqueadero_client.CupoNoDisponibleError("La zona no tiene cupos disponibles")
+            self.movimientos.append("ocupar")
+
+        def liberar_cupo(self, zona_id, espacio_id):
+            self.movimientos.append("liberar")
+
+    doble = Doble()
+    monkeypatch.setattr(parqueadero_client, "ocupar_cupo", doble.ocupar_cupo)
+    monkeypatch.setattr(parqueadero_client, "liberar_cupo", doble.liberar_cupo)
+    monkeypatch.setattr(parqueadero_client, "codigos_de_espacios", lambda ids: {})
+    return doble
 
 
 @pytest.fixture
@@ -226,7 +254,7 @@ def test_vehiculo_rechazado_se_reenvia(client, admin, sufijo):
     assert len(r.json()["documentos"]) == 2
 
 
-def test_entrada_normal_exige_vehiculo_y_propietario_aprobados(client, admin, sufijo):
+def test_entrada_normal_exige_vehiculo_y_propietario_aprobados(client, admin, sufijo, parqueadero):
     _registrar(client, sufijo)
     est = _login(client, f"est-{sufijo}@ufps.edu.co", "clave-segura-1")
     uid = client.get(f"{API}/usuarios/me", headers=est).json()["id"]
@@ -234,10 +262,7 @@ def test_entrada_normal_exige_vehiculo_y_propietario_aprobados(client, admin, su
     vehiculo = _vehiculo(client, est, placa).json()
     client.post(f"{API}/usuarios/me/carnet", headers=est, files={"archivo": ("c.png", PNG, "image/png")})
 
-    zona = client.post(
-        f"{API}/zonas", headers=admin, json={"nombre": f"Zona {sufijo}", "capacidad_total": 5}
-    ).json()
-    entrada = {"vehiculo_id": vehiculo["id"], "zona_id": zona["id"], "tipo_acceso": "normal"}
+    entrada = {"vehiculo_id": vehiculo["id"], "zona_id": str(uuid.uuid4()), "tipo_acceso": "normal"}
 
     r = client.post(f"{API}/accesos/entrada", headers=admin, json=entrada)
     assert r.status_code == 409 and "verificados" in r.json()["detail"]
@@ -247,3 +272,66 @@ def test_entrada_normal_exige_vehiculo_y_propietario_aprobados(client, admin, su
 
     client.post(f"{API}/verificaciones/usuarios/{uid}/resolver", headers=admin, json={"aprobar": True})
     assert client.post(f"{API}/accesos/entrada", headers=admin, json=entrada).status_code == 201
+    assert parqueadero.movimientos == ["ocupar"]  # los rechazos previos no tocaron cupos
+
+
+def _vehiculo_visitante(client, admin):
+    placa = "VIS" + str(uuid.uuid4().int)[:3]
+    r = client.post(
+        f"{API}/vehiculos", headers=admin, json={"placa": placa, "tipo_vehiculo": "carro", "es_visitante": True}
+    )
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def _entrada_visitante(client, admin, vehiculo_id):
+    yo = client.get(f"{API}/usuarios/me", headers=admin).json()["id"]
+    return client.post(
+        f"{API}/accesos/entrada",
+        headers=admin,
+        json={
+            "vehiculo_id": vehiculo_id,
+            "zona_id": str(uuid.uuid4()),
+            "tipo_acceso": "visitante",
+            "autorizado_por_id": yo,
+            "justificacion": "Visita a decanatura",
+        },
+    )
+
+
+def test_entrada_y_salida_mueven_el_cupo_en_parqueadero(client, admin, parqueadero):
+    vehiculo = _vehiculo_visitante(client, admin)
+
+    r = _entrada_visitante(client, admin, vehiculo["id"])
+    assert r.status_code == 201, r.text
+    assert parqueadero.movimientos == ["ocupar"]
+
+    activos = client.get(f"{API}/accesos", headers=admin).json()
+    assert vehiculo["placa"] in [a["placa"] for a in activos]
+
+    acceso_id = r.json()["id"]
+    assert client.post(f"{API}/accesos/{acceso_id}/salida", headers=admin).status_code == 200
+    assert parqueadero.movimientos == ["ocupar", "liberar"]
+    # Segunda salida sobre el mismo acceso: no existe abierto y no vuelve a liberar el cupo.
+    assert client.post(f"{API}/accesos/{acceso_id}/salida", headers=admin).status_code == 404
+    assert parqueadero.movimientos == ["ocupar", "liberar"]
+
+
+def test_sin_cupos_no_crea_el_acceso(client, admin, parqueadero):
+    parqueadero.sin_cupos = True
+    vehiculo = _vehiculo_visitante(client, admin)
+
+    assert _entrada_visitante(client, admin, vehiculo["id"]).status_code == 409
+    with SessionLocal() as db:
+        assert db.query(Acceso).filter(Acceso.vehiculo_id == uuid.UUID(vehiculo["id"])).count() == 0
+
+
+def test_si_falla_crear_el_acceso_se_libera_el_cupo(client, admin, parqueadero):
+    """Compensacion: el cupo ya se ocupo en el otro servicio, pero el vehiculo ya esta adentro
+    (indice unico de acceso activo) y el acceso no se puede crear."""
+    vehiculo = _vehiculo_visitante(client, admin)
+    assert _entrada_visitante(client, admin, vehiculo["id"]).status_code == 201
+
+    sin_excepciones = TestClient(app, raise_server_exceptions=False)
+    assert _entrada_visitante(sin_excepciones, admin, vehiculo["id"]).status_code == 500
+    assert parqueadero.movimientos == ["ocupar", "ocupar", "liberar"]

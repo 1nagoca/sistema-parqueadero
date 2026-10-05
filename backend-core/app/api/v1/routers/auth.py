@@ -23,7 +23,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     if not usuario.activo:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario inactivo")
 
-    token = crear_access_token(subject=str(usuario.id))
+    token = crear_access_token(subject=str(usuario.id), rol=usuario.rol.value)
     return {"access_token": token, "token_type": "bearer"}
 
 

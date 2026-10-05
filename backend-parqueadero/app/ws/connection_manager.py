@@ -6,7 +6,7 @@ from fastapi import WebSocket
 class ConnectionManager:
     """Registro en memoria de sockets conectados al mapa de zonas en tiempo real.
 
-    Para produccion con mas de un worker/replica de backend-core, este estado deberia
+    Para produccion con mas de un worker/replica de este servicio, este estado deberia
     moverse a un pub/sub compartido (ej. Redis) para que el broadcast llegue a clientes
     conectados a otra instancia.
     """

@@ -1,18 +1,17 @@
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_role
 from app.models.acceso import Acceso
 from app.models.enums import EstadoVerificacion, RolUsuario, TipoAcceso
-from app.models.espacio import Espacio
 from app.models.usuario import Usuario
 from app.models.vehiculo import Vehiculo
-from app.models.zona import Zona
 from app.schemas.acceso import AccesoActivoRead, AccesoEntradaCreate, AccesoRead
-from app.services import acceso_service, realtime_service, vehiculo_service
-from app.services.zona_service import EspacioNoDisponibleError, SinCuposDisponiblesError
+from app.parqueadero_client import client as parqueadero_client
+from app.parqueadero_client.client import CupoNoDisponibleError, ParqueaderoNoDisponibleError
+from app.services import acceso_service, vehiculo_service
 
 router = APIRouter(prefix="/accesos", tags=["accesos"])
 
@@ -26,22 +25,30 @@ def listar_accesos_activos(
     """Vehiculos actualmente adentro (sin fecha_hora_salida), para que el vigilante pueda
     registrar la salida sin tener que recordar/escribir la placa de nuevo."""
     consulta = (
-        db.query(Acceso, Vehiculo.placa, Espacio.codigo)
+        db.query(Acceso, Vehiculo.placa)
         .join(Vehiculo, Vehiculo.id == Acceso.vehiculo_id)
-        .outerjoin(Espacio, Espacio.id == Acceso.espacio_id)
         .filter(Acceso.fecha_hora_salida.is_(None))
     )
     if zona_id is not None:
         consulta = consulta.filter(Acceso.zona_id == zona_id)
-    consulta = consulta.order_by(Acceso.fecha_hora_entrada)
+    filas = consulta.order_by(Acceso.fecha_hora_entrada).all()
+
+    # El codigo del espacio es un dato de cortesia: si el servicio de parqueadero no responde,
+    # el vigilante igual ve los vehiculos y puede registrar salidas.
+    try:
+        codigos = parqueadero_client.codigos_de_espacios(
+            [acceso.espacio_id for acceso, _ in filas if acceso.espacio_id is not None]
+        )
+    except ParqueaderoNoDisponibleError:
+        codigos = {}
 
     return [
         AccesoActivoRead(
             **AccesoRead.model_validate(acceso).model_dump(),
             placa=placa,
-            espacio_codigo=espacio_codigo,
+            espacio_codigo=codigos.get(acceso.espacio_id),
         )
-        for acceso, placa, espacio_codigo in consulta.all()
+        for acceso, placa in filas
     ]
 
 
@@ -70,18 +77,16 @@ def buscar_acceso_activo(
 @router.post("/entrada", response_model=AccesoRead, status_code=status.HTTP_201_CREATED)
 def registrar_entrada(
     datos: AccesoEntradaCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     vigilante: Usuario = Depends(require_role(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
 ):
     _exigir_vehiculo_verificado(db, datos)
     try:
-        acceso = acceso_service.registrar_entrada(db, datos, realizado_por_id=vigilante.id)
-    except (SinCuposDisponiblesError, EspacioNoDisponibleError) as exc:
+        return acceso_service.registrar_entrada(db, datos, realizado_por_id=vigilante.id)
+    except CupoNoDisponibleError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-
-    _programar_broadcast(background_tasks, db, acceso)
-    return acceso
+    except ParqueaderoNoDisponibleError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
 
 def _exigir_vehiculo_verificado(db: Session, datos: AccesoEntradaCreate) -> None:
@@ -105,25 +110,14 @@ def _exigir_vehiculo_verificado(db: Session, datos: AccesoEntradaCreate) -> None
 @router.post("/{acceso_id}/salida", response_model=AccesoRead)
 def registrar_salida(
     acceso_id: uuid.UUID,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     vigilante: Usuario = Depends(require_role(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
 ):
     try:
-        acceso = acceso_service.registrar_salida(db, acceso_id, realizado_por_id=vigilante.id)
+        return acceso_service.registrar_salida(db, acceso_id, realizado_por_id=vigilante.id)
     except acceso_service.AccesoNoEncontradoOYaCerradoError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-
-    _programar_broadcast(background_tasks, db, acceso)
-    return acceso
-
-
-def _programar_broadcast(background_tasks: BackgroundTasks, db: Session, acceso: Acceso) -> None:
-    """Envia el estado fresco de la zona por /ws/zonas despues de responder, para que el mapa
-    de usuarios se actualice sin polling. Se agenda como BackgroundTask porque el broadcast es
-    async y acceso_service/zona_service son sincronos (SQLAlchemy Session clasica)."""
-    zona = db.get(Zona, acceso.zona_id)
-    if zona is not None:
-        background_tasks.add_task(
-            realtime_service.broadcast_actualizacion_zona, zona.id, zona.cupos_disponibles
-        )
+    except CupoNoDisponibleError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except ParqueaderoNoDisponibleError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc

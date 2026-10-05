@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8
 
     BACKEND_VISION_URL: str = "http://backend-vision:8001"
+    PARQUEADERO_URL: str = "http://backend-parqueadero:8002"
 
     # Almacenamiento privado de los documentos de verificacion (carnet, placa, tarjeta de
     # propiedad). No se sirve como estatico: solo se entrega via endpoint autenticado.

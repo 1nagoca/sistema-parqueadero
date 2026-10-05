@@ -39,8 +39,6 @@ if URL_PRUEBAS is not None:
             "Se rechaza para no vaciar una base real."
         )
     os.environ["DATABASE_URL"] = URL_PRUEBAS.render_as_string(hide_password=False)
-    # La base de pruebas es desechable: se autoriza a la migracion 0003 a borrar zonas/espacios.
-    os.environ["PARQUEADERO_DATOS_MIGRADOS"] = "1"
 
 
 def _crear_base_si_falta(url: URL) -> None:

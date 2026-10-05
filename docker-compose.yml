@@ -23,6 +23,7 @@ services:
     restart: unless-stopped
     depends_on:
       - backend-core
+      - backend-parqueadero
       - backend-vision
     ports:
       - "${GATEWAY_PORT:-8000}:8000"
@@ -40,6 +41,41 @@ services:
     environment:
       CONFIANZA_MINIMA: ${CONFIANZA_MINIMA_ALPR:-0.5}
 
+  # Base de datos propia del servicio de parqueadero: si se cae, identidad y accesos siguen
+  # arriba (y al reves).
+  db-parqueadero:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-parqueadero}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-parqueadero}
+      POSTGRES_DB: parqueadero_zonas
+    ports:
+      - "${PARQUEADERO_DB_PORT:-5434}:5432"
+    volumes:
+      - db_parqueadero_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-parqueadero}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Zonas, espacios y cupos en tiempo real. Los demas servicios le piden ocupar/liberar cupos
+  # por su API interna (/interno), que el gateway no publica.
+  backend-parqueadero:
+    build: ./backend-parqueadero
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
+    depends_on:
+      db-parqueadero:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-parqueadero}:${POSTGRES_PASSWORD:-parqueadero}@db-parqueadero:5432/parqueadero_zonas
+      SECRET_KEY: ${SECRET_KEY:-cambiar-esta-clave-en-produccion}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:5173"]}
+    volumes:
+      - ./backend-parqueadero:/code
+
   backend-core:
     build: ./backend-core
     restart: unless-stopped
@@ -51,10 +87,13 @@ services:
         condition: service_healthy
       backend-vision:
         condition: service_started
+      backend-parqueadero:
+        condition: service_started
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-parqueadero}:${POSTGRES_PASSWORD:-parqueadero}@db:5432/${POSTGRES_DB:-parqueadero}
       SECRET_KEY: ${SECRET_KEY:-cambiar-esta-clave-en-produccion}
       BACKEND_VISION_URL: http://backend-vision:8001
+      PARQUEADERO_URL: http://backend-parqueadero:8002
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:5173"]}
       UPLOAD_DIR: /code/uploads
     volumes:
@@ -79,4 +118,5 @@ services:
 
 volumes:
   db_data:
+  db_parqueadero_data:
   uploads_data:

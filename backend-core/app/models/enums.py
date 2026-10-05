@@ -16,13 +16,6 @@ class TipoVehiculo(str, enum.Enum):
     OTRO = "otro"
 
 
-class EstadoEspacio(str, enum.Enum):
-    LIBRE = "libre"
-    OCUPADO = "ocupado"
-    RESERVADO = "reservado"
-    MANTENIMIENTO = "mantenimiento"
-
-
 class TipoAcceso(str, enum.Enum):
     NORMAL = "normal"
     VISITANTE = "visitante"

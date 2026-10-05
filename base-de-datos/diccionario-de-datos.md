@@ -1,7 +1,15 @@
 # Diccionario de datos — Parqueadero UFPS
 
 Motor: PostgreSQL 16. Las llaves primarias son `uuid` generados con `gen_random_uuid()`. Todas las fechas son `timestamptz`.
-Fuente: migraciones `backend-core/alembic/versions` (0001 estructura inicial, 0002 verificación de estudiantes).
+
+Hay **una base de datos por microservicio**:
+
+| Base de datos | Servicio | Tablas | Migraciones |
+|---|---|---|---|
+| `parqueadero` | `backend-core` (identidad y accesos) | `usuarios`, `vehiculos`, `documentos`, `accesos`, `auditoria_accesos` | `backend-core/alembic/versions` |
+| `parqueadero_zonas` | `backend-parqueadero` | `zonas`, `espacios` | `backend-parqueadero/alembic/versions` |
+
+`accesos.zona_id` y `accesos.espacio_id` apuntan a filas de la otra base: son identificadores sin llave foránea, y la consistencia la cuida el código (ver `docs/arquitectura.md`).
 
 ## Resumen de tablas
 
@@ -23,8 +31,8 @@ Fuente: migraciones `backend-core/alembic/versions` (0001 estructura inicial, 00
 | `espacios.zona_id` | `zonas.id` | muchos a uno | RESTRICT |
 | `accesos.vehiculo_id` | `vehiculos.id` | muchos a uno | RESTRICT |
 | `accesos.usuario_id` | `usuarios.id` | muchos a uno (opcional) | RESTRICT |
-| `accesos.zona_id` | `zonas.id` | muchos a uno | RESTRICT |
-| `accesos.espacio_id` | `espacios.id` | muchos a uno (opcional) | RESTRICT |
+| `accesos.zona_id` | `zonas.id` (otra base) | muchos a uno | Sin llave foránea |
+| `accesos.espacio_id` | `espacios.id` (otra base) | muchos a uno (opcional) | Sin llave foránea |
 | `accesos.autorizado_por_id` | `usuarios.id` | muchos a uno (opcional) | RESTRICT |
 | `documentos.usuario_id` | `usuarios.id` | muchos a uno | CASCADE |
 | `documentos.vehiculo_id` | `vehiculos.id` | muchos a uno (opcional) | CASCADE |
@@ -69,6 +77,8 @@ Restricciones: `ck_vehiculos_placa_mayusculas` (placa = upper(placa)); `ck_vehic
 
 ## zonas
 
+Base `parqueadero_zonas`.
+
 | Columna | Tipo | Nulo | Por defecto | Descripción |
 |---|---|---|---|---|
 | `id` | uuid | No | `gen_random_uuid()` | PK |
@@ -83,6 +93,8 @@ Restricciones: `ck_vehiculos_placa_mayusculas` (placa = upper(placa)); `ck_vehic
 Restricciones: `ck_zonas_capacidad_positiva`, `ck_zonas_cupos_en_rango`.
 
 ## espacios
+
+Base `parqueadero_zonas`.
 
 | Columna | Tipo | Nulo | Por defecto | Descripción |
 |---|---|---|---|---|
@@ -103,8 +115,8 @@ Restricciones: único `(zona_id, codigo)`. Índice en `zona_id`.
 | `id` | uuid | No | `gen_random_uuid()` | PK |
 | `vehiculo_id` | uuid | No | | FK a `vehiculos` |
 | `usuario_id` | uuid | Sí | | FK a `usuarios`; quien ingresa |
-| `zona_id` | uuid | No | | FK a `zonas` |
-| `espacio_id` | uuid | Sí | | FK a `espacios` |
+| `zona_id` | uuid | No | | Id de la zona en la base `parqueadero_zonas` (sin FK) |
+| `espacio_id` | uuid | Sí | | Id del espacio en la base `parqueadero_zonas` (sin FK) |
 | `tipo_acceso` | `acceso_tipo_enum` | No | `normal` | normal, visitante |
 | `fecha_hora_entrada` | timestamptz | No | `now()` | |
 | `fecha_hora_salida` | timestamptz | Sí | | Nula mientras el vehículo sigue dentro |

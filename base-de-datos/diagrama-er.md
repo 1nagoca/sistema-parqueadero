@@ -1,5 +1,7 @@
 # Diagrama entidad-relación
 
+Hay una base de datos por microservicio: `zonas` y `espacios` están en la base `parqueadero_zonas` (servicio de parqueadero) y el resto en la base `parqueadero`. Las dos relaciones de `accesos` con `zonas` y `espacios` (líneas punteadas) cruzan de una base a otra y no son llaves foráneas.
+
 Se visualiza directamente en GitHub (Mermaid). Para exportarlo a PostgreSQL, MySQL u otro motor, usa [`diagrama-er.dbml`](diagrama-er.dbml) en <https://dbdiagram.io/d>.
 
 ```mermaid
@@ -11,8 +13,8 @@ erDiagram
     usuarios ||--o{ accesos : "autoriza visitante"
     vehiculos ||--o{ accesos : "registra"
     zonas ||--o{ espacios : "contiene"
-    zonas ||--o{ accesos : "recibe"
-    espacios |o--o{ accesos : "ocupa"
+    zonas ||..o{ accesos : "recibe (otra base)"
+    espacios |o..o{ accesos : "ocupa (otra base)"
     usuarios ||--o{ auditoria_accesos : "realiza"
 
     usuarios {
@@ -67,8 +69,8 @@ erDiagram
         uuid id PK
         uuid vehiculo_id FK
         uuid usuario_id FK
-        uuid zona_id FK
-        uuid espacio_id FK
+        uuid zona_id
+        uuid espacio_id
         enum tipo_acceso
         timestamptz fecha_hora_entrada
         timestamptz fecha_hora_salida

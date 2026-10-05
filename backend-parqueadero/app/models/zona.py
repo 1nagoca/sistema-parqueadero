@@ -9,7 +9,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
-    from app.models.acceso import Acceso
     from app.models.espacio import Espacio
 
 
@@ -39,4 +38,3 @@ class Zona(Base):
     )
 
     espacios: Mapped[list["Espacio"]] = relationship(back_populates="zona")
-    accesos: Mapped[list["Acceso"]] = relationship(back_populates="zona")

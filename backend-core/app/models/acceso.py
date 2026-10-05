@@ -22,10 +22,8 @@ from app.db.base import Base
 from app.models.enums import TipoAcceso
 
 if TYPE_CHECKING:
-    from app.models.espacio import Espacio
     from app.models.usuario import Usuario
     from app.models.vehiculo import Vehiculo
-    from app.models.zona import Zona
 
 acceso_tipo_enum = ENUM(
     TipoAcceso, name="acceso_tipo_enum", create_type=False, values_callable=lambda e: [m.value for m in e]
@@ -63,12 +61,10 @@ class Acceso(Base):
     usuario_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("usuarios.id", ondelete="RESTRICT"), nullable=True
     )
-    zona_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("zonas.id", ondelete="RESTRICT"), nullable=False
-    )
-    espacio_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("espacios.id", ondelete="RESTRICT"), nullable=True
-    )
+    # Zona y espacio viven en la base de datos del servicio de parqueadero: aqui solo se
+    # guarda su identificador, sin llave foranea.
+    zona_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    espacio_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     tipo_acceso: Mapped[TipoAcceso] = mapped_column(
         acceso_tipo_enum, nullable=False, default=TipoAcceso.NORMAL, server_default=TipoAcceso.NORMAL.value
     )
@@ -95,5 +91,3 @@ class Acceso(Base):
     autorizado_por: Mapped["Usuario | None"] = relationship(
         back_populates="accesos_autorizados", foreign_keys=[autorizado_por_id]
     )
-    zona: Mapped["Zona"] = relationship(back_populates="accesos")
-    espacio: Mapped["Espacio | None"] = relationship(back_populates="accesos")

@@ -10,7 +10,6 @@ from app.db.base import Base
 from app.models.enums import EstadoEspacio
 
 if TYPE_CHECKING:
-    from app.models.acceso import Acceso
     from app.models.zona import Zona
 
 espacio_estado_enum = ENUM(
@@ -43,4 +42,3 @@ class Espacio(Base):
     )
 
     zona: Mapped["Zona"] = relationship(back_populates="espacios")
-    accesos: Mapped[list["Acceso"]] = relationship(back_populates="espacio")
