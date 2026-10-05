@@ -103,3 +103,4 @@ No bloquean nada, pero conviene arreglarlas.
 - [ ] Probar toda la interfaz en un navegador, incluida la lectura de placas con fotos reales.
 - [ ] La lectura de placas la puede usar cualquier usuario con sesión; limitarla a vigilantes y
       administradores.
+- [ ] Entrada con vehiculo_id inexistente responde 500 en vez de 404/409 (violación de llave foránea; deducido del código, no probado)
