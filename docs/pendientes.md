@@ -17,35 +17,75 @@ El detalle de lo ya hecho y de cómo funciona está en [`arquitectura.md`](arqui
 
 ## Paso 3 — Separar Identidad y verificación
 
-Crear el servicio `backend-identidad` con su propia base de datos.
+Crear el servicio `backend-identidad` con su propia base de datos. El contrato está en
+[`arquitectura.md`](arquitectura.md#servicio-de-identidad-contrato). No se copian datos: las
+bases solo tienen usuarios de prueba.
 
-- [ ] Mover a ese servicio: inicio de sesión, registro, usuarios, vehículos, documentos y
-      verificaciones (routers, modelos, esquemas y servicios).
-- [ ] Mover las tablas `usuarios`, `vehiculos` y `documentos` a una base nueva, con su migración
-      inicial y copiando los datos actuales (igual que se hizo con zonas y espacios).
-- [ ] Mover el volumen de archivos subidos (`uploads_data`) al servicio nuevo.
-- [ ] Agregar las rutas al gateway: `/auth`, `/usuarios`, `/vehiculos`, `/documentos`,
-      `/verificaciones`.
-- [ ] Cambiar en el gateway la validación de sesión de visión para que apunte al servicio nuevo.
-- [ ] Pasar sus tests (`test_verificacion.py`) al servicio nuevo.
+### A. Contrato
 
-Requiere aprobar el cambio de esquema.
+- [x] Dejar por escrito la API interna, los claims del token, los nombres y puertos y las
+      decisiones del servicio.
+
+### B. Servicio nuevo vacío
+
+- [ ] Crear `backend-identidad` (FastAPI, `/health`, Alembic y tests) en el puerto interno 8003.
+- [ ] Agregar a `docker-compose.yml` el servicio, el contenedor `db-identidad` (base
+      `parqueadero_identidad`, puerto 5435 en el host) y un volumen propio para archivos.
+
+### C. Copiar el código de identidad
+
+- [ ] Copiar inicio de sesión, registro, usuarios, vehículos, documentos y verificaciones
+      (routers, modelos, esquemas y servicios). `backend-core` sigue intacto y atendiendo.
+- [ ] Migración inicial con `usuarios`, `vehiculos`, `documentos` y `auditoria_identidad`
+      (solo inserción, como `auditoria_accesos`).
+- [ ] La verificación escribe en `auditoria_identidad` y se lee en
+      `GET /api/v1/verificaciones/auditoria` (solo administrador).
+- [ ] Crear la API interna: `GET /interno/vehiculos/{id}` y `GET /interno/usuarios?id=`.
+- [ ] Copiar los tests de identidad de `test_verificacion.py` al servicio nuevo.
+
+### D. Sembrar admin y vigilante
+
+- [ ] Script de siembra que crea un administrador y un vigilante si no existen, con las
+      contraseñas tomadas del entorno.
+
+### E. Desacoplar core
+
+- [ ] Validar el token por su cuenta, sin consultar la tabla `usuarios`.
+- [ ] Guardar la `placa` en `accesos` al registrar la entrada; la lista de vehículos adentro y
+      la búsqueda por placa dejan de leer `vehiculos`.
+- [ ] Consultar a identidad por su API interna el vehículo, su dueño y la existencia de
+      `usuario_id` y `autorizado_por_id` (hoy son consultas directas a la base).
+- [ ] Si identidad no responde, rechazar toda entrada con 503 y un mensaje claro; salidas,
+      lista y búsqueda siguen funcionando.
+- [ ] Quitar las llaves foráneas de `accesos` a `usuarios` y `vehiculos` y la de
+      `auditoria_accesos.realizado_por_id`: quedan como identificadores sin restricción, igual
+      que `zona_id` y `espacio_id`.
+- [ ] Sustituir identidad por un doble en los tests de accesos.
+
+Entre la parte E y la F el entorno de desarrollo no funciona de punta a punta: el navegador
+aún crea usuarios y vehículos en `backend-core` y accesos ya los busca en identidad.
+
+### F. Corte del gateway y borrado en core
+
+- [ ] Enviar a identidad `/auth`, `/usuarios`, `/vehiculos`, `/documentos` y `/verificaciones`.
+- [ ] Apuntar a identidad la validación de sesión de visión.
+- [ ] Borrar de `backend-core` el código y los tests de identidad, las tablas `documentos`,
+      `vehiculos` y `usuarios` (migración reversible) y el volumen `uploads_data`.
+
+### G. Cierre y documentación
+
+- [ ] Frontend: mostrar en la pantalla de auditoría del administrador las dos fuentes, accesos
+      (`/auditoria`) y verificaciones (`/verificaciones/auditoria`).
+- [ ] Probar el flujo completo en el navegador.
+- [ ] Actualizar `arquitectura.md`, `README.md`, `AGENTS.md` y `base-de-datos/`.
+
+Las partes B, C, E y F requieren aprobar cambios de esquema o de `docker-compose.yml`.
 
 ## Paso 4 — Accesos con su base y auditoría
 
 Lo que queda en `backend-core` pasa a ser el servicio de Accesos.
 
 - [ ] Renombrar `backend-core` a `backend-accesos` (carpeta, `docker-compose.yml`, gateway).
-- [ ] Quitar de `accesos` las llaves foráneas a `usuarios` y `vehiculos`: quedan como
-      identificadores sin restricción, igual que `zona_id` y `espacio_id`.
-- [ ] Quitar la llave foránea de `auditoria_accesos.realizado_por_id` a `usuarios`.
-- [ ] Crear en Identidad una API interna para que Accesos consulte un vehículo por placa y si el
-      vehículo y su dueño están aprobados (hoy se hace con una consulta directa a la base).
-- [ ] Decidir dónde se audita la verificación de estudiantes: hoy escribe en la misma tabla de
-      auditoría que los accesos.
-- [ ] Hacer que Accesos valide el token por su cuenta, sin consultar la tabla de usuarios.
-
-Requiere aprobar el cambio de esquema.
 
 ## Paso 5 — Corregir diagramas, BPM y documentos
 

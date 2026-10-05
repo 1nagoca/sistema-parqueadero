@@ -10,7 +10,7 @@ ninguno lee las tablas de otro.
 
 | Servicio | Responsabilidad | Datos propios |
 |---|---|---|
-| Identidad y verificación | Inicio de sesión, usuarios, vehículos, documentos y su aprobación | `usuarios`, `vehiculos`, `documentos` |
+| Identidad y verificación | Inicio de sesión, usuarios, vehículos, documentos y su aprobación | `usuarios`, `vehiculos`, `documentos`, `auditoria_identidad` |
 | Parqueadero | Zonas, espacios y cupos en tiempo real (WebSocket) | `zonas`, `espacios` |
 | Accesos | Entradas, salidas y auditoría | `accesos`, `auditoria_accesos` |
 | Visión (ALPR) | Lectura de placas a partir de una foto | Ninguno (sin estado) |
@@ -56,6 +56,84 @@ La salida es simétrica: primero se libera el cupo y luego se confirma la salida
 confirmación falla, se vuelve a ocupar. Parqueadero avisa cada cambio por WebSocket.
 
 La API `/interno` es solo entre servicios: el gateway no la publica.
+
+## Servicio de Identidad: contrato
+
+Lo que tendrá `backend-identidad` cuando se separe de `backend-core` (paso 3). Todavía no está
+construido; los pasos están en [`pendientes.md`](pendientes.md).
+
+### Nombres y puertos
+
+| Qué | Valor |
+|---|---|
+| Servicio | `backend-identidad`, puerto interno 8003 (sin puerto publicado) |
+| Base de datos | `parqueadero_identidad`, contenedor `db-identidad`, puerto 5435 en el host |
+| Tablas | `usuarios`, `vehiculos`, `documentos`, `auditoria_identidad` |
+| Archivos subidos | Volumen propio, privado y con descarga autenticada |
+
+Rutas que el gateway le envía: `/api/v1/auth`, `/usuarios`, `/vehiculos`, `/documentos` y
+`/verificaciones`. `/api/v1/accesos` y `/api/v1/auditoria` siguen en Accesos.
+
+### Token
+
+Solo Identidad emite tokens (`POST /api/v1/auth/login`). Son JWT firmados con HS256 y la
+`SECRET_KEY` compartida, válidos 8 horas.
+
+| Claim | Contenido |
+|---|---|
+| `sub` | Identificador del usuario |
+| `rol` | `estudiante`, `docente`, `administrativo`, `vigilante` o `admin` |
+| `exp` | Vencimiento |
+
+Accesos y Parqueadero autorizan solo con la firma y el `rol` del token, sin consultar a
+Identidad. Costo: un usuario desactivado conserva acceso a ambos hasta que su token expire.
+
+### API interna
+
+La usa Accesos al registrar una entrada. Las respuestas no llevan nombres, correos ni
+documentos.
+
+| Ruta | Para qué | Respuesta |
+|---|---|---|
+| `GET /interno/vehiculos/{vehiculo_id}` | Saber si el vehículo existe, su placa y si él y su dueño están aprobados | 200 con el cuerpo de abajo; 404 si no existe |
+| `GET /interno/usuarios?id=<uuid>&id=<uuid>` | Saber si existen el conductor (`usuario_id`) y quien autoriza (`autorizado_por_id`) | 200 con la lista de los que existen: `[{"id", "rol", "activo"}]` |
+
+```json
+{
+  "id": "…",
+  "placa": "ABC123",
+  "es_visitante": false,
+  "estado_verificacion": "aprobado",
+  "propietario": { "id": "…", "estado_verificacion": "aprobado" }
+}
+```
+
+`propietario` es `null` cuando el vehículo no tiene dueño registrado (visitante).
+
+Accesos traduce un 404 de Identidad a su propio 404. Si Identidad no responde, tarda más de 5
+segundos o responde algo inesperado, Accesos contesta 503 «El servicio de identidad no está
+disponible».
+
+### Si Identidad se cae
+
+| Operación de Accesos | Resultado |
+|---|---|
+| Registrar una entrada (normal o de visitante) | 503: no se puede comprobar el vehículo ni los usuarios |
+| Registrar una salida | Funciona |
+| Listar vehículos adentro y buscar un acceso por placa | Funcionan: `accesos` guarda la placa al registrar la entrada |
+
+### Decisiones del servicio
+
+- **No se copian datos.** Las bases solo tienen usuarios de prueba: en la base nueva se siembran
+  un administrador y un vigilante.
+- **Auditoría propia.** Aprobar o rechazar un usuario o un vehículo se registra en
+  `auditoria_identidad` (solo inserción) y se consulta en `GET /api/v1/verificaciones/auditoria`
+  (solo administrador). Las trazas anteriores quedan en `auditoria_accesos`: la auditoría no se
+  modifica ni se borra.
+- **Accesos guarda la placa.** Así las salidas no dependen de Identidad; `vehiculo_id`,
+  `usuario_id` y `autorizado_por_id` quedan como identificadores sin llave foránea.
+- **`/interno` sin clave por ahora.** Está protegida solo por no publicarse en el gateway, igual
+  que la de Parqueadero; la clave entre servicios llega con el paso 7.
 
 ## Decisiones
 
