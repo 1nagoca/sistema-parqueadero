@@ -16,10 +16,24 @@ services:
       timeout: 5s
       retries: 10
 
-  # No se publica un puerto al host: en la arquitectura confirmada, backend-vision solo es
-  # alcanzable por backend-core dentro de la red interna de docker-compose (no expone
-  # credenciales de BD ni logica de negocio). Para depurar localmente, agregar temporalmente
-  # `ports: ["8001:8001"]`.
+  # Unica puerta de entrada del navegador: reparte cada ruta al microservicio que corresponde
+  # (ver gateway/nginx.conf.template). Los servicios de atras no publican puerto al host.
+  gateway:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend-core
+      - backend-vision
+    ports:
+      - "${GATEWAY_PORT:-8000}:8000"
+    environment:
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
+    volumes:
+      - ./gateway/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+
+  # No se publica un puerto al host: backend-vision solo es alcanzable a traves del gateway,
+  # que exige sesion valida (no tiene credenciales de BD ni logica de negocio). Para depurar
+  # localmente, agregar temporalmente `ports: ["8001:8001"]`.
   backend-vision:
     build: ./backend-vision
     restart: unless-stopped
@@ -37,8 +51,6 @@ services:
         condition: service_healthy
       backend-vision:
         condition: service_started
-    ports:
-      - "${BACKEND_CORE_PORT:-8000}:8000"
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-parqueadero}:${POSTGRES_PASSWORD:-parqueadero}@db:5432/${POSTGRES_DB:-parqueadero}
       SECRET_KEY: ${SECRET_KEY:-cambiar-esta-clave-en-produccion}

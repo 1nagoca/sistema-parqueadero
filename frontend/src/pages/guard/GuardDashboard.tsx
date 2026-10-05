@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import Button from "@/components/common/Button";
+import PlateReader from "@/components/scanner/PlateReader";
 import PlateSearchBar from "@/components/scanner/PlateSearchBar";
 import QRScanner from "@/components/scanner/QRScanner";
 import { useAuth } from "@/context/AuthContext";
@@ -13,6 +14,7 @@ import {
 } from "@/services/api/accesos";
 import { listarEspacios } from "@/services/api/espacios";
 import { buscarPorPlaca, crearVehiculo } from "@/services/api/vehiculos";
+import type { LecturaPlaca } from "@/services/api/vision";
 import { listarZonas } from "@/services/api/zonas";
 import type { Acceso, AccesoActivo, Espacio, TipoVehiculo, Vehiculo, Zona } from "@/types/api";
 
@@ -32,6 +34,7 @@ export default function GuardDashboard() {
   const [accesosActivos, setAccesosActivos] = useState<AccesoActivo[]>([]);
   const [resultado, setResultado] = useState<Resultado>({ estado: "vacio" });
   const [mostrarScanner, setMostrarScanner] = useState(false);
+  const [lecturaAlpr, setLecturaAlpr] = useState<LecturaPlaca | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
@@ -73,7 +76,10 @@ export default function GuardDashboard() {
     }
   }
 
-  async function buscar(placa: string) {
+  /** `lectura` solo llega cuando la placa la leyo el microservicio de vision; una busqueda
+   * manual o por QR la descarta para no marcar el acceso como detectado por ALPR. */
+  async function buscar(placa: string, lectura: LecturaPlaca | null = null) {
+    setLecturaAlpr(lectura);
     setMostrarScanner(false);
     setMensaje(null);
     setError(null);
@@ -101,6 +107,12 @@ export default function GuardDashboard() {
     }
   }
 
+  function camposAlpr() {
+    return lecturaAlpr
+      ? { placa_detectada_por_alpr: true, confianza_alpr: lecturaAlpr.confianza }
+      : {};
+  }
+
   async function confirmarEntradaNormal(vehiculoId: string) {
     await conCargando(() =>
       registrarEntrada({
@@ -108,6 +120,7 @@ export default function GuardDashboard() {
         zona_id: zonaId,
         espacio_id: espacioId || null,
         tipo_acceso: "normal",
+        ...camposAlpr(),
       }),
     );
   }
@@ -122,6 +135,7 @@ export default function GuardDashboard() {
         tipo_acceso: "visitante",
         autorizado_por_id: usuario.id,
         justificacion,
+        ...camposAlpr(),
       }),
     );
   }
@@ -141,6 +155,7 @@ export default function GuardDashboard() {
       await accion();
       setMensaje("Listo");
       setResultado({ estado: "vacio" });
+      setLecturaAlpr(null);
       setEspacioId("");
       recargarZonaYEspacios();
     } catch (err) {
@@ -209,6 +224,13 @@ export default function GuardDashboard() {
 
       <section className="mb-4 space-y-3 rounded-2xl bg-white p-4 shadow-sm">
         <PlateSearchBar onBuscar={buscar} buscando={resultado.estado === "cargando"} />
+        <PlateReader onDetectada={(lectura) => buscar(lectura.placa, lectura)} />
+        {lecturaAlpr && (
+          <p className="text-sm text-gray-600">
+            Placa leida por camara: <span className="font-semibold">{lecturaAlpr.placa}</span> (confianza{" "}
+            {Math.round(lecturaAlpr.confianza * 100)}%)
+          </p>
+        )}
         <Button
           type="button"
           variante="secundaria"
@@ -217,7 +239,7 @@ export default function GuardDashboard() {
         >
           {mostrarScanner ? "Cerrar camara" : "Escanear QR"}
         </Button>
-        <QRScanner activo={mostrarScanner} onDetectado={buscar} />
+        <QRScanner activo={mostrarScanner} onDetectado={(placa) => buscar(placa)} />
       </section>
 
       {mensaje && <p className="mb-4 rounded-xl bg-emerald-100 p-3 text-emerald-800">{mensaje}</p>}
@@ -305,7 +327,7 @@ function ResultadoPanel({
   if (resultado.estado === "vacio") {
     return (
       <p className="rounded-2xl bg-white p-6 text-center text-gray-400 shadow-sm">
-        Busca una placa o escanea un QR para comenzar.
+        Busca una placa, lee una con foto o escanea un QR para comenzar.
       </p>
     );
   }

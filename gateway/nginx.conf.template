@@ -1,0 +1,67 @@
+# API Gateway: unica entrada del navegador hacia los microservicios. Reparte por ruta, de modo
+# que el frontend solo conoce una direccion aunque detras haya varios servicios.
+# La imagen oficial de nginx sustituye ${FRONTEND_ORIGIN} al arrancar (envsubst sobre templates).
+
+# DNS interno de docker-compose: con `set $variable` + resolver, nginx vuelve a resolver el
+# nombre del servicio si su contenedor se recrea y cambia de IP (sin esto responderia 502).
+resolver 127.0.0.11 valid=10s;
+
+map $http_origin $cors_origin {
+    default "";
+    "${FRONTEND_ORIGIN}" $http_origin;
+}
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    "" close;
+}
+
+server {
+    listen 8000;
+
+    # Los documentos de verificacion admiten hasta 5 MB (MAX_UPLOAD_BYTES en backend-core).
+    client_max_body_size 6m;
+
+    set $core http://backend-core:8000;
+    set $vision http://backend-vision:8001;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+    # Microservicio de vision (ALPR). Es stateless y no conoce usuarios, asi que el gateway
+    # exige una sesion valida antes de dejar pasar la imagen.
+    location /api/v1/alpr/ {
+        if ($request_method = OPTIONS) {
+            add_header Access-Control-Allow-Origin $cors_origin always;
+            add_header Access-Control-Allow-Methods "POST, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Authorization, Content-Type" always;
+            add_header Access-Control-Max-Age 600 always;
+            return 204;
+        }
+
+        auth_request /_auth;
+        add_header Access-Control-Allow-Origin $cors_origin always;
+        proxy_pass $vision;
+    }
+
+    location = /_auth {
+        internal;
+        proxy_pass $core/api/v1/usuarios/me;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+    }
+
+    # Cupos en tiempo real (WebSocket).
+    location /ws/ {
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_read_timeout 1h;
+        proxy_pass $core;
+    }
+
+    location / {
+        proxy_pass $core;
+    }
+}

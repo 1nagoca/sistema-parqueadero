@@ -115,6 +115,8 @@ export interface AccesoEntradaPayload {
   tipo_acceso: TipoAcceso;
   autorizado_por_id?: string | null;
   justificacion?: string | null;
+  placa_detectada_por_alpr?: boolean;
+  confianza_alpr?: number | null;
 }
 
 export interface UsuarioCreatePayload {
