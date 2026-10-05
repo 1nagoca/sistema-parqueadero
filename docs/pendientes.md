@@ -13,6 +13,7 @@ El detalle de lo ya hecho y de cómo funciona está en [`arquitectura.md`](arqui
 | 4. Accesos con su base y auditoría | Pendiente |
 | 5. Corregir diagramas, BPM y documentos | Pendiente |
 | 6. Preparar la presentación | Pendiente |
+| 7. Endurecer secretos antes de publicar | Pendiente |
 
 ## Paso 3 — Separar Identidad y verificación
 
@@ -71,6 +72,22 @@ Para que todo coincida con el código real.
 - [ ] Demostrar la autonomía: apagar una base de datos y mostrar que el otro servicio sigue
       respondiendo.
 - [ ] Confirmar con el profesor el enfoque (una base por microservicio y API Gateway).
+
+## Paso 7 — Endurecer secretos antes de publicar
+
+`SECRET_KEY` (firma los tokens de sesión) y `POSTGRES_PASSWORD` tienen valores de ejemplo
+públicos en `.env.example`.
+
+- [ ] Generar un `SECRET_KEY` nuevo (`openssl rand -hex 32`) y ponerlo solo en `.env`, nunca en
+      `.env.example`.
+- [ ] Cambiar `POSTGRES_PASSWORD` en `.env` por una contraseña larga (si el volumen de la base ya
+      existe, recrearlo o cambiarla también dentro de Postgres). Aplica a las dos bases:
+      `parqueadero` y `parqueadero_zonas`.
+- [ ] Confirmar que `.env.example` conserva solo valores de ejemplo.
+- [ ] No exponer los puertos de las bases de datos al exterior en `docker-compose.yml`.
+- [ ] Confirmar que `CORS_ORIGINS` solo incluye los orígenes reales.
+
+Obligatorio antes de publicarlo en internet o de usarlo con datos reales de estudiantes.
 
 ## Mejoras menores detectadas
 
