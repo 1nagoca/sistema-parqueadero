@@ -83,6 +83,8 @@ def registrar_entrada(
     _exigir_vehiculo_verificado(db, datos)
     try:
         return acceso_service.registrar_entrada(db, datos, realizado_por_id=vigilante.id)
+    except acceso_service.VehiculoYaAdentroError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except CupoNoDisponibleError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except ParqueaderoNoDisponibleError as exc:

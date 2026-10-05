@@ -93,7 +93,7 @@ Obligatorio antes de publicarlo en internet o de usarlo con datos reales de estu
 
 No bloquean nada, pero conviene arreglarlas.
 
-- [ ] Registrar una entrada de un vehículo que ya está adentro responde error 500; debería dar un
+- [x] Registrar una entrada de un vehículo que ya está adentro responde error 500; debería dar un
       mensaje claro (409).
 - [ ] Si falla la compensación de un cupo, solo queda un registro en el log; falta un reintento.
 - [ ] La API interna de Parqueadero (`/interno`) solo está protegida por no estar publicada;

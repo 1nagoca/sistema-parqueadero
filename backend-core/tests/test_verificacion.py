@@ -19,6 +19,7 @@ from app.models.acceso import Acceso  # noqa: E402
 from app.models.enums import RolUsuario  # noqa: E402
 from app.parqueadero_client import client as parqueadero_client  # noqa: E402
 from app.models.usuario import Usuario  # noqa: E402
+from app.services import acceso_service, auditoria_service  # noqa: E402
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
@@ -326,12 +327,49 @@ def test_sin_cupos_no_crea_el_acceso(client, admin, parqueadero):
         assert db.query(Acceso).filter(Acceso.vehiculo_id == uuid.UUID(vehiculo["id"])).count() == 0
 
 
-def test_si_falla_crear_el_acceso_se_libera_el_cupo(client, admin, parqueadero):
-    """Compensacion: el cupo ya se ocupo en el otro servicio, pero el vehiculo ya esta adentro
-    (indice unico de acceso activo) y el acceso no se puede crear."""
+def test_si_falla_crear_el_acceso_se_libera_el_cupo(client, admin, parqueadero, monkeypatch):
+    """Compensacion: el cupo ya se ocupo en el otro servicio, pero el acceso no se puede crear
+    (aqui falla su traza de auditoria)."""
+
+    def auditoria_caida(*args, **kwargs):
+        raise RuntimeError("auditoria caida")
+
     vehiculo = _vehiculo_visitante(client, admin)
-    assert _entrada_visitante(client, admin, vehiculo["id"]).status_code == 201
+    monkeypatch.setattr(auditoria_service, "registrar_auditoria", auditoria_caida)
 
     sin_excepciones = TestClient(app, raise_server_exceptions=False)
     assert _entrada_visitante(sin_excepciones, admin, vehiculo["id"]).status_code == 500
+    assert parqueadero.movimientos == ["ocupar", "liberar"]
+    assert _accesos_abiertos(vehiculo["id"]) == 0
+
+
+def test_entrada_de_vehiculo_que_ya_esta_adentro_responde_409(client, admin, parqueadero):
+    vehiculo = _vehiculo_visitante(client, admin)
+    assert _entrada_visitante(client, admin, vehiculo["id"]).status_code == 201
+
+    r = _entrada_visitante(client, admin, vehiculo["id"])
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"] == "El vehiculo ya tiene un acceso activo"
+    assert parqueadero.movimientos == ["ocupar"]  # el rechazo no toco el cupo
+    assert _accesos_abiertos(vehiculo["id"]) == 1
+
+
+def test_entradas_simultaneas_del_mismo_vehiculo_responden_409(client, admin, parqueadero, monkeypatch):
+    """Carrera: las dos entradas pasan la comprobacion previa; el indice unico de acceso activo
+    rechaza la segunda y se libera el cupo que ya habia ocupado."""
+    vehiculo = _vehiculo_visitante(client, admin)
+    assert _entrada_visitante(client, admin, vehiculo["id"]).status_code == 201
+
+    monkeypatch.setattr(acceso_service, "_tiene_acceso_activo", lambda db, vehiculo_id: False)
+    assert _entrada_visitante(client, admin, vehiculo["id"]).status_code == 409
     assert parqueadero.movimientos == ["ocupar", "ocupar", "liberar"]
+    assert _accesos_abiertos(vehiculo["id"]) == 1
+
+
+def _accesos_abiertos(vehiculo_id):
+    with SessionLocal() as db:
+        return (
+            db.query(Acceso)
+            .filter(Acceso.vehiculo_id == uuid.UUID(vehiculo_id), Acceso.fecha_hora_salida.is_(None))
+            .count()
+        )

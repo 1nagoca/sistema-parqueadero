@@ -2,6 +2,7 @@ import logging
 import uuid
 
 from sqlalchemy import Integer, cast, func, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.acceso import Acceso
@@ -17,6 +18,13 @@ class AccesoNoEncontradoOYaCerradoError(Exception):
     """No existe un acceso abierto con ese id (o ya se le registro la salida)."""
 
 
+class VehiculoYaAdentroError(Exception):
+    """El vehiculo ya tiene un acceso abierto: no puede entrar otra vez sin haber salido."""
+
+
+INDICE_ACCESO_ACTIVO = "uq_accesos_vehiculo_activo"
+
+
 def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id: uuid.UUID) -> Acceso:
     """RN-01 + RN-03: ocupa el cupo en el servicio de parqueadero y crea el acceso junto con su
     traza de auditoria.
@@ -24,7 +32,13 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
     El cupo y el acceso viven en bases de datos distintas, asi que no hay una transaccion que
     cubra los dos. Primero se ocupa el cupo (si no hay, el servicio lo rechaza y no se crea
     nada); si despues falla la creacion del acceso, se compensa liberando el cupo.
+
+    Un vehiculo que ya esta adentro se rechaza antes de tocar el cupo. Si dos entradas
+    simultaneas pasan esa comprobacion, el indice unico de acceso activo rechaza la segunda.
     """
+    if _tiene_acceso_activo(db, datos.vehiculo_id):
+        raise VehiculoYaAdentroError("El vehiculo ya tiene un acceso activo")
+
     parqueadero_client.ocupar_cupo(datos.zona_id, datos.espacio_id)
 
     try:
@@ -56,6 +70,13 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
         )
 
         db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        _compensar(parqueadero_client.liberar_cupo, datos.zona_id, datos.espacio_id)
+        diag = getattr(exc.orig, "diag", None)
+        if getattr(diag, "constraint_name", None) == INDICE_ACCESO_ACTIVO:
+            raise VehiculoYaAdentroError("El vehiculo ya tiene un acceso activo") from exc
+        raise
     except Exception:
         db.rollback()
         _compensar(parqueadero_client.liberar_cupo, datos.zona_id, datos.espacio_id)
@@ -63,6 +84,15 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
 
     db.refresh(acceso)
     return acceso
+
+
+def _tiene_acceso_activo(db: Session, vehiculo_id: uuid.UUID) -> bool:
+    return (
+        db.query(Acceso.id)
+        .filter(Acceso.vehiculo_id == vehiculo_id, Acceso.fecha_hora_salida.is_(None))
+        .first()
+        is not None
+    )
 
 
 def registrar_salida(db: Session, acceso_id: uuid.UUID, realizado_por_id: uuid.UUID) -> Acceso:
