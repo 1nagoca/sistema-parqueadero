@@ -366,6 +366,22 @@ def test_entradas_simultaneas_del_mismo_vehiculo_responden_409(client, admin, pa
     assert _accesos_abiertos(vehiculo["id"]) == 1
 
 
+def test_entrada_con_vehiculo_inexistente_responde_404(client, admin, parqueadero):
+    vehiculo_id = str(uuid.uuid4())
+
+    normal = client.post(
+        f"{API}/accesos/entrada", headers=admin, json={"vehiculo_id": vehiculo_id, "zona_id": str(uuid.uuid4())}
+    )
+    assert normal.status_code == 404, normal.text
+    assert normal.json()["detail"] == "El vehiculo no existe"
+
+    visitante = _entrada_visitante(client, admin, vehiculo_id)
+    assert visitante.status_code == 404, visitante.text
+
+    assert parqueadero.movimientos == []  # el rechazo no toco el cupo
+    assert _accesos_abiertos(vehiculo_id) == 0
+
+
 def _accesos_abiertos(vehiculo_id):
     with SessionLocal() as db:
         return (

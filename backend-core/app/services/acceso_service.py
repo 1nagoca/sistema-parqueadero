@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.acceso import Acceso
 from app.models.enums import AccionAuditoria
+from app.models.vehiculo import Vehiculo
 from app.parqueadero_client import client as parqueadero_client
 from app.schemas.acceso import AccesoEntradaCreate
 from app.services import auditoria_service
@@ -16,6 +17,10 @@ logger = logging.getLogger(__name__)
 
 class AccesoNoEncontradoOYaCerradoError(Exception):
     """No existe un acceso abierto con ese id (o ya se le registro la salida)."""
+
+
+class VehiculoNoEncontradoError(Exception):
+    """No existe un vehiculo con ese id."""
 
 
 class VehiculoYaAdentroError(Exception):
@@ -33,9 +38,12 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
     cubra los dos. Primero se ocupa el cupo (si no hay, el servicio lo rechaza y no se crea
     nada); si despues falla la creacion del acceso, se compensa liberando el cupo.
 
-    Un vehiculo que ya esta adentro se rechaza antes de tocar el cupo. Si dos entradas
-    simultaneas pasan esa comprobacion, el indice unico de acceso activo rechaza la segunda.
+    Un vehiculo que no existe o que ya esta adentro se rechaza antes de tocar el cupo. Si dos
+    entradas simultaneas pasan esa comprobacion, el indice unico de acceso activo rechaza la
+    segunda.
     """
+    if db.get(Vehiculo, datos.vehiculo_id) is None:
+        raise VehiculoNoEncontradoError("El vehiculo no existe")
     if _tiene_acceso_activo(db, datos.vehiculo_id):
         raise VehiculoYaAdentroError("El vehiculo ya tiene un acceso activo")
 
