@@ -1,0 +1,166 @@
+// Diagrama entidad-relación — Parqueadero UFPS
+// Pegar en https://dbdiagram.io/d para verlo y exportarlo a PostgreSQL, MySQL, SQL Server u otro (menú Export).
+// Fuente de verdad: las migraciones de backend-core/alembic/versions (0001 y 0002).
+
+Enum usuario_rol_enum {
+  estudiante
+  docente
+  administrativo
+  vigilante
+  admin
+}
+
+Enum vehiculo_tipo_enum {
+  carro
+  moto
+  bicicleta
+  otro
+}
+
+Enum acceso_tipo_enum {
+  normal
+  visitante
+}
+
+Enum espacio_estado_enum {
+  libre
+  ocupado
+  reservado
+  mantenimiento
+}
+
+Enum verificacion_estado_enum {
+  pendiente
+  aprobado
+  rechazado
+}
+
+Enum documento_tipo_enum {
+  carnet
+  foto_placa
+  tarjeta_propiedad
+}
+
+Enum auditoria_accion_enum {
+  creacion
+  actualizacion
+  eliminacion
+}
+
+Table usuarios {
+  id uuid [pk, default: `gen_random_uuid()`]
+  nombre_completo varchar(150) [not null]
+  correo_institucional varchar(150) [not null, unique]
+  documento_identidad varchar(30) [not null, unique]
+  telefono varchar(20)
+  rol usuario_rol_enum [not null]
+  hashed_password varchar(255) [not null]
+  activo boolean [not null, default: true]
+  universidad varchar(150)
+  estado_verificacion verificacion_estado_enum [not null, default: 'aprobado']
+  motivo_rechazo text
+  consentimiento_datos_en timestamptz
+  creado_en timestamptz [not null, default: `now()`]
+  actualizado_en timestamptz [not null, default: `now()`]
+}
+
+Table vehiculos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  placa varchar(10) [not null, unique, note: 'Siempre en mayúsculas (CHECK)']
+  tipo_vehiculo vehiculo_tipo_enum [not null]
+  marca varchar(50)
+  modelo varchar(50)
+  color varchar(30)
+  usuario_id uuid [ref: > usuarios.id, note: 'Obligatorio salvo que es_visitante = true (CHECK)']
+  es_visitante boolean [not null, default: false]
+  estado_verificacion verificacion_estado_enum [not null, default: 'aprobado']
+  motivo_rechazo text
+  creado_en timestamptz [not null, default: `now()`]
+
+  indexes {
+    usuario_id
+  }
+}
+
+Table zonas {
+  id uuid [pk, default: `gen_random_uuid()`]
+  nombre varchar(100) [not null, unique]
+  ubicacion_descripcion text
+  capacidad_total integer [not null, note: 'CHECK > 0']
+  cupos_disponibles integer [not null, note: 'CHECK entre 0 y capacidad_total']
+  activa boolean [not null, default: true]
+  creado_en timestamptz [not null, default: `now()`]
+  actualizado_en timestamptz [not null, default: `now()`]
+}
+
+Table espacios {
+  id uuid [pk, default: `gen_random_uuid()`]
+  zona_id uuid [not null, ref: > zonas.id]
+  codigo varchar(20) [not null]
+  estado espacio_estado_enum [not null, default: 'libre']
+  tipo_espacio varchar(20)
+  creado_en timestamptz [not null, default: `now()`]
+  actualizado_en timestamptz [not null, default: `now()`]
+
+  indexes {
+    zona_id
+    (zona_id, codigo) [unique]
+  }
+}
+
+Table accesos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  vehiculo_id uuid [not null, ref: > vehiculos.id]
+  usuario_id uuid [ref: > usuarios.id]
+  zona_id uuid [not null, ref: > zonas.id]
+  espacio_id uuid [ref: > espacios.id]
+  tipo_acceso acceso_tipo_enum [not null, default: 'normal']
+  fecha_hora_entrada timestamptz [not null, default: `now()`]
+  fecha_hora_salida timestamptz [note: 'CHECK: posterior a la entrada. Un vehículo solo puede tener un acceso sin salida']
+  duracion_minutos integer
+  autorizado_por_id uuid [ref: > usuarios.id, note: 'Obligatorio si tipo_acceso = visitante']
+  justificacion text [note: 'Obligatoria si tipo_acceso = visitante']
+  placa_detectada_por_alpr boolean [not null, default: false]
+  confianza_alpr numeric(5,2)
+  creado_en timestamptz [not null, default: `now()`]
+
+  indexes {
+    usuario_id
+    zona_id
+  }
+}
+
+Table documentos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  usuario_id uuid [not null, ref: > usuarios.id]
+  vehiculo_id uuid [ref: > vehiculos.id, note: 'NULL solo si tipo = carnet; obligatorio en los demás (CHECK)']
+  tipo documento_tipo_enum [not null]
+  ruta_archivo varchar(255) [not null]
+  content_type varchar(50) [not null]
+  tamano_bytes integer [not null]
+  creado_en timestamptz [not null, default: `now()`]
+
+  indexes {
+    usuario_id
+    vehiculo_id
+  }
+}
+
+Table auditoria_accesos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  tabla_afectada varchar(50) [not null]
+  registro_id uuid [not null]
+  accion auditoria_accion_enum [not null]
+  valores_anteriores jsonb
+  valores_nuevos jsonb
+  realizado_por_id uuid [not null, ref: > usuarios.id]
+  motivo text
+  fecha_hora timestamptz [not null, default: `now()`]
+  ip_origen varchar(45)
+  Note: 'Append-only: no se modifica ni se borra'
+
+  indexes {
+    fecha_hora
+    (tabla_afectada, registro_id)
+  }
+}
