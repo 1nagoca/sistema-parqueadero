@@ -109,6 +109,16 @@ services:
       SECRET_KEY: ${SECRET_KEY:-cambiar-esta-clave-en-produccion}
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:5173"]}
       UPLOAD_DIR: /code/uploads
+      # Solo las usa el script de siembra (python -m app.db.seed). Sin valor por defecto: las
+      # contraseñas vienen del .env y, si faltan, el script falla sin crear nada.
+      SEED_ADMIN_CORREO: ${SEED_ADMIN_CORREO:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_ADMIN_NOMBRE: ${SEED_ADMIN_NOMBRE:-}
+      SEED_ADMIN_DOCUMENTO: ${SEED_ADMIN_DOCUMENTO:-}
+      SEED_VIGILANTE_CORREO: ${SEED_VIGILANTE_CORREO:-}
+      SEED_VIGILANTE_PASSWORD: ${SEED_VIGILANTE_PASSWORD:-}
+      SEED_VIGILANTE_NOMBRE: ${SEED_VIGILANTE_NOMBRE:-}
+      SEED_VIGILANTE_DOCUMENTO: ${SEED_VIGILANTE_DOCUMENTO:-}
     volumes:
       - ./backend-identidad:/code
       # Documentos de verificacion: datos personales, en un volumen propio y nunca como estatico.

@@ -45,7 +45,7 @@ bases solo tienen usuarios de prueba.
 
 ### D. Sembrar admin y vigilante
 
-- [ ] Script de siembra que crea un administrador y un vigilante si no existen, con las
+- [x] Script de siembra que crea un administrador y un vigilante si no existen, con las
       contraseñas tomadas del entorno.
 
 ### E. Desacoplar core
