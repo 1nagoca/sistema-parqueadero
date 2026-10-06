@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     # Documentos de verificacion: volumen privado, nunca se sirve como estatico.
     UPLOAD_DIR: str = "/code/uploads"
+    MAX_UPLOAD_BYTES: int = 5 * 1024 * 1024
 
     # Universidad habilitada para autorregistro y dominios de correo aceptados para ella.
     UNIVERSIDAD_NOMBRE: str = "Universidad Francisco de Paula Santander"

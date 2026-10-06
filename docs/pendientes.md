@@ -34,14 +34,14 @@ bases solo tienen usuarios de prueba.
 
 ### C. Copiar el código de identidad
 
-- [ ] Copiar inicio de sesión, registro, usuarios, vehículos, documentos y verificaciones
+- [x] Copiar inicio de sesión, registro, usuarios, vehículos, documentos y verificaciones
       (routers, modelos, esquemas y servicios). `backend-core` sigue intacto y atendiendo.
-- [ ] Migración inicial con `usuarios`, `vehiculos`, `documentos` y `auditoria_identidad`
+- [x] Migración inicial con `usuarios`, `vehiculos`, `documentos` y `auditoria_identidad`
       (solo inserción, como `auditoria_accesos`).
-- [ ] La verificación escribe en `auditoria_identidad` y se lee en
+- [x] La verificación escribe en `auditoria_identidad` y se lee en
       `GET /api/v1/verificaciones/auditoria` (solo administrador).
-- [ ] Crear la API interna: `GET /interno/vehiculos/{id}` y `GET /interno/usuarios?id=`.
-- [ ] Copiar los tests de identidad de `test_verificacion.py` al servicio nuevo.
+- [x] Crear la API interna: `GET /interno/vehiculos/{id}` y `GET /interno/usuarios?id=`.
+- [x] Copiar los tests de identidad de `test_verificacion.py` al servicio nuevo.
 
 ### D. Sembrar admin y vigilante
 
@@ -147,3 +147,4 @@ No bloquean nada, pero conviene arreglarlas.
 - [ ] Entrada con usuario_id o autorizado_por_id inexistente responde 500 en vez de 404 (violación de llave foránea a usuarios; deducido del código, no probado)
 - [ ] Los índices de las migraciones de identidad y de core no están declarados en los modelos (`alembic check`; solo afecta a `--autogenerate`)
 - [ ] `deps.py` de identidad y de core responde 500 en vez de 401 si el token trae un `sub` que no es UUID (deducido del código, no probado; `backend-parqueadero` ya lo maneja)
+- [ ] `POST /vehiculos` con un `usuario_id` que no existe responde 500 por la llave foránea (identidad y core; deducido, no probado)
