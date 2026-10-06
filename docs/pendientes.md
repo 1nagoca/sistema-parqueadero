@@ -51,13 +51,13 @@ bases solo tienen usuarios de prueba.
 ### E. Desacoplar core
 
 - [ ] Validar el token por su cuenta, sin consultar la tabla `usuarios`.
-- [ ] Guardar la `placa` en `accesos` al registrar la entrada; la lista de vehículos adentro y
+- [x] Guardar la `placa` en `accesos` al registrar la entrada; la lista de vehículos adentro y
       la búsqueda por placa dejan de leer `vehiculos`.
 - [ ] Consultar a identidad por su API interna el vehículo, su dueño y la existencia de
       `usuario_id` y `autorizado_por_id` (hoy son consultas directas a la base).
 - [ ] Si identidad no responde, rechazar toda entrada con 503 y un mensaje claro; salidas,
       lista y búsqueda siguen funcionando.
-- [ ] Quitar las llaves foráneas de `accesos` a `usuarios` y `vehiculos` y la de
+- [x] Quitar las llaves foráneas de `accesos` a `usuarios` y `vehiculos` y la de
       `auditoria_accesos.realizado_por_id`: quedan como identificadores sin restricción, igual
       que `zona_id` y `espacio_id`.
 - [ ] Sustituir identidad por un doble en los tests de accesos.
@@ -71,6 +71,8 @@ aún crea usuarios y vehículos en `backend-core` y accesos ya los busca en iden
 - [ ] Apuntar a identidad la validación de sesión de visión.
 - [ ] Borrar de `backend-core` el código y los tests de identidad, las tablas `documentos`,
       `vehiculos` y `usuarios` (migración reversible) y el volumen `uploads_data`.
+- [ ] Retirar o adaptar `tests/test_migracion_placa.py` de `backend-core` cuando se borren
+      `usuarios` y `vehiculos`.
 
 ### G. Cierre y documentación
 

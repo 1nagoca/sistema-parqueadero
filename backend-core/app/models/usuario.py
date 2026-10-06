@@ -10,8 +10,6 @@ from app.db.base import Base
 from app.models.enums import EstadoVerificacion, RolUsuario
 
 if TYPE_CHECKING:
-    from app.models.acceso import Acceso
-    from app.models.auditoria_acceso import AuditoriaAcceso
     from app.models.documento import Documento
     from app.models.vehiculo import Vehiculo
 
@@ -58,10 +56,3 @@ class Usuario(Base):
         back_populates="usuario", foreign_keys="Vehiculo.usuario_id"
     )
     documentos: Mapped[list["Documento"]] = relationship(back_populates="usuario", cascade="all, delete-orphan")
-    accesos_como_conductor: Mapped[list["Acceso"]] = relationship(
-        back_populates="usuario", foreign_keys="Acceso.usuario_id"
-    )
-    accesos_autorizados: Mapped[list["Acceso"]] = relationship(
-        back_populates="autorizado_por", foreign_keys="Acceso.autorizado_por_id"
-    )
-    auditorias: Mapped[list["AuditoriaAcceso"]] = relationship(back_populates="realizado_por")

@@ -11,7 +11,7 @@ from app.models.vehiculo import Vehiculo
 from app.schemas.acceso import AccesoActivoRead, AccesoEntradaCreate, AccesoRead
 from app.parqueadero_client import client as parqueadero_client
 from app.parqueadero_client.client import CupoNoDisponibleError, ParqueaderoNoDisponibleError
-from app.services import acceso_service, vehiculo_service
+from app.services import acceso_service
 
 router = APIRouter(prefix="/accesos", tags=["accesos"])
 
@@ -24,20 +24,16 @@ def listar_accesos_activos(
 ):
     """Vehiculos actualmente adentro (sin fecha_hora_salida), para que el vigilante pueda
     registrar la salida sin tener que recordar/escribir la placa de nuevo."""
-    consulta = (
-        db.query(Acceso, Vehiculo.placa)
-        .join(Vehiculo, Vehiculo.id == Acceso.vehiculo_id)
-        .filter(Acceso.fecha_hora_salida.is_(None))
-    )
+    consulta = db.query(Acceso).filter(Acceso.fecha_hora_salida.is_(None))
     if zona_id is not None:
         consulta = consulta.filter(Acceso.zona_id == zona_id)
-    filas = consulta.order_by(Acceso.fecha_hora_entrada).all()
+    accesos = consulta.order_by(Acceso.fecha_hora_entrada).all()
 
     # El codigo del espacio es un dato de cortesia: si el servicio de parqueadero no responde,
     # el vigilante igual ve los vehiculos y puede registrar salidas.
     try:
         codigos = parqueadero_client.codigos_de_espacios(
-            [acceso.espacio_id for acceso, _ in filas if acceso.espacio_id is not None]
+            [acceso.espacio_id for acceso in accesos if acceso.espacio_id is not None]
         )
     except ParqueaderoNoDisponibleError:
         codigos = {}
@@ -45,10 +41,10 @@ def listar_accesos_activos(
     return [
         AccesoActivoRead(
             **AccesoRead.model_validate(acceso).model_dump(),
-            placa=placa,
+            placa=acceso.placa,
             espacio_codigo=codigos.get(acceso.espacio_id),
         )
-        for acceso, placa in filas
+        for acceso in accesos
     ]
 
 
@@ -59,14 +55,11 @@ def buscar_acceso_activo(
     _: Usuario = Depends(require_role(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
 ):
     """Usado por el panel de vigilancia para saber si una placa tiene un acceso abierto
-    (y por lo tanto corresponde ofrecer 'registrar salida' en vez de una nueva entrada)."""
-    vehiculo = vehiculo_service.obtener_por_placa(db, placa)
-    if vehiculo is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehiculo no encontrado")
-
+    (y por lo tanto corresponde ofrecer 'registrar salida' en vez de una nueva entrada).
+    Usa la placa guardada en el acceso, sin leer la tabla de vehiculos."""
     acceso = (
         db.query(Acceso)
-        .filter(Acceso.vehiculo_id == vehiculo.id, Acceso.fecha_hora_salida.is_(None))
+        .filter(Acceso.placa == placa.strip().upper(), Acceso.fecha_hora_salida.is_(None))
         .first()
     )
     if acceso is None:

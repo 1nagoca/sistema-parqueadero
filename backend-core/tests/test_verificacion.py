@@ -10,13 +10,14 @@ if not os.environ.get("DATABASE_URL"):
     pytest.skip("requiere DATABASE_URL de una BD de pruebas", allow_module_level=True)
 
 from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy.exc import IntegrityError  # noqa: E402
 
 from app.core.config import settings  # noqa: E402
 from app.core.security import hashear_password  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.acceso import Acceso  # noqa: E402
-from app.models.enums import RolUsuario  # noqa: E402
+from app.models.enums import RolUsuario, TipoAcceso  # noqa: E402
 from app.parqueadero_client import client as parqueadero_client  # noqa: E402
 from app.models.usuario import Usuario  # noqa: E402
 from app.services import acceso_service, auditoria_service  # noqa: E402
@@ -380,6 +381,81 @@ def test_entrada_con_vehiculo_inexistente_responde_404(client, admin, parqueader
 
     assert parqueadero.movimientos == []  # el rechazo no toco el cupo
     assert _accesos_abiertos(vehiculo_id) == 0
+
+
+def test_la_entrada_guarda_la_placa_y_la_lista_y_la_busqueda_la_usan(client, admin, parqueadero):
+    vehiculo = _vehiculo_visitante(client, admin)
+    r = _entrada_visitante(client, admin, vehiculo["id"])
+    assert r.status_code == 201, r.text
+    acceso_id = r.json()["id"]
+
+    with SessionLocal() as db:
+        assert db.get(Acceso, uuid.UUID(acceso_id)).placa == vehiculo["placa"]
+
+    activos = client.get(f"{API}/accesos", headers=admin).json()
+    assert [a["placa"] for a in activos if a["id"] == acceso_id] == [vehiculo["placa"]]
+
+    # la busqueda normaliza la placa igual que antes
+    r = client.get(f"{API}/accesos/buscar", headers=admin, params={"placa": f" {vehiculo['placa'].lower()} "})
+    assert r.status_code == 200, r.text
+    assert r.json()["id"] == acceso_id
+    assert client.get(f"{API}/accesos/buscar", headers=admin, params={"placa": "NOESTA1"}).status_code == 404
+
+
+def test_un_acceso_sin_vehiculo_ni_usuarios_locales_se_lista_se_busca_y_sale(client, admin, parqueadero):
+    """Ya no hay llaves foraneas: el vehiculo y los usuarios son de identidad y pueden no estar
+    en esta base. La placa guardada basta para la lista, la busqueda y la salida."""
+    placa = "HUE" + str(uuid.uuid4().int)[:3]
+    with SessionLocal() as db:
+        acceso = Acceso(
+            vehiculo_id=uuid.uuid4(),
+            placa=placa,
+            usuario_id=uuid.uuid4(),
+            zona_id=uuid.uuid4(),
+            tipo_acceso=TipoAcceso.VISITANTE,
+            autorizado_por_id=uuid.uuid4(),
+            justificacion="Visita a decanatura",
+        )
+        db.add(acceso)
+        db.commit()
+        acceso_id = str(acceso.id)
+
+    activos = client.get(f"{API}/accesos", headers=admin).json()
+    assert [a["placa"] for a in activos if a["id"] == acceso_id] == [placa]
+
+    r = client.get(f"{API}/accesos/buscar", headers=admin, params={"placa": placa})
+    assert r.status_code == 200, r.text
+    assert r.json()["id"] == acceso_id
+
+    assert client.post(f"{API}/accesos/{acceso_id}/salida", headers=admin).status_code == 200
+    assert parqueadero.movimientos == ["liberar"]
+    assert client.get(f"{API}/accesos/buscar", headers=admin, params={"placa": placa}).status_code == 404
+
+
+def test_las_restricciones_de_accesos_siguen_sin_llaves_foraneas():
+    vehiculo_id = uuid.uuid4()
+    placa = "IDX" + str(uuid.uuid4().int)[:3]
+
+    def acceso(**campos):
+        return Acceso(**{"vehiculo_id": vehiculo_id, "placa": placa, "zona_id": uuid.uuid4(), **campos})
+
+    with SessionLocal() as db:
+        db.add(acceso())
+        db.commit()
+
+        # un solo acceso activo por vehiculo
+        db.add(acceso())
+        with pytest.raises(IntegrityError) as error:
+            db.commit()
+        assert error.value.orig.diag.constraint_name == acceso_service.INDICE_ACCESO_ACTIVO
+        db.rollback()
+
+        # la placa se guarda en mayusculas, como en vehiculos
+        db.add(acceso(vehiculo_id=uuid.uuid4(), placa=placa.lower()))
+        with pytest.raises(IntegrityError) as error:
+            db.commit()
+        assert error.value.orig.diag.constraint_name == "ck_accesos_placa_mayusculas"
+        db.rollback()
 
 
 def _accesos_abiertos(vehiculo_id):

@@ -11,7 +11,6 @@ from app.models.usuario import estado_verificacion_enum
 from app.models.enums import EstadoVerificacion, TipoVehiculo
 
 if TYPE_CHECKING:
-    from app.models.acceso import Acceso
     from app.models.documento import Documento
     from app.models.usuario import Usuario
 
@@ -52,5 +51,4 @@ class Vehiculo(Base):
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     usuario: Mapped["Usuario | None"] = relationship(back_populates="vehiculos", foreign_keys=[usuario_id])
-    accesos: Mapped[list["Acceso"]] = relationship(back_populates="vehiculo")
     documentos: Mapped[list["Documento"]] = relationship(back_populates="vehiculo", cascade="all, delete-orphan")

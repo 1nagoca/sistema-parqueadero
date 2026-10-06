@@ -42,7 +42,8 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
     entradas simultaneas pasan esa comprobacion, el indice unico de acceso activo rechaza la
     segunda.
     """
-    if db.get(Vehiculo, datos.vehiculo_id) is None:
+    vehiculo = db.get(Vehiculo, datos.vehiculo_id)
+    if vehiculo is None:
         raise VehiculoNoEncontradoError("El vehiculo no existe")
     if _tiene_acceso_activo(db, datos.vehiculo_id):
         raise VehiculoYaAdentroError("El vehiculo ya tiene un acceso activo")
@@ -52,6 +53,7 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
     try:
         acceso = Acceso(
             vehiculo_id=datos.vehiculo_id,
+            placa=vehiculo.placa,
             usuario_id=datos.usuario_id,
             zona_id=datos.zona_id,
             espacio_id=datos.espacio_id,
