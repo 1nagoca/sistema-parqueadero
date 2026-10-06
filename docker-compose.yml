@@ -76,6 +76,44 @@ services:
     volumes:
       - ./backend-parqueadero:/code
 
+  # Base de datos propia del servicio de identidad: si se cae, parqueadero sigue arriba y
+  # accesos solo rechaza las entradas (ver docs/arquitectura.md).
+  db-identidad:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-parqueadero}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-parqueadero}
+      POSTGRES_DB: parqueadero_identidad
+    ports:
+      - "${IDENTIDAD_DB_PORT:-5435}:5432"
+    volumes:
+      - db_identidad_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-parqueadero}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Usuarios, vehiculos, documentos y verificaciones. Por ahora esta vacio (solo /health) y el
+  # gateway aun no le envia rutas. No publica puerto al host.
+  backend-identidad:
+    build: ./backend-identidad
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8003 --reload
+    depends_on:
+      db-identidad:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-parqueadero}:${POSTGRES_PASSWORD:-parqueadero}@db-identidad:5432/parqueadero_identidad
+      SECRET_KEY: ${SECRET_KEY:-cambiar-esta-clave-en-produccion}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:5173"]}
+      UPLOAD_DIR: /code/uploads
+    volumes:
+      - ./backend-identidad:/code
+      # Documentos de verificacion: datos personales, en un volumen propio y nunca como estatico.
+      - identidad_uploads:/code/uploads
+
   backend-core:
     build: ./backend-core
     restart: unless-stopped
@@ -119,4 +157,6 @@ services:
 volumes:
   db_data:
   db_parqueadero_data:
+  db_identidad_data:
+  identidad_uploads:
   uploads_data:

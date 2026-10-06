@@ -28,8 +28,8 @@ bases solo tienen usuarios de prueba.
 
 ### B. Servicio nuevo vacío
 
-- [ ] Crear `backend-identidad` (FastAPI, `/health`, Alembic y tests) en el puerto interno 8003.
-- [ ] Agregar a `docker-compose.yml` el servicio, el contenedor `db-identidad` (base
+- [x] Crear `backend-identidad` (FastAPI, `/health`, Alembic y tests) en el puerto interno 8003.
+- [x] Agregar a `docker-compose.yml` el servicio, el contenedor `db-identidad` (base
       `parqueadero_identidad`, puerto 5435 en el host) y un volumen propio para archivos.
 
 ### C. Copiar el código de identidad
