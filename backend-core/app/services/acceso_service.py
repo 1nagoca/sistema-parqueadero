@@ -5,9 +5,9 @@ from sqlalchemy import Integer, cast, func, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.identidad_client import client as identidad_client
 from app.models.acceso import Acceso
-from app.models.enums import AccionAuditoria
-from app.models.vehiculo import Vehiculo
+from app.models.enums import AccionAuditoria, EstadoVerificacion, TipoAcceso
 from app.parqueadero_client import client as parqueadero_client
 from app.schemas.acceso import AccesoEntradaCreate
 from app.services import auditoria_service
@@ -19,8 +19,12 @@ class AccesoNoEncontradoOYaCerradoError(Exception):
     """No existe un acceso abierto con ese id (o ya se le registro la salida)."""
 
 
-class VehiculoNoEncontradoError(Exception):
-    """No existe un vehiculo con ese id."""
+class VehiculoNoVerificadoError(Exception):
+    """El vehiculo o su propietario aun no estan aprobados por el administrador."""
+
+
+class UsuarioNoEncontradoError(Exception):
+    """El conductor o quien autoriza el ingreso no existe en el servicio de identidad."""
 
 
 class VehiculoYaAdentroError(Exception):
@@ -38,13 +42,15 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
     cubra los dos. Primero se ocupa el cupo (si no hay, el servicio lo rechaza y no se crea
     nada); si despues falla la creacion del acceso, se compensa liberando el cupo.
 
-    Un vehiculo que no existe o que ya esta adentro se rechaza antes de tocar el cupo. Si dos
-    entradas simultaneas pasan esa comprobacion, el indice unico de acceso activo rechaza la
-    segunda.
+    El vehiculo y los usuarios se consultan al servicio de identidad: si no responde, la
+    entrada se rechaza (identidad_client.IdentidadNoDisponibleError) porque no se puede
+    comprobar nada. Un vehiculo que no existe, que no esta verificado o que ya esta adentro se
+    rechaza antes de tocar el cupo. Si dos entradas simultaneas pasan esa comprobacion, el
+    indice unico de acceso activo rechaza la segunda.
     """
-    vehiculo = db.get(Vehiculo, datos.vehiculo_id)
-    if vehiculo is None:
-        raise VehiculoNoEncontradoError("El vehiculo no existe")
+    vehiculo = identidad_client.obtener_vehiculo(datos.vehiculo_id)
+    _exigir_vehiculo_verificado(vehiculo, datos.tipo_acceso)
+    _exigir_usuarios_existentes(datos)
     if _tiene_acceso_activo(db, datos.vehiculo_id):
         raise VehiculoYaAdentroError("El vehiculo ya tiene un acceso activo")
 
@@ -94,6 +100,32 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
 
     db.refresh(acceso)
     return acceso
+
+
+def _exigir_vehiculo_verificado(vehiculo: identidad_client.VehiculoIdentidad, tipo_acceso: TipoAcceso) -> None:
+    """Un acceso normal exige vehiculo y propietario aprobados por el administrador; el
+    visitante ya pasa por su propio flujo de autorizacion + justificacion."""
+    if tipo_acceso != TipoAcceso.NORMAL:
+        return
+    aprobado = EstadoVerificacion.APROBADO.value
+    if vehiculo.estado_verificacion != aprobado or (
+        vehiculo.propietario_id is not None and vehiculo.propietario_estado_verificacion != aprobado
+    ):
+        raise VehiculoNoVerificadoError(
+            "El vehiculo o su propietario aun no estan verificados por el administrador"
+        )
+
+
+def _exigir_usuarios_existentes(datos: AccesoEntradaCreate) -> None:
+    """El conductor y quien autoriza deben existir en identidad (no importa si estan activos)."""
+    pedidos = [i for i in (datos.usuario_id, datos.autorizado_por_id) if i is not None]
+    if not pedidos:
+        return
+    existentes = identidad_client.usuarios_existentes(pedidos)
+    if datos.usuario_id is not None and datos.usuario_id not in existentes:
+        raise UsuarioNoEncontradoError("El conductor (usuario_id) no existe")
+    if datos.autorizado_por_id is not None and datos.autorizado_por_id not in existentes:
+        raise UsuarioNoEncontradoError("Quien autoriza (autorizado_por_id) no existe")
 
 
 def _tiene_acceso_activo(db: Session, vehiculo_id: uuid.UUID) -> bool:

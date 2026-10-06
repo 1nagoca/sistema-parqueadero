@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     BACKEND_VISION_URL: str = "http://backend-vision:8001"
     PARQUEADERO_URL: str = "http://backend-parqueadero:8002"
+    IDENTIDAD_URL: str = "http://backend-identidad:8003"
 
     # Almacenamiento privado de los documentos de verificacion (carnet, placa, tarjeta de
     # propiedad). No se sirve como estatico: solo se entrega via endpoint autenticado.

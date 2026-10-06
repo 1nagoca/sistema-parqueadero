@@ -3,11 +3,10 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_role
+from app.api.deps import UsuarioToken, get_db, require_role_token
+from app.identidad_client.client import IdentidadNoDisponibleError, VehiculoNoEncontradoError
 from app.models.acceso import Acceso
-from app.models.enums import EstadoVerificacion, RolUsuario, TipoAcceso
-from app.models.usuario import Usuario
-from app.models.vehiculo import Vehiculo
+from app.models.enums import RolUsuario
 from app.schemas.acceso import AccesoActivoRead, AccesoEntradaCreate, AccesoRead
 from app.parqueadero_client import client as parqueadero_client
 from app.parqueadero_client.client import CupoNoDisponibleError, ParqueaderoNoDisponibleError
@@ -20,7 +19,7 @@ router = APIRouter(prefix="/accesos", tags=["accesos"])
 def listar_accesos_activos(
     zona_id: uuid.UUID | None = None,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(require_role(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
+    _: UsuarioToken = Depends(require_role_token(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
 ):
     """Vehiculos actualmente adentro (sin fecha_hora_salida), para que el vigilante pueda
     registrar la salida sin tener que recordar/escribir la placa de nuevo."""
@@ -52,7 +51,7 @@ def listar_accesos_activos(
 def buscar_acceso_activo(
     placa: str,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(require_role(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
+    _: UsuarioToken = Depends(require_role_token(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
 ):
     """Usado por el panel de vigilancia para saber si una placa tiene un acceso abierto
     (y por lo tanto corresponde ofrecer 'registrar salida' en vez de una nueva entrada).
@@ -71,44 +70,27 @@ def buscar_acceso_activo(
 def registrar_entrada(
     datos: AccesoEntradaCreate,
     db: Session = Depends(get_db),
-    vigilante: Usuario = Depends(require_role(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
+    vigilante: UsuarioToken = Depends(require_role_token(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
 ):
-    _exigir_vehiculo_verificado(db, datos)
     try:
         return acceso_service.registrar_entrada(db, datos, realizado_por_id=vigilante.id)
-    except acceso_service.VehiculoNoEncontradoError as exc:
+    except (VehiculoNoEncontradoError, acceso_service.UsuarioNoEncontradoError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except acceso_service.VehiculoYaAdentroError as exc:
+    except (acceso_service.VehiculoNoVerificadoError, acceso_service.VehiculoYaAdentroError) as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except IdentidadNoDisponibleError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except CupoNoDisponibleError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except ParqueaderoNoDisponibleError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
 
-def _exigir_vehiculo_verificado(db: Session, datos: AccesoEntradaCreate) -> None:
-    """Un acceso normal exige vehiculo y propietario aprobados por el administrador; el
-    visitante ya pasa por su propio flujo de autorizacion + justificacion."""
-    if datos.tipo_acceso != TipoAcceso.NORMAL:
-        return
-    vehiculo = db.get(Vehiculo, datos.vehiculo_id)
-    if vehiculo is None:
-        return
-    propietario = db.get(Usuario, vehiculo.usuario_id) if vehiculo.usuario_id is not None else None
-    if vehiculo.estado_verificacion != EstadoVerificacion.APROBADO or (
-        propietario is not None and propietario.estado_verificacion != EstadoVerificacion.APROBADO
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="El vehiculo o su propietario aun no estan verificados por el administrador",
-        )
-
-
 @router.post("/{acceso_id}/salida", response_model=AccesoRead)
 def registrar_salida(
     acceso_id: uuid.UUID,
     db: Session = Depends(get_db),
-    vigilante: Usuario = Depends(require_role(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
+    vigilante: UsuarioToken = Depends(require_role_token(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
 ):
     try:
         return acceso_service.registrar_salida(db, acceso_id, realizado_por_id=vigilante.id)

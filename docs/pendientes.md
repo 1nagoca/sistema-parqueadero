@@ -50,17 +50,17 @@ bases solo tienen usuarios de prueba.
 
 ### E. Desacoplar core
 
-- [ ] Validar el token por su cuenta, sin consultar la tabla `usuarios`.
+- [x] Validar el token por su cuenta, sin consultar la tabla `usuarios`.
 - [x] Guardar la `placa` en `accesos` al registrar la entrada; la lista de vehículos adentro y
       la búsqueda por placa dejan de leer `vehiculos`.
-- [ ] Consultar a identidad por su API interna el vehículo, su dueño y la existencia de
+- [x] Consultar a identidad por su API interna el vehículo, su dueño y la existencia de
       `usuario_id` y `autorizado_por_id` (hoy son consultas directas a la base).
-- [ ] Si identidad no responde, rechazar toda entrada con 503 y un mensaje claro; salidas,
+- [x] Si identidad no responde, rechazar toda entrada con 503 y un mensaje claro; salidas,
       lista y búsqueda siguen funcionando.
 - [x] Quitar las llaves foráneas de `accesos` a `usuarios` y `vehiculos` y la de
       `auditoria_accesos.realizado_por_id`: quedan como identificadores sin restricción, igual
       que `zona_id` y `espacio_id`.
-- [ ] Sustituir identidad por un doble en los tests de accesos.
+- [x] Sustituir identidad por un doble en los tests de accesos.
 
 Entre la parte E y la F el entorno de desarrollo no funciona de punta a punta: el navegador
 aún crea usuarios y vehículos en `backend-core` y accesos ya los busca en identidad.
@@ -146,7 +146,7 @@ No bloquean nada, pero conviene arreglarlas.
 - [ ] La lectura de placas la puede usar cualquier usuario con sesión; limitarla a vigilantes y
       administradores.
 - [x] Entrada con vehiculo_id inexistente responde 500 en vez de 404/409 (violación de llave foránea; deducido del código, no probado)
-- [ ] Entrada con usuario_id o autorizado_por_id inexistente responde 500 en vez de 404 (violación de llave foránea a usuarios; deducido del código, no probado)
+- [x] Entrada con usuario_id o autorizado_por_id inexistente responde 500 en vez de 404 (violación de llave foránea a usuarios; deducido del código, no probado)
 - [ ] Los índices de las migraciones de identidad y de core no están declarados en los modelos (`alembic check`; solo afecta a `--autogenerate`)
 - [ ] `deps.py` de identidad y de core responde 500 en vez de 401 si el token trae un `sub` que no es UUID (deducido del código, no probado; `backend-parqueadero` ya lo maneja)
 - [ ] `POST /vehiculos` con un `usuario_id` que no existe responde 500 por la llave foránea (identidad y core; deducido, no probado)
