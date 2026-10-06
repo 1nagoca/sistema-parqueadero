@@ -1,8 +1,30 @@
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from jose import JWTError, jwt
+from passlib.context import CryptContext
 
 from app.core.config import settings
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def hashear_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verificar_password(password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(password, hashed_password)
+
+
+def crear_access_token(subject: str, rol: str, expires_delta: timedelta | None = None) -> str:
+    """El rol viaja en el token para que los demas microservicios autoricen sin consultar la
+    base de datos de usuarios."""
+    expira = datetime.now(timezone.utc) + (
+        expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    payload: dict[str, Any] = {"sub": subject, "rol": rol, "exp": expira}
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
 
 def decodificar_token(token: str) -> dict[str, Any]:

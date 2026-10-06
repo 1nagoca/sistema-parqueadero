@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 
-# Todavia sin routers: los de identidad (auth, usuarios, vehiculos, documentos y
-# verificaciones) llegan en la parte C del paso 3.
+from app.api.v1.routers import auth, usuarios
+
 api_router = APIRouter()
+api_router.include_router(auth.router)
+api_router.include_router(usuarios.router)

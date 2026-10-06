@@ -145,3 +145,5 @@ No bloquean nada, pero conviene arreglarlas.
       administradores.
 - [x] Entrada con vehiculo_id inexistente responde 500 en vez de 404/409 (violación de llave foránea; deducido del código, no probado)
 - [ ] Entrada con usuario_id o autorizado_por_id inexistente responde 500 en vez de 404 (violación de llave foránea a usuarios; deducido del código, no probado)
+- [ ] Los índices de las migraciones de identidad y de core no están declarados en los modelos (`alembic check`; solo afecta a `--autogenerate`)
+- [ ] `deps.py` de identidad y de core responde 500 en vez de 401 si el token trae un `sub` que no es UUID (deducido del código, no probado; `backend-parqueadero` ya lo maneja)
