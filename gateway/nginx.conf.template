@@ -19,10 +19,11 @@ map $http_upgrade $connection_upgrade {
 server {
     listen 8000;
 
-    # Los documentos de verificacion admiten hasta 5 MB (MAX_UPLOAD_BYTES en backend-core).
+    # Los documentos de verificacion admiten hasta 5 MB (MAX_UPLOAD_BYTES en backend-identidad).
     client_max_body_size 6m;
 
     set $core http://backend-core:8000;
+    set $identidad http://backend-identidad:8003;
     set $parqueadero http://backend-parqueadero:8002;
     set $vision http://backend-vision:8001;
 
@@ -48,9 +49,15 @@ server {
 
     location = /_auth {
         internal;
-        proxy_pass $core/api/v1/usuarios/me;
+        proxy_pass $identidad/api/v1/usuarios/me;
         proxy_pass_request_body off;
         proxy_set_header Content-Length "";
+    }
+
+    # Microservicio de identidad: inicio de sesion, registro, usuarios, vehiculos, documentos y
+    # verificaciones. Su API interna (/interno) no se publica aqui a proposito.
+    location ~ ^/api/v1/(auth|usuarios|vehiculos|documentos|verificaciones)(/|$) {
+        proxy_pass $identidad;
     }
 
     # Microservicio de parqueadero: zonas, espacios, reportes de ocupacion y cupos en tiempo
@@ -67,6 +74,7 @@ server {
         proxy_pass $parqueadero;
     }
 
+    # Lo demas (accesos y auditoria) va al servicio de accesos.
     location / {
         proxy_pass $core;
     }

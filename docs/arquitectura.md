@@ -22,7 +22,9 @@ corresponde. Así el frontend conoce una sola dirección.
 Navegador → gateway :8000 → /api/v1/alpr/*                      → visión
                           → /api/v1/zonas, espacios, reportes   → parqueadero
                           → /ws/*                               → parqueadero
-                          → lo demás                            → identidad / accesos
+                          → /api/v1/auth, usuarios, vehiculos,
+                            documentos, verificaciones          → identidad
+                          → lo demás (accesos, auditoría)       → accesos
 ```
 
 ## Estado actual
@@ -37,10 +39,12 @@ Navegador → gateway :8000 → /api/v1/alpr/*                      → visión
 | Servicio | Carpeta | Base de datos |
 |---|---|---|
 | Parqueadero | `backend-parqueadero` | `parqueadero_zonas` (contenedor `db-parqueadero`, puerto 5434) |
-| Identidad + Accesos (aún juntos) | `backend-core` | `parqueadero` (contenedor `db`, puerto 5433) |
+| Identidad | `backend-identidad` | `parqueadero_identidad` (contenedor `db-identidad`, puerto 5435) |
+| Accesos | `backend-core` | `parqueadero` (contenedor `db`, puerto 5433) |
 | Visión | `backend-vision` | Ninguna |
 
-Identidad y Accesos siguen juntos en `backend-core`. Parqueadero y Visión ya son independientes.
+El gateway ya envía las rutas de identidad a `backend-identidad`. `backend-core` conserva una
+copia sin uso de ese código y de sus tablas hasta que se borre (paso 3, parte F).
 
 ## Cómo se registra una entrada (dos bases de datos)
 
@@ -59,8 +63,8 @@ La API `/interno` es solo entre servicios: el gateway no la publica.
 
 ## Servicio de Identidad: contrato
 
-Lo que tendrá `backend-identidad` cuando se separe de `backend-core` (paso 3). Todavía no está
-construido; los pasos están en [`pendientes.md`](pendientes.md).
+Lo que ofrece `backend-identidad`. Lo que falta del paso 3 está en
+[`pendientes.md`](pendientes.md).
 
 ### Nombres y puertos
 

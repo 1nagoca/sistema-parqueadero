@@ -67,8 +67,8 @@ aún crea usuarios y vehículos en `backend-core` y accesos ya los busca en iden
 
 ### F. Corte del gateway y borrado en core
 
-- [ ] Enviar a identidad `/auth`, `/usuarios`, `/vehiculos`, `/documentos` y `/verificaciones`.
-- [ ] Apuntar a identidad la validación de sesión de visión.
+- [x] Enviar a identidad `/auth`, `/usuarios`, `/vehiculos`, `/documentos` y `/verificaciones`.
+- [x] Apuntar a identidad la validación de sesión de visión.
 - [ ] Borrar de `backend-core` el código y los tests de identidad, las tablas `documentos`,
       `vehiculos` y `usuarios` (migración reversible) y el volumen `uploads_data`.
 - [ ] Retirar o adaptar `tests/test_migracion_placa.py` de `backend-core` cuando se borren

@@ -23,6 +23,7 @@ services:
     restart: unless-stopped
     depends_on:
       - backend-core
+      - backend-identidad
       - backend-parqueadero
       - backend-vision
     ports:
