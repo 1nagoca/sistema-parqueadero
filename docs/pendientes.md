@@ -104,13 +104,13 @@ Para que todo coincida con el código real.
 
 - [ ] **BPM por roles:** una calle por rol (estudiante, vigilante, administrador, sistema) con las
       actividades de cada uno, como pidió el profesor.
-- [ ] **Diagrama de arquitectura:** los 4 microservicios, cada uno con su base de datos, y el
+- [x] **Diagrama de arquitectura:** los 4 microservicios, cada uno con su base de datos, y el
       gateway como entrada única.
-- [ ] **Diagrama de despliegue:** agregar el gateway y las bases separadas; corregir
+- [x] **Diagrama de despliegue:** agregar el gateway y las bases separadas; corregir
       `postgres:15` por `postgres:16`.
-- [ ] **Mapa de contextos:** ya no hay "Shared Kernel" entre Espacios y Accesos; ahora se hablan
+- [x] **Mapa de contextos:** ya no hay "Shared Kernel" entre Espacios y Accesos; ahora se hablan
       por API.
-- [ ] **Capas:** explicar que las capas (routers → services → models) son la organización interna
+- [x] **Capas:** explicar que las capas (routers → services → models) son la organización interna
       de cada microservicio, no la arquitectura global.
 - [ ] Actualizar `README.md` y `AGENTS.md` (estructura, comandos y puertos nuevos).
 - [ ] Actualizar la colección de Postman si cambia alguna ruta.

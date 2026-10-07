@@ -16,7 +16,8 @@ ninguno lee las tablas de otro.
 | Visión (ALPR) | Lectura de placas a partir de una foto | Ninguno (sin estado) |
 
 El navegador entra siempre por el **API Gateway** (nginx), que reparte cada ruta al servicio que
-corresponde. Así el frontend conoce una sola dirección.
+corresponde. Así el frontend conoce una sola dirección. Los diagramas (arquitectura, despliegue,
+mapa de contextos y capas) están en [`diagramas/`](diagramas/README.md).
 
 ```
 Navegador → gateway :8000 → /api/v1/alpr/*                      → visión
