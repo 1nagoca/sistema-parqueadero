@@ -76,7 +76,7 @@ aún crea usuarios y vehículos en `backend-core` y accesos ya los busca en iden
 
 ### G. Cierre y documentación
 
-- [ ] Frontend: mostrar en la pantalla de auditoría del administrador las dos fuentes, accesos
+- [x] Frontend: mostrar en la pantalla de auditoría del administrador las dos fuentes, accesos
       (`/auditoria`) y verificaciones (`/verificaciones/auditoria`).
 - [x] Probar el flujo completo en el navegador.
 - [ ] Actualizar `arquitectura.md`, `README.md`, `AGENTS.md` y `base-de-datos/`.

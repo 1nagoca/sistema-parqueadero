@@ -5,7 +5,7 @@ import Button from "@/components/common/Button";
 import DocumentoVisor from "@/components/verificacion/DocumentoVisor";
 import EstadoBadge from "@/components/verificacion/EstadoBadge";
 import { useAuth } from "@/context/AuthContext";
-import { listarAuditoria } from "@/services/api/auditoria";
+import { listarAuditoria, listarAuditoriaVerificaciones } from "@/services/api/auditoria";
 import { ApiError } from "@/services/api/client";
 import { crearEspacio, listarEspacios } from "@/services/api/espacios";
 import { crearUsuario, listarUsuarios } from "@/services/api/usuarios";
@@ -512,16 +512,63 @@ function SeccionEspacios() {
   );
 }
 
+type OrigenAuditoria = "accesos" | "verificaciones";
+
+/** Cada origen es un microservicio distinto: accesos guarda entradas y salidas; identidad, las
+ * verificaciones. Se cargan por separado para que la caida de uno no oculte al otro. */
+const ORIGENES: Record<
+  OrigenAuditoria,
+  { etiqueta: string; estilo: string; listar: (tabla?: string) => Promise<AuditoriaAcceso[]>; error: string }
+> = {
+  accesos: {
+    etiqueta: "Accesos",
+    estilo: "bg-sky-100 text-sky-800",
+    listar: listarAuditoria,
+    error: "No se pudo cargar la auditoria de accesos. Se muestran solo las verificaciones.",
+  },
+  verificaciones: {
+    etiqueta: "Verificaciones",
+    estilo: "bg-amber-100 text-amber-800",
+    listar: listarAuditoriaVerificaciones,
+    error: "No se pudo cargar la auditoria de verificaciones. Se muestran solo los accesos.",
+  },
+};
+
+const ORIGENES_AUDITORIA = Object.keys(ORIGENES) as OrigenAuditoria[];
+
+type CargaAuditoria = { registros: AuditoriaAcceso[]; error: boolean; cargando: boolean };
+
+const CARGA_INICIAL: Record<OrigenAuditoria, CargaAuditoria> = {
+  accesos: { registros: [], error: false, cargando: true },
+  verificaciones: { registros: [], error: false, cargando: true },
+};
+
 function SeccionAuditoria() {
-  const [registros, setRegistros] = useState<AuditoriaAcceso[]>([]);
+  const [cargas, setCargas] = useState(CARGA_INICIAL);
   const [filtro, setFiltro] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    listarAuditoria(filtro || undefined)
-      .then(setRegistros)
-      .catch((err) => setError(err instanceof ApiError ? err.message : "No se pudo cargar la auditoria"));
+    // Si el filtro cambia antes de que llegue una respuesta, esa respuesta ya no se usa.
+    let vigente = true;
+    setCargas(CARGA_INICIAL);
+    for (const origen of ORIGENES_AUDITORIA) {
+      ORIGENES[origen]
+        .listar(filtro || undefined)
+        .then((registros) => ({ registros, error: false, cargando: false }))
+        .catch(() => ({ registros: [], error: true, cargando: false }))
+        .then((carga) => {
+          if (vigente) setCargas((actual) => ({ ...actual, [origen]: carga }));
+        });
+    }
+    return () => {
+      vigente = false;
+    };
   }, [filtro]);
+
+  const registros = ORIGENES_AUDITORIA.flatMap((origen) =>
+    cargas[origen].registros.map((registro) => ({ origen, registro })),
+  ).sort((a, b) => new Date(b.registro.fecha_hora).getTime() - new Date(a.registro.fecha_hora).getTime());
+  const cargando = ORIGENES_AUDITORIA.some((origen) => cargas[origen].cargando);
 
   return (
     <div className="space-y-4">
@@ -530,20 +577,32 @@ function SeccionAuditoria() {
         <select value={filtro} onChange={(evento) => setFiltro(evento.target.value)} className={`${campo} w-full`}>
           <option value="">Todas</option>
           <option value="accesos">accesos</option>
+          <option value="usuarios">usuarios</option>
+          <option value="vehiculos">vehiculos</option>
           <option value="espacios">espacios</option>
           <option value="zonas">zonas</option>
         </select>
       </div>
 
-      {error && <p className="rounded-xl bg-red-100 p-3 text-red-800">{error}</p>}
+      {ORIGENES_AUDITORIA.filter((origen) => cargas[origen].error).map((origen) => (
+        <p key={origen} className="rounded-xl bg-red-100 p-3 text-red-800">
+          {ORIGENES[origen].error}
+        </p>
+      ))}
 
       <div className="space-y-2">
-        {registros.map((registro) => (
-          <div key={registro.id} className="rounded-xl bg-white p-3 text-sm shadow-sm">
-            <p className="font-medium text-gray-900">
-              {registro.tabla_afectada} · {registro.accion}
-            </p>
+        {registros.map(({ origen, registro }) => (
+          <div key={`${origen}-${registro.id}`} className="rounded-xl bg-white p-3 text-sm shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium text-gray-900">
+                {registro.tabla_afectada} · {registro.accion}
+              </p>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ORIGENES[origen].estilo}`}>
+                {ORIGENES[origen].etiqueta}
+              </span>
+            </div>
             <p className="text-xs text-gray-500">{new Date(registro.fecha_hora).toLocaleString("es-CO")}</p>
+            {registro.motivo && <p className="mt-1 text-xs text-gray-700">Motivo: {registro.motivo}</p>}
             {registro.valores_nuevos && (
               <pre className="mt-1 overflow-x-auto text-xs text-gray-600">
                 {JSON.stringify(registro.valores_nuevos)}
@@ -551,7 +610,8 @@ function SeccionAuditoria() {
             )}
           </div>
         ))}
-        {registros.length === 0 && <p className="text-center text-gray-400">Sin registros.</p>}
+        {cargando && registros.length === 0 && <p className="text-center text-gray-400">Cargando...</p>}
+        {!cargando && registros.length === 0 && <p className="text-center text-gray-400">Sin registros.</p>}
       </div>
     </div>
   );
