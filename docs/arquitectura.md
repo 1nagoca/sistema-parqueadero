@@ -17,7 +17,7 @@ ninguno lee las tablas de otro.
 
 El navegador entra siempre por el **API Gateway** (nginx), que reparte cada ruta al servicio que
 corresponde. Así el frontend conoce una sola dirección. Los diagramas (arquitectura, despliegue,
-mapa de contextos y capas) están en [`diagramas/`](diagramas/README.md).
+mapa de contextos, capas y procesos por rol) están en [`diagramas/`](diagramas/README.md).
 
 ```
 Navegador → gateway :8000 → /api/v1/alpr/*                      → visión

@@ -11,7 +11,7 @@ El detalle de lo ya hecho y de cómo funciona está en [`arquitectura.md`](arqui
 | 2. Separar Parqueadero con su base de datos | Hecho |
 | 3. Separar Identidad y verificación | Hecho |
 | 4. Accesos con su base y auditoría | Hecho |
-| 5. Corregir diagramas, BPM y documentos | Pendiente |
+| 5. Corregir diagramas, BPM y documentos | Hecho |
 | 6. Preparar la presentación | Pendiente |
 | 7. Endurecer secretos antes de publicar | Pendiente |
 
@@ -98,11 +98,11 @@ Y como cierre:
 - [x] Renombrar `backend-core` a `backend-accesos` (carpeta, `docker-compose.yml`, gateway y
       documentación).
 
-## Paso 5 — Corregir diagramas, BPM y documentos
+## Paso 5 — Corregir diagramas, BPM y documentos (hecho)
 
-Para que todo coincida con el código real.
+Para que todo coincida con el código real. Los diagramas están en [`diagramas/`](diagramas/README.md).
 
-- [ ] **BPM por roles:** una calle por rol (estudiante, vigilante, administrador, sistema) con las
+- [x] **BPM por roles:** una calle por rol (estudiante, vigilante, administrador, sistema) con las
       actividades de cada uno, como pidió el profesor.
 - [x] **Diagrama de arquitectura:** los 4 microservicios, cada uno con su base de datos, y el
       gateway como entrada única.
@@ -112,8 +112,9 @@ Para que todo coincida con el código real.
       por API.
 - [x] **Capas:** explicar que las capas (routers → services → models) son la organización interna
       de cada microservicio, no la arquitectura global.
-- [ ] Actualizar `README.md` y `AGENTS.md` (estructura, comandos y puertos nuevos).
-- [ ] Actualizar la colección de Postman si cambia alguna ruta.
+- [x] Actualizar `README.md` y `AGENTS.md` (estructura, comandos y puertos nuevos).
+- [x] Actualizar la colección de Postman si cambia alguna ruta (ninguna cambió: las 20 peticiones siguen
+      existiendo por el gateway).
 
 ## Paso 6 — Preparar la presentación
 
@@ -168,3 +169,6 @@ No bloquean nada, pero conviene arreglarlas.
 - [ ] La colección de Postman lleva contraseñas de prueba escritas en el archivo versionado y sus inicios de sesión usan cuentas (`estudiante@uni.edu.co`, entre otras) que pueden no existir ya en identidad.
 - [ ] Alinear `.env.example` con los puertos reales: trae `POSTGRES_PORT=5432` y el equipo de desarrollo usa 5433 para la base de accesos.
 - [ ] Corregir los comentarios que aún dicen que `backend-core` llama a visión (`backend-vision`) o avisa por `/ws/zonas` (frontend), y el nombre `backend-core` en la colección de Postman.
+- [ ] Un visitante que vuelve a entrar pasa como acceso normal, sin autorización ni justificación (hueco frente a RN-03: su vehículo queda aprobado y sin dueño).
+- [ ] `/ws/zonas` no valida la sesión.
+- [ ] El filtro de auditoría ofrece `espacios` y `zonas`, tablas de las que ningún servicio escribe trazas hoy.
