@@ -10,7 +10,7 @@ El detalle de lo ya hecho y de cómo funciona está en [`arquitectura.md`](arqui
 | 1. Gateway + visión con pantalla propia | Hecho |
 | 2. Separar Parqueadero con su base de datos | Hecho |
 | 3. Separar Identidad y verificación | Hecho |
-| 4. Accesos con su base y auditoría | Pendiente |
+| 4. Accesos con su base y auditoría | Hecho |
 | 5. Corregir diagramas, BPM y documentos | Pendiente |
 | 6. Preparar la presentación | Pendiente |
 | 7. Endurecer secretos antes de publicar | Pendiente |
@@ -83,18 +83,19 @@ aún crea usuarios y vehículos en `backend-core` y accesos ya los busca en iden
 
 Las partes B, C, E y F requieren aprobar cambios de esquema o de `docker-compose.yml`.
 
-## Paso 4 — Accesos con su base y auditoría
+## Paso 4 — Accesos con su base y auditoría (hecho)
 
-Lo que quedó en `backend-core` ya es el servicio de Accesos. Se hizo durante el paso 3:
+Lo que quedó en `backend-core` es el servicio de Accesos, ahora `backend-accesos`. Se hizo
+durante el paso 3:
 
 - [x] Base propia (`parqueadero`) solo con `accesos` y `auditoria_accesos`, sin tablas ni llaves
       foráneas de identidad.
 - [x] Auditoría propia de accesos; la de verificaciones pasó a identidad.
 - [x] Validar el token por firma y claims y consultar a identidad por su API interna.
 
-Falta:
+Y como cierre:
 
-- [ ] Renombrar `backend-core` a `backend-accesos` (carpeta, `docker-compose.yml`, gateway y
+- [x] Renombrar `backend-core` a `backend-accesos` (carpeta, `docker-compose.yml`, gateway y
       documentación).
 
 ## Paso 5 — Corregir diagramas, BPM y documentos
@@ -166,3 +167,4 @@ No bloquean nada, pero conviene arreglarlas.
 - [ ] No se valida que quien autoriza una entrada de visitante (`autorizado_por_id`) sea vigilante o administrador.
 - [ ] La colección de Postman lleva contraseñas de prueba escritas en el archivo versionado y sus inicios de sesión usan cuentas (`estudiante@uni.edu.co`, entre otras) que pueden no existir ya en identidad.
 - [ ] Alinear `.env.example` con los puertos reales: trae `POSTGRES_PORT=5432` y el equipo de desarrollo usa 5433 para la base de accesos.
+- [ ] Corregir los comentarios que aún dicen que `backend-core` llama a visión (`backend-vision`) o avisa por `/ws/zonas` (frontend), y el nombre `backend-core` en la colección de Postman.

@@ -34,12 +34,12 @@ Navegador → gateway :8000 → /api/v1/alpr/*                      → visión
 | 1. Gateway + visión con pantalla propia | Hecho |
 | 2. Separar Parqueadero | Hecho |
 | 3. Separar Identidad y verificación | Hecho |
-| 4. Accesos con su base y auditoría | Pendiente: solo falta renombrar `backend-core` |
+| 4. Accesos con su base y auditoría | Hecho |
 
 | Servicio | Carpeta | Puerto interno | Base de datos |
 |---|---|---|---|
 | Identidad | `backend-identidad` | 8003 | `parqueadero_identidad` (contenedor `db-identidad`, puerto 5435) |
-| Accesos | `backend-core` | 8000 | `parqueadero` (contenedor `db`, puerto 5432) |
+| Accesos | `backend-accesos` | 8000 | `parqueadero` (contenedor `db`, puerto 5432) |
 | Parqueadero | `backend-parqueadero` | 8002 | `parqueadero_zonas` (contenedor `db-parqueadero`, puerto 5434) |
 | Visión | `backend-vision` | 8001 | Ninguna |
 
@@ -48,8 +48,8 @@ bases son los del host: los de la tabla son los valores por defecto de `docker-c
 cambian en `.env` (`POSTGRES_PORT`, `PARQUEADERO_DB_PORT`, `IDENTIDAD_DB_PORT`). En el equipo de
 desarrollo actual el `.env` usa 5433 para la base de accesos, porque el 5432 ya está ocupado.
 
-`backend-core` solo contiene Accesos (entradas, salidas y auditoría); se renombrará a
-`backend-accesos` en el paso 4.
+`backend-accesos` solo contiene Accesos (entradas, salidas y auditoría); antes se llamaba
+`backend-core`, cuando también incluía identidad y parqueadero.
 
 ## Cómo se registra una entrada (tres servicios)
 
@@ -162,13 +162,12 @@ Si Identidad no responde, tarda más de 5 segundos o responde algo inesperado, A
 
 ## Lo que falta resolver
 
-- **Renombrar `backend-core`.** Ya es solo Accesos; falta cambiarle el nombre (paso 4).
 - **Compensación fallida.** Si Parqueadero se cae justo entre ocupar y compensar, el contador
   queda desfasado y solo se deja un registro en el log; falta un mecanismo de reintento.
 
 ## Migrar una base existente
 
-`backend-core` trae la migración `0003_separar_parqueadero`, que borra `zonas` y `espacios`.
+`backend-accesos` trae la migración `0003_separar_parqueadero`, que borra `zonas` y `espacios`.
 Antes hay que copiar esos datos a la base nueva:
 
 ```
@@ -176,7 +175,7 @@ docker compose up -d db-parqueadero backend-parqueadero
 docker compose exec backend-parqueadero alembic upgrade head
 docker compose exec -T db pg_dump -U parqueadero -d parqueadero --data-only -t zonas -t espacios \
   | docker compose exec -T db-parqueadero psql -U parqueadero -d parqueadero_zonas -1
-docker compose exec -e PARQUEADERO_DATOS_MIGRADOS=1 backend-core alembic upgrade head
+docker compose exec -e PARQUEADERO_DATOS_MIGRADOS=1 backend-accesos alembic upgrade head
 ```
 
 La migración `0005_borrar_identidad` borra `usuarios`, `vehiculos` y `documentos` de la base de
@@ -184,7 +183,7 @@ Accesos. Esos datos no se copian (identidad se siembra aparte); si las tablas ti
 migración se niega a correr salvo que se confirme con `IDENTIDAD_DATOS_MIGRADOS=1`:
 
 ```
-docker compose exec -e IDENTIDAD_DATOS_MIGRADOS=1 backend-core alembic upgrade head
+docker compose exec -e IDENTIDAD_DATOS_MIGRADOS=1 backend-accesos alembic upgrade head
 ```
 
 En una instalación nueva basta `alembic upgrade head` en cada servicio y sembrar identidad.

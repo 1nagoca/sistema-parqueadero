@@ -22,7 +22,7 @@ server {
     # Los documentos de verificacion admiten hasta 5 MB (MAX_UPLOAD_BYTES en backend-identidad).
     client_max_body_size 6m;
 
-    set $core http://backend-core:8000;
+    set $accesos http://backend-accesos:8000;
     set $identidad http://backend-identidad:8003;
     set $parqueadero http://backend-parqueadero:8002;
     set $vision http://backend-vision:8001;
@@ -76,6 +76,6 @@ server {
 
     # Lo demas (accesos y auditoria) va al servicio de accesos.
     location / {
-        proxy_pass $core;
+        proxy_pass $accesos;
     }
 }

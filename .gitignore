@@ -18,7 +18,6 @@ frontend/dist/
 
 # Documentos subidos por estudiantes (datos personales)
 uploads/
-backend-core/uploads/
 
 # Docker
 *.log

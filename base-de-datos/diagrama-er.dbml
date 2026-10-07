@@ -2,11 +2,11 @@
 // Pegar en https://dbdiagram.io/d para verlo y exportarlo a PostgreSQL, MySQL, SQL Server u otro (menú Export).
 // Hay una base de datos por microservicio (ver los TableGroup al final):
 //   parqueadero_identidad (backend-identidad): usuarios, vehiculos, documentos, auditoria_identidad
-//   parqueadero           (backend-core, accesos): accesos, auditoria_accesos
+//   parqueadero           (backend-accesos): accesos, auditoria_accesos
 //   parqueadero_zonas     (backend-parqueadero): zonas, espacios
 // Entre bases no hay llaves foraneas: accesos y auditoria_accesos guardan solo los identificadores
 // de vehiculos, usuarios, zonas y espacios.
-// Fuente de verdad: alembic/versions de backend-identidad, backend-core y backend-parqueadero.
+// Fuente de verdad: alembic/versions de backend-identidad, backend-accesos y backend-parqueadero.
 
 Enum usuario_rol_enum {
   estudiante

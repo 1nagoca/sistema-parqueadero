@@ -22,7 +22,7 @@ services:
     image: nginx:1.27-alpine
     restart: unless-stopped
     depends_on:
-      - backend-core
+      - backend-accesos
       - backend-identidad
       - backend-parqueadero
       - backend-vision
@@ -125,10 +125,10 @@ services:
       # Documentos de verificacion: datos personales, en un volumen propio y nunca como estatico.
       - identidad_uploads:/code/uploads
 
-  backend-core:
-    build: ./backend-core
+  backend-accesos:
+    build: ./backend-accesos
     restart: unless-stopped
-    # --reload solo para desarrollo: como ./backend-core esta montado en /code, uvicorn reinicia
+    # --reload solo para desarrollo: como ./backend-accesos esta montado en /code, uvicorn reinicia
     # solo al guardar un .py. El CMD del Dockerfile (sin --reload) queda para produccion.
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
@@ -145,13 +145,13 @@ services:
       IDENTIDAD_URL: http://backend-identidad:8003
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:5173"]}
     volumes:
-      - ./backend-core:/code
+      - ./backend-accesos:/code
 
   frontend:
     build: ./frontend
     restart: unless-stopped
     depends_on:
-      - backend-core
+      - backend-accesos
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     environment:
