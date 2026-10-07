@@ -9,13 +9,13 @@ El detalle de lo ya hecho y de cómo funciona está en [`arquitectura.md`](arqui
 |---|---|
 | 1. Gateway + visión con pantalla propia | Hecho |
 | 2. Separar Parqueadero con su base de datos | Hecho |
-| 3. Separar Identidad y verificación | Pendiente |
+| 3. Separar Identidad y verificación | Hecho |
 | 4. Accesos con su base y auditoría | Pendiente |
 | 5. Corregir diagramas, BPM y documentos | Pendiente |
 | 6. Preparar la presentación | Pendiente |
 | 7. Endurecer secretos antes de publicar | Pendiente |
 
-## Paso 3 — Separar Identidad y verificación
+## Paso 3 — Separar Identidad y verificación (hecho)
 
 Crear el servicio `backend-identidad` con su propia base de datos. El contrato está en
 [`arquitectura.md`](arquitectura.md#servicio-de-identidad-contrato). No se copian datos: las
@@ -79,15 +79,23 @@ aún crea usuarios y vehículos en `backend-core` y accesos ya los busca en iden
 - [x] Frontend: mostrar en la pantalla de auditoría del administrador las dos fuentes, accesos
       (`/auditoria`) y verificaciones (`/verificaciones/auditoria`).
 - [x] Probar el flujo completo en el navegador.
-- [ ] Actualizar `arquitectura.md`, `README.md`, `AGENTS.md` y `base-de-datos/`.
+- [x] Actualizar `arquitectura.md`, `README.md`, `AGENTS.md` y `base-de-datos/`.
 
 Las partes B, C, E y F requieren aprobar cambios de esquema o de `docker-compose.yml`.
 
 ## Paso 4 — Accesos con su base y auditoría
 
-Lo que queda en `backend-core` pasa a ser el servicio de Accesos.
+Lo que quedó en `backend-core` ya es el servicio de Accesos. Se hizo durante el paso 3:
 
-- [ ] Renombrar `backend-core` a `backend-accesos` (carpeta, `docker-compose.yml`, gateway).
+- [x] Base propia (`parqueadero`) solo con `accesos` y `auditoria_accesos`, sin tablas ni llaves
+      foráneas de identidad.
+- [x] Auditoría propia de accesos; la de verificaciones pasó a identidad.
+- [x] Validar el token por firma y claims y consultar a identidad por su API interna.
+
+Falta:
+
+- [ ] Renombrar `backend-core` a `backend-accesos` (carpeta, `docker-compose.yml`, gateway y
+      documentación).
 
 ## Paso 5 — Corregir diagramas, BPM y documentos
 
@@ -123,9 +131,11 @@ públicos en `.env.example`.
 - [ ] Generar un `SECRET_KEY` nuevo (`openssl rand -hex 32`) y ponerlo solo en `.env`, nunca en
       `.env.example`.
 - [ ] Cambiar `POSTGRES_PASSWORD` en `.env` por una contraseña larga (si el volumen de la base ya
-      existe, recrearlo o cambiarla también dentro de Postgres). Aplica a las dos bases:
-      `parqueadero` y `parqueadero_zonas`.
+      existe, recrearlo o cambiarla también dentro de Postgres). Aplica a las tres bases:
+      `parqueadero`, `parqueadero_zonas` y `parqueadero_identidad`.
 - [ ] Confirmar que `.env.example` conserva solo valores de ejemplo.
+- [ ] Pasar a variables de Postman las contraseñas escritas en
+      `postman/parqueadero.postman_collection.json` y no reutilizar esas contraseñas.
 - [ ] No exponer los puertos de las bases de datos al exterior en `docker-compose.yml`.
 - [ ] Confirmar que `CORS_ORIGINS` solo incluye los orígenes reales.
 
@@ -147,6 +157,12 @@ No bloquean nada, pero conviene arreglarlas.
       administradores.
 - [x] Entrada con vehiculo_id inexistente responde 500 en vez de 404/409 (violación de llave foránea; deducido del código, no probado)
 - [x] Entrada con usuario_id o autorizado_por_id inexistente responde 500 en vez de 404 (violación de llave foránea a usuarios; deducido del código, no probado)
-- [ ] Los índices de las migraciones de identidad y de core no están declarados en los modelos (`alembic check`; solo afecta a `--autogenerate`)
-- [ ] `deps.py` de identidad y de core responde 500 en vez de 401 si el token trae un `sub` que no es UUID (deducido del código, no probado; `backend-parqueadero` ya lo maneja)
-- [ ] `POST /vehiculos` con un `usuario_id` que no existe responde 500 por la llave foránea (identidad y core; deducido, no probado)
+- [ ] Los índices de las migraciones de identidad y de accesos no están declarados en los modelos (`alembic check`; solo afecta a `--autogenerate`)
+- [ ] `deps.py` de identidad responde 500 en vez de 401 si el token trae un `sub` que no es UUID (deducido del código, no probado; accesos y parqueadero ya lo manejan)
+- [ ] `POST /vehiculos` con un `usuario_id` que no existe responde 500 por la llave foránea (identidad; deducido, no probado)
+- [ ] El frontend no tiene configuración de ESLint, así que `npm run lint` no corre.
+- [ ] Un usuario desactivado conserva acceso a accesos y parqueadero hasta que expire su token (8 horas), porque el token se valida sin consultar a identidad.
+- [ ] Las placas venezolanas (7 caracteres) no se aceptan: solo se valida el formato colombiano y el campo del formulario permite 6 caracteres.
+- [ ] No se valida que quien autoriza una entrada de visitante (`autorizado_por_id`) sea vigilante o administrador.
+- [ ] La colección de Postman lleva contraseñas de prueba escritas en el archivo versionado y sus inicios de sesión usan cuentas (`estudiante@uni.edu.co`, entre otras) que pueden no existir ya en identidad.
+- [ ] Alinear `.env.example` con los puertos reales: trae `POSTGRES_PORT=5432` y el equipo de desarrollo usa 5433 para la base de accesos.

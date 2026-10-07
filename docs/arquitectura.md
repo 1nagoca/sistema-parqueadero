@@ -1,9 +1,9 @@
 # Arquitectura — Parqueadero UFPS
 
-El sistema migra de un backend único a microservicios, un servicio por vez. Este documento dice
-a dónde vamos y en qué punto estamos.
+El sistema pasó de un backend único a microservicios, un servicio por vez. Este documento dice
+cómo está armado y qué falta.
 
-## Objetivo: cuatro microservicios
+## Cuatro microservicios
 
 Cada servicio tiene su propia base de datos y su propia API. Entre ellos solo se hablan por API;
 ninguno lee las tablas de otro.
@@ -33,28 +33,35 @@ Navegador → gateway :8000 → /api/v1/alpr/*                      → visión
 |---|---|
 | 1. Gateway + visión con pantalla propia | Hecho |
 | 2. Separar Parqueadero | Hecho |
-| 3. Separar Identidad y verificación | Pendiente |
-| 4. Accesos con su base y auditoría | Pendiente |
+| 3. Separar Identidad y verificación | Hecho |
+| 4. Accesos con su base y auditoría | Pendiente: solo falta renombrar `backend-core` |
 
-| Servicio | Carpeta | Base de datos |
-|---|---|---|
-| Parqueadero | `backend-parqueadero` | `parqueadero_zonas` (contenedor `db-parqueadero`, puerto 5434) |
-| Identidad | `backend-identidad` | `parqueadero_identidad` (contenedor `db-identidad`, puerto 5435) |
-| Accesos | `backend-core` | `parqueadero` (contenedor `db`, puerto 5433) |
-| Visión | `backend-vision` | Ninguna |
+| Servicio | Carpeta | Puerto interno | Base de datos |
+|---|---|---|---|
+| Identidad | `backend-identidad` | 8003 | `parqueadero_identidad` (contenedor `db-identidad`, puerto 5435) |
+| Accesos | `backend-core` | 8000 | `parqueadero` (contenedor `db`, puerto 5432) |
+| Parqueadero | `backend-parqueadero` | 8002 | `parqueadero_zonas` (contenedor `db-parqueadero`, puerto 5434) |
+| Visión | `backend-vision` | 8001 | Ninguna |
 
-Cada servicio tiene su código y su base de datos. `backend-core` ya solo contiene Accesos
-(entradas, salidas y auditoría); se renombrará a `backend-accesos` en el paso 4.
+Solo publican puerto de aplicación el gateway (8000) y el frontend (5173). Los puertos de las
+bases son los del host: los de la tabla son los valores por defecto de `docker-compose.yml` y se
+cambian en `.env` (`POSTGRES_PORT`, `PARQUEADERO_DB_PORT`, `IDENTIDAD_DB_PORT`). En el equipo de
+desarrollo actual el `.env` usa 5433 para la base de accesos, porque el 5432 ya está ocupado.
 
-## Cómo se registra una entrada (dos bases de datos)
+`backend-core` solo contiene Accesos (entradas, salidas y auditoría); se renombrará a
+`backend-accesos` en el paso 4.
 
-El cupo y el acceso viven en bases distintas, así que no hay una transacción que cubra los dos.
-Se resuelve con compensación:
+## Cómo se registra una entrada (tres servicios)
 
-1. Accesos pide a Parqueadero ocupar el cupo (`POST /interno/cupos/ocupar`). Si no hay cupo,
+El vehículo, el cupo y el acceso viven en bases distintas, así que no hay una transacción que
+cubra todo. Primero se comprueba y después se compensa:
+
+1. Accesos pide a Identidad el vehículo y los usuarios (ver el contrato más abajo). Si algo no
+   existe, no está aprobado o Identidad no responde, la entrada se rechaza sin tocar el cupo.
+2. Accesos pide a Parqueadero ocupar el cupo (`POST /interno/cupos/ocupar`). Si no hay cupo,
    Parqueadero responde 409 y no se crea nada.
-2. Accesos crea el acceso y su auditoría en su propia base.
-3. Si el paso 2 falla, Accesos pide liberar el cupo (`POST /interno/cupos/liberar`).
+3. Accesos crea el acceso (con la placa que le dio Identidad) y su auditoría en su propia base.
+4. Si el paso 3 falla, Accesos pide liberar el cupo (`POST /interno/cupos/liberar`).
 
 La salida es simétrica: primero se libera el cupo y luego se confirma la salida; si la
 confirmación falla, se vuelve a ocupar. Parqueadero avisa cada cambio por WebSocket.
@@ -63,8 +70,7 @@ La API `/interno` es solo entre servicios: el gateway no la publica.
 
 ## Servicio de Identidad: contrato
 
-Lo que ofrece `backend-identidad`. Lo que falta del paso 3 está en
-[`pendientes.md`](pendientes.md).
+Lo que ofrece `backend-identidad` a los demás servicios y al gateway.
 
 ### Nombres y puertos
 
@@ -73,10 +79,10 @@ Lo que ofrece `backend-identidad`. Lo que falta del paso 3 está en
 | Servicio | `backend-identidad`, puerto interno 8003 (sin puerto publicado) |
 | Base de datos | `parqueadero_identidad`, contenedor `db-identidad`, puerto 5435 en el host |
 | Tablas | `usuarios`, `vehiculos`, `documentos`, `auditoria_identidad` |
-| Archivos subidos | Volumen propio, privado y con descarga autenticada |
+| Archivos subidos | Volumen `identidad_uploads`, privado y con descarga autenticada |
 
 Rutas que el gateway le envía: `/api/v1/auth`, `/usuarios`, `/vehiculos`, `/documentos` y
-`/verificaciones`. `/api/v1/accesos` y `/api/v1/auditoria` siguen en Accesos.
+`/verificaciones`. `/api/v1/accesos` y `/api/v1/auditoria` van a Accesos.
 
 ### Token
 
@@ -114,9 +120,10 @@ documentos.
 
 `propietario` es `null` cuando el vehículo no tiene dueño registrado (visitante).
 
-Accesos traduce un 404 de Identidad a su propio 404. Si Identidad no responde, tarda más de 5
-segundos o responde algo inesperado, Accesos contesta 503 «El servicio de identidad no está
-disponible».
+Accesos traduce un 404 de Identidad a su propio 404, y también responde 404 si `usuario_id` o
+`autorizado_por_id` no existen. Una entrada normal exige vehículo y dueño aprobados (409 si no).
+Si Identidad no responde, tarda más de 5 segundos o responde algo inesperado, Accesos contesta
+503 «El servicio de identidad no esta disponible».
 
 ### Si Identidad se cae
 
@@ -128,8 +135,9 @@ disponible».
 
 ### Decisiones del servicio
 
-- **No se copian datos.** Las bases solo tienen usuarios de prueba: en la base nueva se siembran
-  un administrador y un vigilante.
+- **No se copiaron datos.** Las bases solo tenían usuarios de prueba: en la de identidad se
+  siembran un administrador y un vigilante con `python -m app.db.seed`, que toma correos y
+  contraseñas del entorno (`SEED_*`); ninguna contraseña está en el código.
 - **Auditoría propia.** Aprobar o rechazar un usuario o un vehículo se registra en
   `auditoria_identidad` (solo inserción) y se consulta en `GET /api/v1/verificaciones/auditoria`
   (solo administrador). Las trazas anteriores quedan en `auditoria_accesos`: la auditoría no se
@@ -146,16 +154,15 @@ disponible».
 - **Visión no conoce usuarios.** No tiene base de datos ni lógica de negocio. El gateway valida la
   sesión contra Identidad (`auth_request`) antes de dejar pasar la imagen.
 - **Los servicios de atrás no publican puerto.** Solo el gateway es alcanzable desde fuera.
-- **El rol viaja en el token.** Parqueadero autoriza con el JWT (misma `SECRET_KEY`) sin consultar
-  la base de usuarios, así funciona aunque Identidad esté caído. Costo: un usuario desactivado
-  conserva acceso a Parqueadero hasta que su token expire (8 horas).
+- **El rol viaja en el token.** Accesos y Parqueadero autorizan con el JWT (misma `SECRET_KEY`)
+  sin consultar la base de usuarios, así funcionan aunque Identidad esté caído. Costo: un usuario
+  desactivado conserva acceso a ambos hasta que su token expire (8 horas).
 - **Una base por servicio, en contenedores distintos.** Si una base se cae, el otro servicio sigue
   respondiendo lo que no dependa de ella.
 
 ## Lo que falta resolver
 
-- **Separar Identidad de Accesos.** Hoy comparten base; `accesos` aún tiene llaves foráneas a
-  `usuarios` y `vehiculos`, que pasarán a ser identificadores sin restricción.
+- **Renombrar `backend-core`.** Ya es solo Accesos; falta cambiarle el nombre (paso 4).
 - **Compensación fallida.** Si Parqueadero se cae justo entre ocupar y compensar, el contador
   queda desfasado y solo se deja un registro en el log; falta un mecanismo de reintento.
 
@@ -172,4 +179,12 @@ docker compose exec -T db pg_dump -U parqueadero -d parqueadero --data-only -t z
 docker compose exec -e PARQUEADERO_DATOS_MIGRADOS=1 backend-core alembic upgrade head
 ```
 
-En una instalación nueva basta `alembic upgrade head` en cada servicio.
+La migración `0005_borrar_identidad` borra `usuarios`, `vehiculos` y `documentos` de la base de
+Accesos. Esos datos no se copian (identidad se siembra aparte); si las tablas tienen filas, la
+migración se niega a correr salvo que se confirme con `IDENTIDAD_DATOS_MIGRADOS=1`:
+
+```
+docker compose exec -e IDENTIDAD_DATOS_MIGRADOS=1 backend-core alembic upgrade head
+```
+
+En una instalación nueva basta `alembic upgrade head` en cada servicio y sembrar identidad.

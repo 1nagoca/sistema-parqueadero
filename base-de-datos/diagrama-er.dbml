@@ -1,9 +1,12 @@
 // Diagrama entidad-relación — Parqueadero UFPS
 // Pegar en https://dbdiagram.io/d para verlo y exportarlo a PostgreSQL, MySQL, SQL Server u otro (menú Export).
-// Hay una base de datos por microservicio: zonas y espacios viven en la base `parqueadero_zonas`
-// (backend-parqueadero); el resto, en la base `parqueadero` (backend-core). accesos.zona_id y
-// accesos.espacio_id cruzan de una base a otra, por eso no son llaves foraneas.
-// Fuente de verdad: backend-core/alembic/versions y backend-parqueadero/alembic/versions.
+// Hay una base de datos por microservicio (ver los TableGroup al final):
+//   parqueadero_identidad (backend-identidad): usuarios, vehiculos, documentos, auditoria_identidad
+//   parqueadero           (backend-core, accesos): accesos, auditoria_accesos
+//   parqueadero_zonas     (backend-parqueadero): zonas, espacios
+// Entre bases no hay llaves foraneas: accesos y auditoria_accesos guardan solo los identificadores
+// de vehiculos, usuarios, zonas y espacios.
+// Fuente de verdad: alembic/versions de backend-identidad, backend-core y backend-parqueadero.
 
 Enum usuario_rol_enum {
   estudiante
@@ -20,18 +23,6 @@ Enum vehiculo_tipo_enum {
   otro
 }
 
-Enum acceso_tipo_enum {
-  normal
-  visitante
-}
-
-Enum espacio_estado_enum {
-  libre
-  ocupado
-  reservado
-  mantenimiento
-}
-
 Enum verificacion_estado_enum {
   pendiente
   aprobado
@@ -44,11 +35,26 @@ Enum documento_tipo_enum {
   tarjeta_propiedad
 }
 
+// Existe con el mismo nombre en parqueadero_identidad y en parqueadero.
 Enum auditoria_accion_enum {
   creacion
   actualizacion
   eliminacion
 }
+
+Enum acceso_tipo_enum {
+  normal
+  visitante
+}
+
+Enum espacio_estado_enum {
+  libre
+  ocupado
+  reservado
+  mantenimiento
+}
+
+// ---------- Base parqueadero_identidad ----------
 
 Table usuarios {
   id uuid [pk, default: `gen_random_uuid()`]
@@ -58,11 +64,11 @@ Table usuarios {
   telefono varchar(20)
   rol usuario_rol_enum [not null]
   hashed_password varchar(255) [not null]
-  activo boolean [not null, default: true]
   universidad varchar(150)
   estado_verificacion verificacion_estado_enum [not null, default: 'aprobado']
   motivo_rechazo text
   consentimiento_datos_en timestamptz
+  activo boolean [not null, default: true]
   creado_en timestamptz [not null, default: `now()`]
   actualizado_en timestamptz [not null, default: `now()`]
 }
@@ -84,6 +90,87 @@ Table vehiculos {
     usuario_id
   }
 }
+
+Table documentos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  usuario_id uuid [not null, ref: > usuarios.id]
+  vehiculo_id uuid [ref: > vehiculos.id, note: 'NULL solo si tipo = carnet; obligatorio en los demás (CHECK)']
+  tipo documento_tipo_enum [not null]
+  ruta_archivo varchar(255) [not null]
+  content_type varchar(50) [not null]
+  tamano_bytes integer [not null]
+  creado_en timestamptz [not null, default: `now()`]
+
+  indexes {
+    usuario_id
+    vehiculo_id
+  }
+}
+
+Table auditoria_identidad {
+  id uuid [pk, default: `gen_random_uuid()`]
+  tabla_afectada varchar(50) [not null]
+  registro_id uuid [not null]
+  accion auditoria_accion_enum [not null]
+  valores_anteriores jsonb
+  valores_nuevos jsonb
+  realizado_por_id uuid [not null, ref: > usuarios.id]
+  motivo text
+  fecha_hora timestamptz [not null, default: `now()`]
+  ip_origen varchar(45)
+  Note: 'Append-only: no se modifica ni se borra'
+
+  indexes {
+    fecha_hora
+    (tabla_afectada, registro_id)
+  }
+}
+
+// ---------- Base parqueadero (accesos) ----------
+
+Table accesos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  vehiculo_id uuid [not null, note: 'Id de vehiculos en la base parqueadero_identidad (sin FK). Un vehículo solo puede tener un acceso sin salida (índice único parcial)']
+  placa varchar(10) [not null, note: 'Copia de la placa al registrar la entrada; siempre en mayúsculas (CHECK)']
+  usuario_id uuid [note: 'Id de usuarios en la base parqueadero_identidad (sin FK)']
+  zona_id uuid [not null, note: 'Id de zonas en la base parqueadero_zonas (sin FK)']
+  espacio_id uuid [note: 'Id de espacios en la base parqueadero_zonas (sin FK)']
+  tipo_acceso acceso_tipo_enum [not null, default: 'normal']
+  fecha_hora_entrada timestamptz [not null, default: `now()`]
+  fecha_hora_salida timestamptz [note: 'CHECK: posterior a la entrada']
+  duracion_minutos integer
+  autorizado_por_id uuid [note: 'Id de usuarios en la base parqueadero_identidad (sin FK). Obligatorio si tipo_acceso = visitante']
+  justificacion text [note: 'Obligatoria si tipo_acceso = visitante']
+  placa_detectada_por_alpr boolean [not null, default: false]
+  confianza_alpr numeric(5,2)
+  creado_en timestamptz [not null, default: `now()`]
+
+  indexes {
+    usuario_id
+    zona_id
+  }
+}
+
+Table auditoria_accesos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  tabla_afectada varchar(50) [not null]
+  registro_id uuid [not null]
+  accion auditoria_accion_enum [not null]
+  valores_anteriores jsonb
+  valores_nuevos jsonb
+  realizado_por_id uuid [not null, note: 'Id de usuarios en la base parqueadero_identidad (sin FK)']
+  motivo text
+  fecha_hora timestamptz [not null, default: `now()`]
+  ip_origen varchar(45)
+  Note: 'Append-only: no se modifica ni se borra'
+
+  indexes {
+    fecha_hora
+    (tabla_afectada, registro_id)
+  }
+}
+
+// ---------- Base parqueadero_zonas ----------
 
 Table zonas {
   id uuid [pk, default: `gen_random_uuid()`]
@@ -111,59 +198,19 @@ Table espacios {
   }
 }
 
-Table accesos {
-  id uuid [pk, default: `gen_random_uuid()`]
-  vehiculo_id uuid [not null, ref: > vehiculos.id]
-  usuario_id uuid [ref: > usuarios.id]
-  zona_id uuid [not null, note: 'Id de zonas en la base parqueadero_zonas (sin FK)']
-  espacio_id uuid [note: 'Id de espacios en la base parqueadero_zonas (sin FK)']
-  tipo_acceso acceso_tipo_enum [not null, default: 'normal']
-  fecha_hora_entrada timestamptz [not null, default: `now()`]
-  fecha_hora_salida timestamptz [note: 'CHECK: posterior a la entrada. Un vehículo solo puede tener un acceso sin salida']
-  duracion_minutos integer
-  autorizado_por_id uuid [ref: > usuarios.id, note: 'Obligatorio si tipo_acceso = visitante']
-  justificacion text [note: 'Obligatoria si tipo_acceso = visitante']
-  placa_detectada_por_alpr boolean [not null, default: false]
-  confianza_alpr numeric(5,2)
-  creado_en timestamptz [not null, default: `now()`]
-
-  indexes {
-    usuario_id
-    zona_id
-  }
+TableGroup parqueadero_identidad {
+  usuarios
+  vehiculos
+  documentos
+  auditoria_identidad
 }
 
-Table documentos {
-  id uuid [pk, default: `gen_random_uuid()`]
-  usuario_id uuid [not null, ref: > usuarios.id]
-  vehiculo_id uuid [ref: > vehiculos.id, note: 'NULL solo si tipo = carnet; obligatorio en los demás (CHECK)']
-  tipo documento_tipo_enum [not null]
-  ruta_archivo varchar(255) [not null]
-  content_type varchar(50) [not null]
-  tamano_bytes integer [not null]
-  creado_en timestamptz [not null, default: `now()`]
-
-  indexes {
-    usuario_id
-    vehiculo_id
-  }
+TableGroup parqueadero {
+  accesos
+  auditoria_accesos
 }
 
-Table auditoria_accesos {
-  id uuid [pk, default: `gen_random_uuid()`]
-  tabla_afectada varchar(50) [not null]
-  registro_id uuid [not null]
-  accion auditoria_accion_enum [not null]
-  valores_anteriores jsonb
-  valores_nuevos jsonb
-  realizado_por_id uuid [not null, ref: > usuarios.id]
-  motivo text
-  fecha_hora timestamptz [not null, default: `now()`]
-  ip_origen varchar(45)
-  Note: 'Append-only: no se modifica ni se borra'
-
-  indexes {
-    fecha_hora
-    (tabla_afectada, registro_id)
-  }
+TableGroup parqueadero_zonas {
+  zonas
+  espacios
 }
