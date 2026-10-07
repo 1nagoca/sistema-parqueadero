@@ -43,8 +43,8 @@ Navegador → gateway :8000 → /api/v1/alpr/*                      → visión
 | Accesos | `backend-core` | `parqueadero` (contenedor `db`, puerto 5433) |
 | Visión | `backend-vision` | Ninguna |
 
-El gateway ya envía las rutas de identidad a `backend-identidad`. `backend-core` conserva una
-copia sin uso de ese código y de sus tablas hasta que se borre (paso 3, parte F).
+Cada servicio tiene su código y su base de datos. `backend-core` ya solo contiene Accesos
+(entradas, salidas y auditoría); se renombrará a `backend-accesos` en el paso 4.
 
 ## Cómo se registra una entrada (dos bases de datos)
 

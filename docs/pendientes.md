@@ -69,16 +69,16 @@ aún crea usuarios y vehículos en `backend-core` y accesos ya los busca en iden
 
 - [x] Enviar a identidad `/auth`, `/usuarios`, `/vehiculos`, `/documentos` y `/verificaciones`.
 - [x] Apuntar a identidad la validación de sesión de visión.
-- [ ] Borrar de `backend-core` el código y los tests de identidad, las tablas `documentos`,
+- [x] Borrar de `backend-core` el código y los tests de identidad, las tablas `documentos`,
       `vehiculos` y `usuarios` (migración reversible) y el volumen `uploads_data`.
-- [ ] Retirar o adaptar `tests/test_migracion_placa.py` de `backend-core` cuando se borren
+- [x] Retirar o adaptar `tests/test_migracion_placa.py` de `backend-core` cuando se borren
       `usuarios` y `vehiculos`.
 
 ### G. Cierre y documentación
 
 - [ ] Frontend: mostrar en la pantalla de auditoría del administrador las dos fuentes, accesos
       (`/auditoria`) y verificaciones (`/verificaciones/auditoria`).
-- [ ] Probar el flujo completo en el navegador.
+- [x] Probar el flujo completo en el navegador.
 - [ ] Actualizar `arquitectura.md`, `README.md`, `AGENTS.md` y `base-de-datos/`.
 
 Las partes B, C, E y F requieren aprobar cambios de esquema o de `docker-compose.yml`.

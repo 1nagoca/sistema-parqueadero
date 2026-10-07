@@ -9,21 +9,12 @@ class Settings(BaseSettings):
     # contenedor `db` de docker-compose.
     DATABASE_URL: str
 
+    # La misma clave con la que el servicio de identidad firma los tokens: aqui solo se
+    # verifican, nunca se emiten.
     SECRET_KEY: str
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8
 
-    BACKEND_VISION_URL: str = "http://backend-vision:8001"
     PARQUEADERO_URL: str = "http://backend-parqueadero:8002"
     IDENTIDAD_URL: str = "http://backend-identidad:8003"
-
-    # Almacenamiento privado de los documentos de verificacion (carnet, placa, tarjeta de
-    # propiedad). No se sirve como estatico: solo se entrega via endpoint autenticado.
-    UPLOAD_DIR: str = "/code/uploads"
-    MAX_UPLOAD_BYTES: int = 5 * 1024 * 1024
-
-    # Universidad habilitada para autorregistro y dominios de correo aceptados para ella.
-    UNIVERSIDAD_NOMBRE: str = "Universidad Francisco de Paula Santander"
-    UNIVERSIDAD_DOMINIOS_CORREO: list[str] = ["ufps.edu.co"]
 
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
 

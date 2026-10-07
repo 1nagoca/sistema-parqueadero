@@ -134,8 +134,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      backend-vision:
-        condition: service_started
       backend-parqueadero:
         condition: service_started
       backend-identidad:
@@ -143,16 +141,11 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-parqueadero}:${POSTGRES_PASSWORD:-parqueadero}@db:5432/${POSTGRES_DB:-parqueadero}
       SECRET_KEY: ${SECRET_KEY:-cambiar-esta-clave-en-produccion}
-      BACKEND_VISION_URL: http://backend-vision:8001
       PARQUEADERO_URL: http://backend-parqueadero:8002
       IDENTIDAD_URL: http://backend-identidad:8003
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:5173"]}
-      UPLOAD_DIR: /code/uploads
     volumes:
       - ./backend-core:/code
-      # Documentos de verificacion (carnet, placa, tarjeta de propiedad): datos personales,
-      # viven en un volumen propio y nunca se publican como estatico.
-      - uploads_data:/code/uploads
 
   frontend:
     build: ./frontend
@@ -173,4 +166,3 @@ volumes:
   db_parqueadero_data:
   db_identidad_data:
   identidad_uploads:
-  uploads_data:
