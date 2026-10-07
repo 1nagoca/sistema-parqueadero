@@ -118,12 +118,13 @@ Para que todo coincida con el código real. Los diagramas están en [`diagramas/
 
 ## Paso 6 — Preparar la presentación
 
-- [ ] Armar una agenda y repartir los temas para que la exposición sea coherente.
-- [ ] Preparar la demostración: registro de estudiante, aprobación del administrador, lectura de
+- [x] Armar una agenda y repartir los temas para que la exposición sea coherente.
+- [x] Preparar la demostración: registro de estudiante, aprobación del administrador, lectura de
       placa con foto, entrada y salida con el mapa actualizándose en vivo.
-- [ ] Demostrar la autonomía: apagar una base de datos y mostrar que el otro servicio sigue
+- [x] Demostrar la autonomía: apagar una base de datos y mostrar que el otro servicio sigue
       respondiendo.
 - [ ] Confirmar con el profesor el enfoque (una base por microservicio y API Gateway).
+- [ ] Ensayar la demostración completa una vez, con cronómetro.
 
 ## Paso 7 — Endurecer secretos antes de publicar
 
