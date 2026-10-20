@@ -1,3 +1,4 @@
+# Paso 3 del pipeline: quedarse con el texto que parece una placa.
 import re
 
 # Formato de placa colombiana (3 letras + 2 digitos + letra o digito). Ajustar si el
@@ -5,14 +6,17 @@ import re
 PATRON_PLACA = re.compile(r"^[A-Z]{3}\d{2}[A-Z0-9]$")
 
 
+# Deja solo letras y numeros en mayusculas ("abc-123" -> "ABC123").
 def normalizar_placa(texto: str) -> str:
     return re.sub(r"[^A-Z0-9]", "", texto.upper())
 
 
+# Dice si el texto tiene forma de placa colombiana.
 def es_placa_valida(texto: str) -> bool:
     return bool(PATRON_PLACA.match(texto))
 
 
+# De todo lo que leyo el OCR, elige la placa valida con mas confianza.
 def seleccionar_mejor_candidato(candidatos: list[tuple[str, float]]) -> tuple[str, float] | None:
     """Recibe pares (texto, confianza) de OCR, normaliza y retorna el candidato de mayor
     confianza que respete el patron de placa; None si ninguno califica."""
