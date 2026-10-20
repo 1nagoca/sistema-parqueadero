@@ -13,6 +13,7 @@ from app.services import documento_service
 router = APIRouter(prefix="/documentos", tags=["documentos"])
 
 
+# GET /documentos/{id}/archivo (admin o dueno): descarga el archivo; nunca se sirve como estatico.
 @router.get("/{documento_id}/archivo")
 def descargar_documento(
     documento_id: uuid.UUID,

@@ -9,12 +9,14 @@ from app.schemas.zona import ZonaCreate, ZonaRead
 router = APIRouter(prefix="/zonas", tags=["zonas"])
 
 
+# GET /zonas (cualquier usuario): zonas activas con sus cupos, para el mapa.
 @router.get("", response_model=list[ZonaRead])
 def listar_zonas(db: Session = Depends(get_db), _: UsuarioToken = Depends(get_current_user)):
     """Sin restriccion de rol: alimenta el mapa interactivo que ve cualquier usuario autenticado."""
     return db.query(Zona).filter(Zona.activa.is_(True)).all()
 
 
+# POST /zonas (admin): crea una zona con todos sus cupos libres.
 @router.post("", response_model=ZonaRead, status_code=status.HTTP_201_CREATED)
 def crear_zona(
     datos: ZonaCreate,

@@ -8,6 +8,7 @@ from app.models.zona import Zona
 router = APIRouter(prefix="/reportes", tags=["reportes"])
 
 
+# GET /reportes/ocupacion (admin): porcentaje de ocupacion de cada zona.
 @router.get("/ocupacion")
 def ocupacion_por_zona(
     db: Session = Depends(get_db),

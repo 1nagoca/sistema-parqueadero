@@ -15,6 +15,7 @@ from app.services import realtime_service, zona_service
 router = APIRouter(prefix="/interno", tags=["interno"])
 
 
+# POST /interno/cupos/ocupar (lo llama accesos): resta un cupo y avisa al mapa.
 @router.post("/cupos/ocupar", response_model=ZonaRead)
 def ocupar_cupo(datos: CupoSolicitud, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     try:
@@ -25,6 +26,7 @@ def ocupar_cupo(datos: CupoSolicitud, background_tasks: BackgroundTasks, db: Ses
     return _confirmar_y_avisar(db, zona, background_tasks)
 
 
+# POST /interno/cupos/liberar (lo llama accesos): suma un cupo y avisa al mapa.
 @router.post("/cupos/liberar", response_model=ZonaRead)
 def liberar_cupo(datos: CupoSolicitud, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     try:
@@ -35,6 +37,7 @@ def liberar_cupo(datos: CupoSolicitud, background_tasks: BackgroundTasks, db: Se
     return _confirmar_y_avisar(db, zona, background_tasks)
 
 
+# GET /interno/espacios?id= (lo llama accesos): el codigo de cada espacio.
 @router.get("/espacios", response_model=list[EspacioCodigo])
 def codigos_de_espacios(id: list[uuid.UUID] = Query(default=[]), db: Session = Depends(get_db)):
     """Para que accesos muestre el codigo del espacio sin leer esta base de datos."""
@@ -43,6 +46,7 @@ def codigos_de_espacios(id: list[uuid.UUID] = Query(default=[]), db: Session = D
     return db.query(Espacio).filter(Espacio.id.in_(id)).all()
 
 
+# Guarda el cambio y, despues de responder, avisa por WebSocket.
 def _confirmar_y_avisar(db: Session, zona: Zona, background_tasks: BackgroundTasks) -> Zona:
     """Envia el estado fresco de la zona por /ws/zonas despues de responder, para que el mapa
     de usuarios se actualice sin polling."""

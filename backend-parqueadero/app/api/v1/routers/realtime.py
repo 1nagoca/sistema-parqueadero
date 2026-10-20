@@ -5,6 +5,7 @@ from app.ws.connection_manager import connection_manager
 router = APIRouter(tags=["realtime"])
 
 
+# WebSocket /ws/zonas: mantiene abierta la conexion del navegador para avisarle los cambios de cupos.
 @router.websocket("/ws/zonas")
 async def ws_zonas(websocket: WebSocket) -> None:
     await connection_manager.conectar(websocket)

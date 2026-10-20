@@ -15,6 +15,7 @@ from app.services import acceso_service
 router = APIRouter(prefix="/accesos", tags=["accesos"])
 
 
+# GET /accesos (vigilante, admin): vehiculos que estan adentro, con el codigo de su espacio.
 @router.get("", response_model=list[AccesoActivoRead])
 def listar_accesos_activos(
     zona_id: uuid.UUID | None = None,
@@ -47,6 +48,7 @@ def listar_accesos_activos(
     ]
 
 
+# GET /accesos/buscar?placa= (vigilante, admin): el acceso abierto de una placa, para ofrecer la salida.
 @router.get("/buscar", response_model=AccesoRead)
 def buscar_acceso_activo(
     placa: str,
@@ -66,6 +68,7 @@ def buscar_acceso_activo(
     return acceso
 
 
+# POST /accesos/entrada (vigilante, admin): registra una entrada; traduce los errores del service a 404/409/503.
 @router.post("/entrada", response_model=AccesoRead, status_code=status.HTTP_201_CREATED)
 def registrar_entrada(
     datos: AccesoEntradaCreate,
@@ -86,6 +89,7 @@ def registrar_entrada(
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
 
+# POST /accesos/{id}/salida (vigilante, admin): registra la salida y libera el cupo.
 @router.post("/{acceso_id}/salida", response_model=AccesoRead)
 def registrar_salida(
     acceso_id: uuid.UUID,

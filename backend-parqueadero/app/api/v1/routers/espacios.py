@@ -11,6 +11,7 @@ from app.schemas.espacio import EspacioCreate, EspacioRead
 router = APIRouter(prefix="/espacios", tags=["espacios"])
 
 
+# GET /espacios (cualquier usuario): espacios, opcionalmente de una zona.
 @router.get("", response_model=list[EspacioRead])
 def listar_espacios(
     zona_id: uuid.UUID | None = None,
@@ -24,6 +25,7 @@ def listar_espacios(
     return consulta.all()
 
 
+# POST /espacios (admin): crea un espacio dentro de una zona.
 @router.post("", response_model=EspacioRead, status_code=status.HTTP_201_CREATED)
 def crear_espacio(
     datos: EspacioCreate,

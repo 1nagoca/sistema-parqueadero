@@ -13,6 +13,7 @@ from app.schemas.interno import UsuarioInterno, VehiculoInterno
 router = APIRouter(prefix="/interno", tags=["interno"])
 
 
+# GET /interno/vehiculos/{id} (lo llama accesos): placa y estado del vehiculo y de su dueno.
 @router.get("/vehiculos/{vehiculo_id}", response_model=VehiculoInterno)
 def obtener_vehiculo(vehiculo_id: uuid.UUID, db: Session = Depends(get_db)):
     """Si el vehiculo existe, su placa y si el y su dueno estan aprobados."""
@@ -28,6 +29,7 @@ def obtener_vehiculo(vehiculo_id: uuid.UUID, db: Session = Depends(get_db)):
     )
 
 
+# GET /interno/usuarios?id= (lo llama accesos): cuales de esos usuarios existen.
 @router.get("/usuarios", response_model=list[UsuarioInterno])
 def usuarios_existentes(id: list[uuid.UUID] = Query(default=[]), db: Session = Depends(get_db)):
     """De los identificadores pedidos, los usuarios que existen (los demas se omiten)."""

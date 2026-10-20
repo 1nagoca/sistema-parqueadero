@@ -15,6 +15,7 @@ from app.services import documento_service, verificacion_service
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
 
+# GET /usuarios/me (cualquier usuario): su propio perfil y rol.
 @router.get("/me", response_model=UsuarioRead)
 def obtener_usuario_actual(usuario_actual: Usuario = Depends(get_current_user)) -> Usuario:
     """Cualquier usuario autenticado puede leer su propio perfil (usado por el frontend justo
@@ -22,6 +23,7 @@ def obtener_usuario_actual(usuario_actual: Usuario = Depends(get_current_user)) 
     return usuario_actual
 
 
+# GET /usuarios/me/documentos (estudiante): el carnet que ya subio.
 @router.get("/me/documentos", response_model=list[DocumentoRead])
 def listar_mis_documentos(
     db: Session = Depends(get_db),
@@ -35,6 +37,7 @@ def listar_mis_documentos(
     )
 
 
+# POST /usuarios/me/carnet (estudiante): sube o reemplaza el carnet y queda pendiente de revision.
 @router.post("/me/carnet", response_model=UsuarioRead)
 async def subir_carnet(
     archivo: UploadFile = File(...),
@@ -73,6 +76,7 @@ async def subir_carnet(
     return estudiante
 
 
+# POST /usuarios (admin): crea vigilantes, docentes, etc. (los estudiantes se registran solos).
 @router.post("", response_model=UsuarioRead, status_code=status.HTTP_201_CREATED)
 def crear_usuario(
     datos: UsuarioCreate,
@@ -102,6 +106,7 @@ def crear_usuario(
     return usuario
 
 
+# GET /usuarios (admin): lista todos los usuarios.
 @router.get("", response_model=list[UsuarioRead])
 def listar_usuarios(
     db: Session = Depends(get_db),
@@ -110,6 +115,7 @@ def listar_usuarios(
     return db.query(Usuario).order_by(Usuario.nombre_completo).all()
 
 
+# GET /usuarios/{id} (admin, vigilante): los datos de un usuario.
 @router.get("/{usuario_id}", response_model=UsuarioRead)
 def obtener_usuario(
     usuario_id: uuid.UUID,

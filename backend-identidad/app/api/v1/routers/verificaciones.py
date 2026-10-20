@@ -24,6 +24,7 @@ from app.services import verificacion_service
 router = APIRouter(prefix="/verificaciones", tags=["verificaciones"])
 
 
+# GET /verificaciones/pendientes (admin): bandeja de estudiantes y vehiculos por revisar.
 @router.get("/pendientes", response_model=list[SolicitudVerificacion])
 def listar_pendientes(
     db: Session = Depends(get_db),
@@ -64,6 +65,7 @@ def listar_pendientes(
     return solicitudes
 
 
+# POST /verificaciones/usuarios/{id}/resolver (admin): aprueba o rechaza a un estudiante.
 @router.post("/usuarios/{usuario_id}/resolver", response_model=UsuarioRead)
 def resolver_usuario(
     usuario_id: uuid.UUID,
@@ -80,6 +82,7 @@ def resolver_usuario(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+# POST /verificaciones/vehiculos/{id}/resolver (admin): aprueba o rechaza un vehiculo.
 @router.post("/vehiculos/{vehiculo_id}/resolver", response_model=VehiculoRead)
 def resolver_vehiculo(
     vehiculo_id: uuid.UUID,
@@ -96,6 +99,7 @@ def resolver_vehiculo(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+# GET /verificaciones/auditoria (admin): las ultimas 200 trazas de verificaciones.
 @router.get("/auditoria", response_model=list[AuditoriaIdentidadRead])
 def listar_auditoria(
     tabla_afectada: str | None = None,
@@ -110,10 +114,12 @@ def listar_auditoria(
     return consulta.limit(200).all()
 
 
+# Arma la respuesta del estudiante solo con su carnet.
 def _con_documentos_usuario(usuario: Usuario) -> UsuarioConDocumentos:
     base = UsuarioConDocumentos.model_validate(usuario)
     return base.model_copy(update={"documentos": [d for d in base.documentos if d.tipo == TipoDocumento.CARNET]})
 
 
+# Arma la respuesta del vehiculo con sus documentos.
 def _con_documentos_vehiculo(vehiculo: Vehiculo) -> VehiculoConDocumentos:
     return VehiculoConDocumentos.model_validate(vehiculo)

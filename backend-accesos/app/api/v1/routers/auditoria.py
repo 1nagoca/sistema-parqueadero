@@ -9,6 +9,7 @@ from app.schemas.auditoria_acceso import AuditoriaAccesoRead
 router = APIRouter(prefix="/auditoria", tags=["auditoria"])
 
 
+# GET /auditoria (admin): las ultimas 200 trazas de entradas y salidas.
 @router.get("", response_model=list[AuditoriaAccesoRead])
 def listar_auditoria(
     tabla_afectada: str | None = None,

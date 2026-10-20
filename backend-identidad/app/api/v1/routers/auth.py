@@ -15,6 +15,7 @@ from app.schemas.usuario import EstudianteRegistro, UsuarioRead
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+# POST /auth/login (publico): revisa correo y contrasena y devuelve el token JWT.
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)) -> dict:
     usuario = db.query(Usuario).filter(Usuario.correo_institucional == form_data.username).first()
@@ -27,6 +28,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": token, "token_type": "bearer"}
 
 
+# POST /auth/registro (publico): el estudiante crea su cuenta, que queda pendiente.
 @router.post("/registro", response_model=UsuarioRead, status_code=status.HTTP_201_CREATED)
 def registrar_estudiante(datos: EstudianteRegistro, db: Session = Depends(get_db)) -> Usuario:
     """Autorregistro de estudiantes. La cuenta nace ``pendiente`` hasta que un administrador

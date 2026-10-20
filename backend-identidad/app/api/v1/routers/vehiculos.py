@@ -16,12 +16,14 @@ from app.services import documento_service, vehiculo_service, verificacion_servi
 router = APIRouter(prefix="/vehiculos", tags=["vehiculos"])
 
 # Formatos de placa colombianos: carro ABC123; moto ABC12 o ABC12D.
+# Patron de placa segun el tipo de vehiculo.
 _PLACA_POR_TIPO = {
     TipoVehiculo.CARRO: re.compile(r"^[A-Z]{3}\d{3}$"),
     TipoVehiculo.MOTO: re.compile(r"^[A-Z]{3}\d{2}[A-Z]?$"),
 }
 
 
+# POST /vehiculos (admin, vigilante): registra un vehiculo, por ejemplo de un visitante.
 @router.post("", response_model=VehiculoRead, status_code=status.HTTP_201_CREATED)
 def crear_vehiculo(
     datos: VehiculoCreate,
@@ -34,6 +36,7 @@ def crear_vehiculo(
     return vehiculo_service.crear_vehiculo(db, datos)
 
 
+# GET /vehiculos/placa/{placa} (admin, vigilante): busca un vehiculo por su placa.
 @router.get("/placa/{placa}", response_model=VehiculoRead)
 def buscar_por_placa(
     placa: str,
@@ -46,6 +49,7 @@ def buscar_por_placa(
     return vehiculo
 
 
+# GET /vehiculos/mis-vehiculos (estudiante): sus vehiculos con sus documentos.
 @router.get("/mis-vehiculos", response_model=list[VehiculoConDocumentos])
 def listar_mis_vehiculos(
     db: Session = Depends(get_db),
@@ -56,6 +60,7 @@ def listar_mis_vehiculos(
     )
 
 
+# POST /vehiculos/mis-vehiculos (estudiante): registra su vehiculo con foto de placa y tarjeta.
 @router.post("/mis-vehiculos", response_model=VehiculoConDocumentos, status_code=status.HTTP_201_CREATED)
 async def registrar_mi_vehiculo(
     placa: str = Form(...),
@@ -120,6 +125,7 @@ async def registrar_mi_vehiculo(
     return vehiculo
 
 
+# POST /vehiculos/mis-vehiculos/{id}/reenviar (estudiante): reenvia documentos de un vehiculo rechazado.
 @router.post("/mis-vehiculos/{vehiculo_id}/reenviar", response_model=VehiculoConDocumentos)
 async def reenviar_documentos_vehiculo(
     vehiculo_id: uuid.UUID,
@@ -162,6 +168,7 @@ async def reenviar_documentos_vehiculo(
     return vehiculo
 
 
+# Guarda la foto de la placa y la tarjeta en disco.
 async def _guardar_documentos_vehiculo(
     foto_placa: UploadFile, tarjeta_propiedad: UploadFile
 ) -> dict[TipoDocumento, tuple[str, str, int]]:
