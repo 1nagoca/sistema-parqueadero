@@ -13,6 +13,7 @@ import { listarPendientes, resolverUsuario, resolverVehiculo } from "@/services/
 import { crearZona, listarZonas } from "@/services/api/zonas";
 import type { AuditoriaAcceso, Espacio, RolUsuario, SolicitudVerificacion, Usuario, Zona } from "@/types/api";
 
+// Pestanas del panel y su titulo.
 type Pestana = "verificaciones" | "usuarios" | "zonas" | "espacios" | "auditoria";
 
 const ETIQUETAS: Record<Pestana, string> = {
@@ -23,8 +24,10 @@ const ETIQUETAS: Record<Pestana, string> = {
   auditoria: "Auditoria",
 };
 
+// Estilo comun de los campos.
 const campo = "min-h-12 rounded-lg border border-gray-300 px-3";
 
+// Panel del administrador: una pestana por tarea.
 export default function AdminDashboard() {
   const { usuario, cerrarSesion } = useAuth();
   const [pestana, setPestana] = useState<Pestana>("verificaciones");
@@ -64,6 +67,7 @@ export default function AdminDashboard() {
   );
 }
 
+// Bandeja para aprobar o rechazar estudiantes y vehiculos.
 function SeccionVerificaciones() {
   const [solicitudes, setSolicitudes] = useState<SolicitudVerificacion[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -75,6 +79,7 @@ function SeccionVerificaciones() {
     cargar();
   }, []);
 
+  // Trae las solicitudes pendientes.
   async function cargar() {
     try {
       setSolicitudes(await listarPendientes());
@@ -181,6 +186,7 @@ function SeccionVerificaciones() {
   );
 }
 
+// Lista de usuarios y formulario para crear vigilantes, docentes, etc.
 function SeccionUsuarios() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -197,6 +203,7 @@ function SeccionUsuarios() {
     cargar();
   }, []);
 
+  // Trae todos los usuarios.
   async function cargar() {
     try {
       setUsuarios(await listarUsuarios());
@@ -205,6 +212,7 @@ function SeccionUsuarios() {
     }
   }
 
+  // Crea el usuario y recarga la lista.
   async function crear(evento: FormEvent) {
     evento.preventDefault();
     setProcesando(true);
@@ -316,6 +324,7 @@ function SeccionUsuarios() {
   );
 }
 
+// Lista de zonas y formulario para crear una.
 function SeccionZonas() {
   const [zonas, setZonas] = useState<Zona[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -330,6 +339,7 @@ function SeccionZonas() {
     cargar();
   }, []);
 
+  // Trae las zonas.
   async function cargar() {
     try {
       setZonas(await listarZonas());
@@ -338,6 +348,7 @@ function SeccionZonas() {
     }
   }
 
+  // Crea la zona y recarga la lista.
   async function crear(evento: FormEvent) {
     evento.preventDefault();
     setProcesando(true);
@@ -419,6 +430,7 @@ function SeccionZonas() {
   );
 }
 
+// Espacios de una zona y formulario para crear uno.
 function SeccionEspacios() {
   const [zonas, setZonas] = useState<Zona[]>([]);
   const [zonaId, setZonaId] = useState("");
@@ -429,6 +441,7 @@ function SeccionEspacios() {
   const [codigo, setCodigo] = useState("");
   const [tipoEspacio, setTipoEspacio] = useState("");
 
+  // Carga las zonas y elige la primera.
   useEffect(() => {
     listarZonas()
       .then((datos) => {
@@ -438,11 +451,13 @@ function SeccionEspacios() {
       .catch(() => setError("No se pudieron cargar las zonas"));
   }, []);
 
+  // Al cambiar de zona carga sus espacios.
   useEffect(() => {
     if (!zonaId) return;
     listarEspacios(zonaId).then(setEspacios).catch(() => setEspacios([]));
   }, [zonaId]);
 
+  // Crea el espacio en la zona elegida.
   async function crear(evento: FormEvent) {
     evento.preventDefault();
     if (!zonaId) return;
@@ -512,6 +527,7 @@ function SeccionEspacios() {
   );
 }
 
+// Las dos bitacoras que se muestran juntas.
 type OrigenAuditoria = "accesos" | "verificaciones";
 
 /** Cada origen es un microservicio distinto: accesos guarda entradas y salidas; identidad, las
@@ -536,6 +552,7 @@ const ORIGENES: Record<
 
 const ORIGENES_AUDITORIA = Object.keys(ORIGENES) as OrigenAuditoria[];
 
+// Estado de carga de cada bitacora.
 type CargaAuditoria = { registros: AuditoriaAcceso[]; error: boolean; cargando: boolean };
 
 const CARGA_INICIAL: Record<OrigenAuditoria, CargaAuditoria> = {
@@ -543,6 +560,7 @@ const CARGA_INICIAL: Record<OrigenAuditoria, CargaAuditoria> = {
   verificaciones: { registros: [], error: false, cargando: true },
 };
 
+// Muestra juntas las trazas de accesos y de verificaciones, de la mas nueva a la mas vieja.
 function SeccionAuditoria() {
   const [cargas, setCargas] = useState(CARGA_INICIAL);
   const [filtro, setFiltro] = useState("");
@@ -565,6 +583,7 @@ function SeccionAuditoria() {
     };
   }, [filtro]);
 
+  // Une las dos bitacoras y las ordena por fecha.
   const registros = ORIGENES_AUDITORIA.flatMap((origen) =>
     cargas[origen].registros.map((registro) => ({ origen, registro })),
   ).sort((a, b) => new Date(b.registro.fecha_hora).getTime() - new Date(a.registro.fecha_hora).getTime());

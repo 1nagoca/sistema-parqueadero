@@ -1,3 +1,6 @@
+// Tipos de TypeScript con la forma de los datos de la API (copian los schemas de los backends).
+
+// Valores fijos (coinciden con los enums de los backends).
 export type RolUsuario = "estudiante" | "docente" | "administrativo" | "vigilante" | "admin";
 export type TipoVehiculo = "carro" | "moto" | "bicicleta" | "otro";
 export type EstadoEspacio = "libre" | "ocupado" | "reservado" | "mantenimiento";
@@ -6,6 +9,7 @@ export type EstadoVerificacion = "pendiente" | "aprobado" | "rechazado";
 export type TipoDocumento = "carnet" | "foto_placa" | "tarjeta_propiedad";
 export type AccionAuditoria = "creacion" | "actualizacion" | "eliminacion";
 
+// Usuario (identidad).
 export interface Usuario {
   id: string;
   nombre_completo: string;
@@ -21,6 +25,7 @@ export interface Usuario {
   actualizado_en: string;
 }
 
+// Vehiculo (identidad).
 export interface Vehiculo {
   id: string;
   placa: string;
@@ -35,6 +40,7 @@ export interface Vehiculo {
   creado_en: string;
 }
 
+// Documento subido, sin la ruta del archivo.
 export interface Documento {
   id: string;
   tipo: TipoDocumento;
@@ -43,6 +49,7 @@ export interface Documento {
   creado_en: string;
 }
 
+// Vehiculo o usuario junto con sus documentos.
 export interface VehiculoConDocumentos extends Vehiculo {
   documentos: Documento[];
 }
@@ -51,11 +58,13 @@ export interface UsuarioConDocumentos extends Usuario {
   documentos: Documento[];
 }
 
+// Item de la bandeja de verificacion del admin.
 export interface SolicitudVerificacion {
   usuario: UsuarioConDocumentos;
   vehiculos: VehiculoConDocumentos[];
 }
 
+// Lo que envia el estudiante al registrarse.
 export interface RegistroEstudiantePayload {
   nombre_completo: string;
   correo_institucional: string;
@@ -65,6 +74,7 @@ export interface RegistroEstudiantePayload {
   acepta_tratamiento_datos: boolean;
 }
 
+// Zona (parqueadero).
 export interface Zona {
   id: string;
   nombre: string;
@@ -76,6 +86,7 @@ export interface Zona {
   actualizado_en: string;
 }
 
+// Espacio (parqueadero).
 export interface Espacio {
   id: string;
   zona_id: string;
@@ -86,6 +97,7 @@ export interface Espacio {
   actualizado_en: string;
 }
 
+// Acceso (accesos).
 export interface Acceso {
   id: string;
   vehiculo_id: string;
@@ -102,11 +114,13 @@ export interface Acceso {
   confianza_alpr: string | null;
 }
 
+// Acceso abierto con su placa y el codigo del espacio.
 export interface AccesoActivo extends Acceso {
   placa: string;
   espacio_codigo: string | null;
 }
 
+// Lo que envia el vigilante al registrar una entrada.
 export interface AccesoEntradaPayload {
   vehiculo_id: string;
   zona_id: string;
@@ -119,6 +133,7 @@ export interface AccesoEntradaPayload {
   confianza_alpr?: number | null;
 }
 
+// Lo que envia el admin al crear un usuario.
 export interface UsuarioCreatePayload {
   nombre_completo: string;
   correo_institucional: string;
@@ -128,18 +143,21 @@ export interface UsuarioCreatePayload {
   password: string;
 }
 
+// Lo que envia el admin al crear una zona.
 export interface ZonaCreatePayload {
   nombre: string;
   ubicacion_descripcion?: string | null;
   capacidad_total: number;
 }
 
+// Lo que envia el admin al crear un espacio.
 export interface EspacioCreatePayload {
   zona_id: string;
   codigo: string;
   tipo_espacio?: string | null;
 }
 
+// Una traza de auditoria (sirve para las dos bitacoras).
 export interface AuditoriaAcceso {
   id: string;
   tabla_afectada: string;

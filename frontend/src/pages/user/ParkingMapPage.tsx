@@ -7,6 +7,7 @@ import { listarZonas } from "@/services/api/zonas";
 import { useActualizacionesZona } from "@/services/realtime/useActualizacionesZona";
 import type { Espacio, Zona } from "@/types/api";
 
+// Mapa de cupos en tiempo real que ve cualquier usuario.
 export default function ParkingMapPage() {
   const { usuario, cerrarSesion } = useAuth();
   const [zonas, setZonas] = useState<Zona[]>([]);
@@ -14,6 +15,7 @@ export default function ParkingMapPage() {
   const [error, setError] = useState<string | null>(null);
   const [actualizadoEn, setActualizadoEn] = useState<Date | null>(null);
 
+  // Trae las zonas y los espacios de cada una.
   const cargar = useCallback(async () => {
     try {
       const datosZonas = await listarZonas();
@@ -36,7 +38,7 @@ export default function ParkingMapPage() {
     cargar();
   }, [cargar]);
 
-  // El mapa se refresca solo cuando backend-core avisa por /ws/zonas (tras cada entrada/salida),
+  // El mapa se refresca solo cuando backend-parqueadero avisa por /ws/zonas (tras cada entrada/salida),
   // sin necesidad de polling.
   useActualizacionesZona(cargar);
 
@@ -75,6 +77,7 @@ export default function ParkingMapPage() {
   );
 }
 
+// Un item de la leyenda de colores.
 function Leyenda({ color, texto }: { color: string; texto: string }) {
   return (
     <span className="flex items-center gap-1.5">

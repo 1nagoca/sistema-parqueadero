@@ -1,5 +1,6 @@
 import type { EstadoEspacio } from "@/types/api";
 
+// Color de cada estado: verde libre, rojo ocupado, amarillo reservado o en mantenimiento.
 const colorPorEstado: Record<EstadoEspacio, string> = {
   libre: "bg-cupo-libre",
   ocupado: "bg-cupo-ocupado",
@@ -7,6 +8,7 @@ const colorPorEstado: Record<EstadoEspacio, string> = {
   mantenimiento: "bg-cupo-mantenimiento",
 };
 
+// Texto que aparece al pasar el mouse.
 const etiquetaPorEstado: Record<EstadoEspacio, string> = {
   libre: "Libre",
   ocupado: "Ocupado",
@@ -19,6 +21,7 @@ interface Props {
   estado: EstadoEspacio;
 }
 
+// Un cuadro del mapa: el codigo del espacio pintado segun su estado.
 export default function SpaceCell({ codigo, estado }: Props) {
   return (
     <div

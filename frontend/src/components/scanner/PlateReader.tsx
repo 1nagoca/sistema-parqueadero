@@ -15,6 +15,7 @@ export default function PlateReader({ onDetectada }: Props) {
   const [leyendo, setLeyendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Cuando el vigilante toma o elige la foto, la manda a vision y entrega la placa leida.
   async function manejarArchivo(evento: ChangeEvent<HTMLInputElement>) {
     const imagen = evento.target.files?.[0];
     evento.target.value = "";

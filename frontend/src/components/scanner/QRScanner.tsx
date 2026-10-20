@@ -24,6 +24,7 @@ export default function QRScanner({ activo, onDetectado }: Props) {
 
     let cancelado = false;
 
+    // Pide permiso a la camara trasera y empieza a revisar cada cuadro del video.
     async function iniciar() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -45,6 +46,7 @@ export default function QRScanner({ activo, onDetectado }: Props) {
       }
     }
 
+    // Dibuja el cuadro en el canvas y busca un QR; si lo encuentra, entrega la placa.
     function procesarFrame() {
       const video = videoRef.current;
       const canvas = canvasRef.current;
@@ -74,6 +76,7 @@ export default function QRScanner({ activo, onDetectado }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activo]);
 
+  // Apaga la camara y deja de revisar cuadros.
   function detener() {
     cancelAnimationFrame(frameRef.current);
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -96,6 +99,7 @@ export default function QRScanner({ activo, onDetectado }: Props) {
   );
 }
 
+// El QR puede traer la placa como texto o como JSON {"placa": "..."}.
 function extraerPlaca(textoQR: string): string {
   try {
     const datos = JSON.parse(textoQR);

@@ -6,6 +6,7 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variante?: Variante;
 }
 
+// Colores de cada variante del boton.
 const clasesPorVariante: Record<Variante, string> = {
   primaria: "bg-emerald-600 hover:bg-emerald-700 text-white",
   peligro: "bg-red-600 hover:bg-red-700 text-white",

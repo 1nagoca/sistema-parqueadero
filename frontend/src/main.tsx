@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
+// Monta la app de React en el <div id="root"> de index.html.
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />

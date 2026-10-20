@@ -7,9 +7,11 @@ interface Props {
   buscando?: boolean;
 }
 
+// Caja para escribir una placa y buscarla.
 export default function PlateSearchBar({ onBuscar, buscando }: Props) {
   const [placa, setPlaca] = useState("");
 
+  // Envia la placa en mayusculas y sin espacios, y limpia la caja.
   function manejarSubmit(evento: FormEvent) {
     evento.preventDefault();
     const normalizada = placa.trim().toUpperCase();

@@ -1,6 +1,9 @@
+// Direccion del gateway; en el servidor se cambia con VITE_API_BASE_URL.
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
+// Nombre con que se guarda el token en el navegador (localStorage).
 const TOKEN_KEY = "parqueadero_token";
 
+// Error de la API con su codigo HTTP (401, 404, 409...).
 export class ApiError extends Error {
   status: number;
 
@@ -10,6 +13,7 @@ export class ApiError extends Error {
   }
 }
 
+// Guardar, leer y borrar el token de sesion.
 export function guardarToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token);
 }
@@ -34,6 +38,7 @@ export function mensajeDeDetalle(detalle: unknown): string | undefined {
   return undefined;
 }
 
+// Si la respuesta es un error lanza ApiError con el mensaje del backend; si no, devuelve el JSON.
 async function manejarRespuesta<T>(respuesta: Response): Promise<T> {
   if (!respuesta.ok) {
     let detalle = respuesta.statusText;
@@ -51,6 +56,7 @@ async function manejarRespuesta<T>(respuesta: Response): Promise<T> {
   return respuesta.json() as Promise<T>;
 }
 
+// GET con el token.
 export async function apiGet<T>(ruta: string): Promise<T> {
   const respuesta = await fetch(`${BASE_URL}${ruta}`, {
     headers: encabezadosAuth(),
@@ -58,6 +64,7 @@ export async function apiGet<T>(ruta: string): Promise<T> {
   return manejarRespuesta<T>(respuesta);
 }
 
+// POST con cuerpo JSON y el token.
 export async function apiPost<T>(ruta: string, cuerpo?: unknown): Promise<T> {
   const respuesta = await fetch(`${BASE_URL}${ruta}`, {
     method: "POST",
@@ -86,6 +93,7 @@ export async function apiGetBlob(ruta: string): Promise<Blob> {
   return respuesta.blob();
 }
 
+// Agrega Authorization: Bearer <token> si hay sesion.
 function encabezadosAuth(): Record<string, string> {
   const token = obtenerToken();
   return token ? { Authorization: `Bearer ${token}` } : {};

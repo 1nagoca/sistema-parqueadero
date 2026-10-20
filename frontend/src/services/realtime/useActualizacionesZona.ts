@@ -1,14 +1,16 @@
 import { useEffect, useRef } from "react";
 
+// Direccion del WebSocket en el gateway; en el servidor se cambia con VITE_WS_URL.
 const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000/ws/zonas";
 
+// Mensaje que envia el servidor cuando cambian los cupos.
 interface EventoZona {
   evento: string;
   zona_id: string;
   cupos_disponibles: number;
 }
 
-/** Se suscribe a /ws/zonas (poblado por backend-core via BackgroundTasks despues de cada
+/** Se suscribe a /ws/zonas (poblado por backend-parqueadero via BackgroundTasks despues de cada
  * entrada/salida) y llama a `onActualizacion` con cada evento. Reintenta la conexion con
  * backoff simple si el socket se cae. */
 export function useActualizacionesZona(onActualizacion: () => void): void {
@@ -21,6 +23,7 @@ export function useActualizacionesZona(onActualizacion: () => void): void {
     let intentoReconexion = 0;
     let temporizador: ReturnType<typeof setTimeout> | undefined;
 
+    // Abre el WebSocket y, si se cae, reintenta cada vez mas lento (hasta 10 s).
     function conectar() {
       socket = new WebSocket(WS_URL);
 
@@ -45,6 +48,7 @@ export function useActualizacionesZona(onActualizacion: () => void): void {
 
     conectar();
 
+    // Al salir de la pagina cierra el WebSocket y no reintenta.
     return () => {
       cerradoPorLimpieza = true;
       clearTimeout(temporizador);

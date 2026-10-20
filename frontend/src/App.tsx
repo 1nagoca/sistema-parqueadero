@@ -11,6 +11,7 @@ import ParkingMapPage from "@/pages/user/ParkingMapPage";
 import type { RolUsuario } from "@/types/api";
 import { rutaInicioPara } from "@/utils/rutas";
 
+// Deja ver la pagina solo con sesion y con un rol permitido; si no, redirige.
 function RutaProtegida({
   children,
   rolesPermitidos,
@@ -32,6 +33,7 @@ function RutaProtegida({
   return <>{children}</>;
 }
 
+// Cualquier otra ruta lleva al panel del rol (o al login).
 function InicioSegunRol() {
   const { usuario, cargando } = useAuth();
   if (cargando) {
@@ -40,6 +42,7 @@ function InicioSegunRol() {
   return <Navigate to={usuario ? rutaInicioPara(usuario.rol) : "/login"} replace />;
 }
 
+// Que pagina se ve en cada direccion y que roles pueden abrirla.
 function Rutas() {
   return (
     <Routes>
@@ -82,6 +85,7 @@ function Rutas() {
   );
 }
 
+// Componente raiz: router y sesion.
 export default function App() {
   return (
     <Router>

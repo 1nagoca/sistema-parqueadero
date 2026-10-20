@@ -7,8 +7,10 @@ import { registrarEstudiante } from "@/services/api/auth";
 import { ApiError } from "@/services/api/client";
 import { rutaInicioPara } from "@/utils/rutas";
 
+// Estilo comun de los campos del formulario.
 const campo = "min-h-12 w-full rounded-lg border border-gray-300 px-3 focus:border-emerald-500 focus:outline-none";
 
+// Pantalla de autorregistro del estudiante.
 export default function Registro() {
   const { iniciarSesion } = useAuth();
   const navigate = useNavigate();
@@ -22,6 +24,7 @@ export default function Registro() {
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
+  // Revisa que las contrasenas coincidan, crea la cuenta e inicia sesion.
   async function manejarSubmit(evento: FormEvent) {
     evento.preventDefault();
     setError(null);

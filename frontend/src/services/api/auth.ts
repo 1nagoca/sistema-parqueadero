@@ -1,11 +1,14 @@
+// Inicio de sesion y registro (servicio de identidad).
 import type { RegistroEstudiantePayload, Usuario } from "@/types/api";
 import { apiPost, BASE_URL, ApiError } from "./client";
 
+// Lo que devuelve el login.
 export interface TokenRespuesta {
   access_token: string;
   token_type: string;
 }
 
+// Envia correo y contrasena como formulario (asi lo pide OAuth2) y devuelve el token.
 export async function login(correo: string, password: string): Promise<TokenRespuesta> {
   const cuerpo = new URLSearchParams();
   cuerpo.set("username", correo);
@@ -24,6 +27,7 @@ export async function login(correo: string, password: string): Promise<TokenResp
   return respuesta.json();
 }
 
+// Crea la cuenta de un estudiante.
 export function registrarEstudiante(datos: RegistroEstudiantePayload): Promise<Usuario> {
   return apiPost<Usuario>("/auth/registro", datos);
 }

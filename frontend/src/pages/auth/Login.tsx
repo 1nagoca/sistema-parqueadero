@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { ApiError } from "@/services/api/client";
 import { rutaInicioPara } from "@/utils/rutas";
 
+// Pantalla de inicio de sesion.
 export default function Login() {
   const { iniciarSesion } = useAuth();
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
+  // Inicia sesion y lleva al panel segun el rol.
   async function manejarSubmit(evento: FormEvent) {
     evento.preventDefault();
     setError(null);

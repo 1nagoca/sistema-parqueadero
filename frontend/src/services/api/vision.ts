@@ -1,5 +1,6 @@
 import { apiPostForm } from "./client";
 
+// Lo que devuelve el servicio de vision.
 export interface LecturaPlaca {
   placa: string;
   /** Entre 0 y 1. */

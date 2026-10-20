@@ -1,5 +1,6 @@
 import type { EstadoVerificacion } from "@/types/api";
 
+// Color y texto de cada estado de verificacion.
 const ESTILOS: Record<EstadoVerificacion, string> = {
   pendiente: "bg-amber-100 text-amber-800",
   aprobado: "bg-emerald-100 text-emerald-800",
@@ -12,6 +13,7 @@ const TEXTOS: Record<EstadoVerificacion, string> = {
   rechazado: "Rechazado",
 };
 
+// Etiqueta de color con el estado (En revision, Aprobado o Rechazado).
 export default function EstadoBadge({ estado }: { estado: EstadoVerificacion }) {
   return (
     <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${ESTILOS[estado]}`}>

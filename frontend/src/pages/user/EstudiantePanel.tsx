@@ -14,14 +14,17 @@ import {
 } from "@/services/api/vehiculos";
 import type { Documento, TipoVehiculo, Usuario, VehiculoConDocumentos } from "@/types/api";
 
+// Estilo comun de los campos y tipos de archivo que se aceptan.
 const campo = "min-h-12 w-full rounded-lg border border-gray-300 px-3 focus:border-emerald-500 focus:outline-none";
 const ACEPTA_IMAGEN = "image/jpeg,image/png,image/webp";
 const ACEPTA_IMAGEN_O_PDF = `${ACEPTA_IMAGEN},application/pdf`;
 
+// Mensaje de error del backend o uno por defecto.
 function mensajeDe(err: unknown, porDefecto: string): string {
   return err instanceof ApiError ? err.message : porDefecto;
 }
 
+// Panel del estudiante: su verificacion, su carnet y sus vehiculos.
 export default function EstudiantePanel() {
   const { usuario, cerrarSesion } = useAuth();
   const [perfil, setPerfil] = useState<Usuario | null>(usuario);
@@ -29,6 +32,7 @@ export default function EstudiantePanel() {
   const [vehiculos, setVehiculos] = useState<VehiculoConDocumentos[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // Trae a la vez su perfil, su carnet y sus vehiculos.
   const cargar = useCallback(async () => {
     try {
       const [datosPerfil, datosCarnet, datosVehiculos] = await Promise.all([
@@ -49,6 +53,7 @@ export default function EstudiantePanel() {
     cargar();
   }, [cargar]);
 
+  // Puede entrar al parqueadero si el y al menos uno de sus vehiculos estan aprobados.
   const habilitado =
     perfil?.estado_verificacion === "aprobado" && vehiculos.some((v) => v.estado_verificacion === "aprobado");
 
@@ -91,6 +96,7 @@ export default function EstudiantePanel() {
   );
 }
 
+// Estado de su identidad y formulario para subir el carnet.
 function TarjetaIdentidad({
   perfil,
   carnet,
@@ -104,6 +110,7 @@ function TarjetaIdentidad({
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Sube el carnet y recarga el panel.
   async function enviar(evento: FormEvent) {
     evento.preventDefault();
     if (!archivo) return;
@@ -162,6 +169,7 @@ function TarjetaIdentidad({
   );
 }
 
+// Lista de sus vehiculos y formulario para registrar otro.
 function TarjetaVehiculos({ vehiculos, onCambio }: { vehiculos: VehiculoConDocumentos[]; onCambio: () => void }) {
   return (
     <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
@@ -175,12 +183,14 @@ function TarjetaVehiculos({ vehiculos, onCambio }: { vehiculos: VehiculoConDocum
   );
 }
 
+// Un vehiculo con su estado; si fue rechazado, permite reenviar los documentos.
 function FilaVehiculo({ vehiculo, onCambio }: { vehiculo: VehiculoConDocumentos; onCambio: () => void }) {
   const [fotoPlaca, setFotoPlaca] = useState<File | null>(null);
   const [tarjeta, setTarjeta] = useState<File | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Reenvia la foto de la placa y la tarjeta.
   async function reenviar(evento: FormEvent) {
     evento.preventDefault();
     if (!fotoPlaca || !tarjeta) return;
@@ -245,6 +255,7 @@ function FilaVehiculo({ vehiculo, onCambio }: { vehiculo: VehiculoConDocumentos;
   );
 }
 
+// Formulario para registrar un vehiculo con sus dos documentos.
 function FormularioVehiculo({ onCreado }: { onCreado: () => void }) {
   const [abierto, setAbierto] = useState(false);
   const [placa, setPlaca] = useState("");
@@ -257,6 +268,7 @@ function FormularioVehiculo({ onCreado }: { onCreado: () => void }) {
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Envia el vehiculo y sus documentos.
   async function enviar(evento: FormEvent) {
     evento.preventDefault();
     if (!fotoPlaca || !tarjeta) return;

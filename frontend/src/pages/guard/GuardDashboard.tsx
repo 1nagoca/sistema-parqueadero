@@ -18,6 +18,7 @@ import type { LecturaPlaca } from "@/services/api/vision";
 import { listarZonas } from "@/services/api/zonas";
 import type { Acceso, AccesoActivo, Espacio, TipoVehiculo, Vehiculo, Zona } from "@/types/api";
 
+// Lo que se muestra al buscar una placa: nada, cargando, ya esta adentro, registrado o no registrado.
 type Resultado =
   | { estado: "vacio" }
   | { estado: "cargando" }
@@ -25,6 +26,7 @@ type Resultado =
   | { estado: "vehiculo_registrado"; vehiculo: Vehiculo }
   | { estado: "no_registrado"; placa: string };
 
+// Panel del vigilante: buscar placa (a mano, con foto o con QR) y registrar entradas y salidas.
 export default function GuardDashboard() {
   const { usuario, cerrarSesion } = useAuth();
   const [zonas, setZonas] = useState<Zona[]>([]);
@@ -39,10 +41,12 @@ export default function GuardDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
 
+  // Al abrir el panel carga las zonas.
   useEffect(() => {
     cargarZonas();
   }, []);
 
+  // Al cambiar de zona carga sus espacios y los vehiculos que estan adentro.
   useEffect(() => {
     if (!zonaId) {
       setEspaciosZona([]);
@@ -58,6 +62,7 @@ export default function GuardDashboard() {
     setEspacioId("");
   }, [zonaId]);
 
+  // Trae las zonas y elige la primera si no hay ninguna elegida.
   async function cargarZonas() {
     try {
       const datos = await listarZonas();
@@ -68,6 +73,7 @@ export default function GuardDashboard() {
     }
   }
 
+  // Refresca cupos, espacios y vehiculos adentro despues de una entrada o salida.
   async function recargarZonaYEspacios() {
     await cargarZonas();
     if (zonaId) {
@@ -85,6 +91,7 @@ export default function GuardDashboard() {
     setError(null);
     setResultado({ estado: "cargando" });
     try {
+      // Primero mira si ya esta adentro (ofrece salida); si no, si esta registrado (ofrece entrada).
       const accesoActivo = await buscarAccesoActivoPorPlaca(placa);
       if (accesoActivo) {
         const vehiculo = await buscarPorPlaca(placa);
@@ -107,12 +114,14 @@ export default function GuardDashboard() {
     }
   }
 
+  // Marca el acceso como leido por vision si la placa vino de una foto.
   function camposAlpr() {
     return lecturaAlpr
       ? { placa_detectada_por_alpr: true, confianza_alpr: lecturaAlpr.confianza }
       : {};
   }
 
+  // Entrada de un vehiculo registrado.
   async function confirmarEntradaNormal(vehiculoId: string) {
     await conCargando(() =>
       registrarEntrada({
@@ -125,6 +134,7 @@ export default function GuardDashboard() {
     );
   }
 
+  // Entrada de visitante: la autoriza el vigilante de la sesion con una justificacion.
   async function confirmarEntradaVisitante(vehiculoId: string, justificacion: string) {
     if (!usuario) return;
     await conCargando(() =>
@@ -140,10 +150,12 @@ export default function GuardDashboard() {
     );
   }
 
+  // Salida de un vehiculo que esta adentro.
   async function confirmarSalida(accesoId: string) {
     await conCargando(() => registrarSalida(accesoId));
   }
 
+  // Ejecuta la accion mostrando que esta procesando; al terminar limpia y refresca.
   async function conCargando(accion: () => Promise<unknown>) {
     if (!zonaId && resultado.estado !== "con_acceso_activo") {
       setError("Selecciona una zona");
@@ -165,6 +177,7 @@ export default function GuardDashboard() {
     }
   }
 
+  // La zona elegida y si se quedo sin cupos.
   const zonaSeleccionada = zonas.find((z) => z.id === zonaId);
   const sinCupos = zonaSeleccionada !== undefined && zonaSeleccionada.cupos_disponibles <= 0;
 
@@ -287,6 +300,7 @@ export default function GuardDashboard() {
         onEntradaNormal={confirmarEntradaNormal}
         onSalida={confirmarSalida}
         onRegistrarVehiculoVisitante={async (placa, tipoVehiculo, justificacion) => {
+          // Visitante no registrado: primero crea el vehiculo y luego registra la entrada.
           if (!usuario) return;
           setProcesando(true);
           setError(null);
@@ -307,6 +321,7 @@ export default function GuardDashboard() {
   );
 }
 
+// Lo que recibe ResultadoPanel desde el panel.
 interface ResultadoPanelProps {
   resultado: Resultado;
   procesando: boolean;
@@ -316,6 +331,7 @@ interface ResultadoPanelProps {
   onRegistrarVehiculoVisitante: (placa: string, tipo: TipoVehiculo, justificacion: string) => void;
 }
 
+// Muestra el resultado de la busqueda con el boton que corresponde (entrada, salida o visitante).
 function ResultadoPanel({
   resultado,
   procesando,
@@ -381,6 +397,7 @@ function ResultadoPanel({
   );
 }
 
+// Formulario para dejar entrar como visitante un vehiculo no registrado.
 function FormularioVisitante({
   placa,
   procesando,
