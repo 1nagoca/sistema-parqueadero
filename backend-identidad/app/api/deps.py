@@ -9,11 +9,13 @@ from app.db.session import get_db
 from app.models.enums import RolUsuario
 from app.models.usuario import Usuario
 
+# Lee el token del encabezado Authorization: Bearer <token>.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 __all__ = ["get_db", "get_current_user", "require_role"]
 
 
+# Valida el token y busca al usuario en la base; si no existe o esta inactivo, 401.
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
@@ -33,6 +35,7 @@ def get_current_user(
     return usuario
 
 
+# Deja pasar solo a los roles indicados (si no, 403); se usa en cada endpoint.
 def require_role(*roles: RolUsuario):
     def verificador(usuario: Usuario = Depends(get_current_user)) -> Usuario:
         if usuario.rol not in roles:

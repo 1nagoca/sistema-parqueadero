@@ -13,11 +13,13 @@ if TYPE_CHECKING:
     from app.models.usuario import Usuario
     from app.models.vehiculo import Vehiculo
 
+# Usa el tipo ENUM que ya creo la migracion (create_type=False).
 tipo_documento_enum = ENUM(
     TipoDocumento, name="documento_tipo_enum", create_type=False, values_callable=lambda e: [m.value for m in e]
 )
 
 
+# Tabla documentos: carnet, foto de placa o tarjeta de propiedad.
 class Documento(Base):
     """Imagen/PDF de soporte para la verificacion: el carnet cuelga del usuario; la foto de la
     placa y la tarjeta de propiedad cuelgan del vehiculo. El archivo vive en el almacenamiento
@@ -40,5 +42,6 @@ class Documento(Base):
     tamano_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    # Relaciones: el usuario y, si aplica, el vehiculo del documento.
     usuario: Mapped["Usuario"] = relationship(back_populates="documentos")
     vehiculo: Mapped["Vehiculo | None"] = relationship(back_populates="documentos")

@@ -25,10 +25,12 @@ from app.db.session import SessionLocal
 from app.models.enums import EstadoVerificacion, RolUsuario
 from app.models.usuario import Usuario
 
+# Largo minimo de la contrasena de siembra.
 MIN_PASSWORD = 12
 # bcrypt ignora en silencio lo que pase de 72 bytes.
 MAX_PASSWORD_BYTES = 72
 
+# Rol, nombre y documento por defecto de cada usuario a sembrar.
 _POR_DEFECTO = {
     "ADMIN": (RolUsuario.ADMIN, "Administrador del sistema", "SEED-ADMIN"),
     "VIGILANTE": (RolUsuario.VIGILANTE, "Vigilante de turno", "SEED-VIGILANTE"),
@@ -39,6 +41,7 @@ class SiembraError(Exception):
     """Los datos de siembra no sirven; no se creo ningun usuario."""
 
 
+# Un usuario por sembrar.
 @dataclass(frozen=True)
 class UsuarioSemilla:
     rol: RolUsuario
@@ -49,6 +52,7 @@ class UsuarioSemilla:
     documento_identidad: str
 
 
+# Arma los usuarios a sembrar con las variables SEED_* del entorno.
 def datos_desde_entorno(entorno: Mapping[str, str]) -> list[UsuarioSemilla]:
     usuarios = []
     for prefijo, (rol, nombre, documento) in _POR_DEFECTO.items():
@@ -64,6 +68,7 @@ def datos_desde_entorno(entorno: Mapping[str, str]) -> list[UsuarioSemilla]:
     return usuarios
 
 
+# Revisa correos y contrasenas; si algo falla, no se crea nadie.
 def _validar(usuarios: list[UsuarioSemilla]) -> list[UsuarioSemilla]:
     """Devuelve los usuarios con el correo normalizado o lanza SiembraError."""
     validados = []
@@ -95,6 +100,7 @@ def _validar(usuarios: list[UsuarioSemilla]) -> list[UsuarioSemilla]:
     return validados
 
 
+# Crea en la base los usuarios que todavia no existen.
 def sembrar_usuarios(db: Session, usuarios: list[UsuarioSemilla]) -> list[tuple[str, RolUsuario, bool]]:
     """Crea los usuarios que no existan (por correo). Devuelve (correo, rol, creado) de cada uno.
 
@@ -138,6 +144,7 @@ def sembrar_usuarios(db: Session, usuarios: list[UsuarioSemilla]) -> list[tuple[
     return resultados
 
 
+# Corre la siembra e imprime que paso con cada usuario (sin contrasenas).
 def main() -> int:
     try:
         with SessionLocal() as db:

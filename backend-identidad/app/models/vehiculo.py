@@ -14,11 +14,13 @@ if TYPE_CHECKING:
     from app.models.documento import Documento
     from app.models.usuario import Usuario
 
+# Usa el tipo ENUM que ya creo la migracion (create_type=False).
 tipo_vehiculo_enum = ENUM(
     TipoVehiculo, name="vehiculo_tipo_enum", create_type=False, values_callable=lambda e: [m.value for m in e]
 )
 
 
+# Tabla vehiculos: placa unica en mayusculas; sin dueno solo si es de visitante.
 class Vehiculo(Base):
     __tablename__ = "vehiculos"
     __table_args__ = (
@@ -50,5 +52,6 @@ class Vehiculo(Base):
     motivo_rechazo: Mapped[str | None] = mapped_column(Text, nullable=True)
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    # Relaciones: su dueno y sus documentos.
     usuario: Mapped["Usuario | None"] = relationship(back_populates="vehiculos", foreign_keys=[usuario_id])
     documentos: Mapped[list["Documento"]] = relationship(back_populates="vehiculo", cascade="all, delete-orphan")

@@ -12,10 +12,12 @@ if TYPE_CHECKING:
     from app.models.espacio import Espacio
 
 
+# Tabla zonas: capacidad y cupos libres de cada zona.
 class Zona(Base):
     """Fuente de verdad atomica para RN-01 (descuento de cupo) y RN-02 (liberacion de cupo)."""
 
     __tablename__ = "zonas"
+    # Reglas: capacidad mayor que 0 y cupos entre 0 y la capacidad.
     __table_args__ = (
         CheckConstraint("capacidad_total > 0", name="ck_zonas_capacidad_positiva"),
         CheckConstraint(
@@ -37,4 +39,5 @@ class Zona(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    # Relacion: los espacios de la zona.
     espacios: Mapped[list["Espacio"]] = relationship(back_populates="zona")

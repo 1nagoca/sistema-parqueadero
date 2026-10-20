@@ -9,6 +9,7 @@ from app.db.base import Base
 from app.db.session import engine
 
 
+# Crea las tablas directo desde los modelos (solo para pruebas rapidas).
 def crear_tablas() -> None:
     Base.metadata.create_all(bind=engine)
 

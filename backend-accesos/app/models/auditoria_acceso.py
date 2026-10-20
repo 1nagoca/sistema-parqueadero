@@ -9,11 +9,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 from app.models.enums import AccionAuditoria
 
+# Usa el tipo ENUM que ya creo la migracion (create_type=False).
 auditoria_accion_enum = ENUM(
     AccionAuditoria, name="auditoria_accion_enum", create_type=False, values_callable=lambda e: [m.value for m in e]
 )
 
 
+# Tabla auditoria_accesos: bitacora de entradas y salidas (solo se agregan filas).
 class AuditoriaAcceso(Base):
     """Traza inmutable de RN-04. Append-only por permisos de base de datos (ver migracion
     inicial: REVOKE UPDATE, DELETE ON auditoria_accesos), no solo por convencion de la app."""
@@ -27,6 +29,7 @@ class AuditoriaAcceso(Base):
     # Referencia polimorfica (accesos, espacios, zonas); sin FK formal porque apunta a varias tablas.
     registro_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     accion: Mapped[AccionAuditoria] = mapped_column(auditoria_accion_enum, nullable=False)
+    # Como estaba y como quedo el registro (en JSON).
     valores_anteriores: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     valores_nuevos: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     # Usuario del servicio de identidad: solo su identificador, sin llave foranea.

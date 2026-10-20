@@ -20,13 +20,16 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 from app.models.enums import TipoAcceso
 
+# Usa el tipo ENUM que ya creo la migracion (create_type=False).
 acceso_tipo_enum = ENUM(
     TipoAcceso, name="acceso_tipo_enum", create_type=False, values_callable=lambda e: [m.value for m in e]
 )
 
 
+# Tabla accesos: cada entrada y salida de un vehiculo.
 class Acceso(Base):
     __tablename__ = "accesos"
+    # Reglas: placa en mayusculas, salida despues de entrada, visitante autorizado y un acceso abierto por vehiculo.
     __table_args__ = (
         CheckConstraint("placa = upper(placa)", name="ck_accesos_placa_mayusculas"),
         CheckConstraint(
@@ -65,6 +68,7 @@ class Acceso(Base):
     tipo_acceso: Mapped[TipoAcceso] = mapped_column(
         acceso_tipo_enum, nullable=False, default=TipoAcceso.NORMAL, server_default=TipoAcceso.NORMAL.value
     )
+    # Entrada, salida y duracion; la salida queda vacia mientras el vehiculo esta adentro.
     fecha_hora_entrada: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -73,6 +77,7 @@ class Acceso(Base):
     # Vigilante que autoriza el ingreso de un vehiculo de visitante (RN-03).
     autorizado_por_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     justificacion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Si la placa la leyo el servicio de vision y con que confianza.
     placa_detectada_por_alpr: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )

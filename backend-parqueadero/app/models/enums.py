@@ -1,3 +1,4 @@
+# Enums: listas de valores fijos; coinciden con los tipos ENUM de la base.
 import enum
 
 
@@ -11,6 +12,7 @@ class RolUsuario(str, enum.Enum):
     ADMIN = "admin"
 
 
+# Estados de un espacio (definen su color en el mapa).
 class EstadoEspacio(str, enum.Enum):
     LIBRE = "libre"
     OCUPADO = "ocupado"

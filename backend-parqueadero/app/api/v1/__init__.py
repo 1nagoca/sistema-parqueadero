@@ -1,3 +1,4 @@
+# Junta los routers de este servicio bajo /api/v1.
 from fastapi import APIRouter
 
 from app.api.v1.routers import espacios, reportes, zonas

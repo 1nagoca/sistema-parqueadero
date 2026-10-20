@@ -1,3 +1,4 @@
+# Cliente HTTP para hablar con el servicio de parqueadero por su API interna (/interno).
 import uuid
 
 import httpx
@@ -14,14 +15,17 @@ class ParqueaderoNoDisponibleError(Exception):
     """El servicio de parqueadero no respondio o respondio con un error inesperado."""
 
 
+# Pide a parqueadero que reste un cupo de la zona.
 def ocupar_cupo(zona_id: uuid.UUID, espacio_id: uuid.UUID | None) -> None:
     _mover_cupo("ocupar", zona_id, espacio_id)
 
 
+# Pide a parqueadero que sume un cupo a la zona.
 def liberar_cupo(zona_id: uuid.UUID, espacio_id: uuid.UUID | None) -> None:
     _mover_cupo("liberar", zona_id, espacio_id)
 
 
+# Pide el codigo visible de varios espacios.
 def codigos_de_espacios(espacio_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
     """Codigo visible de cada espacio (ej. "A-12"). Los espacios viven en la base de datos del
     servicio de parqueadero, asi que se le preguntan por API en vez de con un JOIN."""
@@ -31,6 +35,7 @@ def codigos_de_espacios(espacio_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
     return {uuid.UUID(espacio["id"]): espacio["codigo"] for espacio in respuesta.json()}
 
 
+# Llama a /interno/cupos/ocupar o /interno/cupos/liberar.
 def _mover_cupo(accion: str, zona_id: uuid.UUID, espacio_id: uuid.UUID | None) -> None:
     _pedir(
         "POST",
@@ -39,6 +44,7 @@ def _mover_cupo(accion: str, zona_id: uuid.UUID, espacio_id: uuid.UUID | None) -
     )
 
 
+# Hace la peticion con 5 s de espera; 409 es sin cupo y cualquier otro error, parqueadero no disponible.
 def _pedir(metodo: str, ruta: str, **kwargs) -> httpx.Response:
     try:
         with httpx.Client(base_url=settings.PARQUEADERO_URL, timeout=5.0) as client:

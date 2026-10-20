@@ -1,3 +1,4 @@
+# Cliente HTTP para hablar con el servicio de identidad por su API interna (/interno).
 import uuid
 from dataclasses import dataclass
 
@@ -14,6 +15,7 @@ class IdentidadNoDisponibleError(Exception):
     """El servicio de identidad no respondio o respondio algo inesperado."""
 
 
+# Lo que responde identidad sobre un vehiculo.
 @dataclass(frozen=True)
 class VehiculoIdentidad:
     """Lo que accesos necesita saber de un vehiculo para registrar su entrada."""
@@ -27,6 +29,7 @@ class VehiculoIdentidad:
     propietario_estado_verificacion: str | None
 
 
+# Pide a identidad un vehiculo por su id (si no existe, VehiculoNoEncontradoError).
 def obtener_vehiculo(vehiculo_id: uuid.UUID) -> VehiculoIdentidad:
     """Los vehiculos viven en la base de datos del servicio de identidad, asi que se le
     preguntan por API en vez de con una consulta local."""
@@ -50,6 +53,7 @@ def obtener_vehiculo(vehiculo_id: uuid.UUID) -> VehiculoIdentidad:
         raise IdentidadNoDisponibleError("El servicio de identidad no esta disponible") from exc
 
 
+# Pregunta a identidad cuales de esos usuarios existen.
 def usuarios_existentes(usuario_ids: list[uuid.UUID]) -> set[uuid.UUID]:
     """De los identificadores pedidos, los que corresponden a un usuario que existe."""
     if not usuario_ids:
@@ -61,6 +65,7 @@ def usuarios_existentes(usuario_ids: list[uuid.UUID]) -> set[uuid.UUID]:
         raise IdentidadNoDisponibleError("El servicio de identidad no esta disponible") from exc
 
 
+# Hace el GET con 5 s de espera; si identidad no responde, IdentidadNoDisponibleError.
 def _pedir(ruta: str, **kwargs) -> httpx.Response:
     try:
         with httpx.Client(base_url=settings.IDENTIDAD_URL, timeout=5.0) as client:
@@ -73,6 +78,7 @@ def _pedir(ruta: str, **kwargs) -> httpx.Response:
     return respuesta
 
 
+# Lee la respuesta como JSON o falla con IdentidadNoDisponibleError.
 def _json(respuesta: httpx.Response):
     if respuesta.status_code != 200:
         raise IdentidadNoDisponibleError("El servicio de identidad no esta disponible")

@@ -12,11 +12,13 @@ from app.models.enums import AccionAuditoria
 if TYPE_CHECKING:
     from app.models.usuario import Usuario
 
+# Usa el tipo ENUM que ya creo la migracion (create_type=False).
 auditoria_accion_enum = ENUM(
     AccionAuditoria, name="auditoria_accion_enum", create_type=False, values_callable=lambda e: [m.value for m in e]
 )
 
 
+# Tabla auditoria_identidad: bitacora de verificaciones (solo se agregan filas).
 class AuditoriaIdentidad(Base):
     """Traza inmutable de las verificaciones. Append-only por permisos de base de datos (ver
     migracion inicial: REVOKE UPDATE, DELETE ON auditoria_identidad), no solo por convencion de
@@ -31,6 +33,7 @@ class AuditoriaIdentidad(Base):
     # Referencia polimorfica (usuarios, vehiculos); sin FK formal porque apunta a varias tablas.
     registro_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     accion: Mapped[AccionAuditoria] = mapped_column(auditoria_accion_enum, nullable=False)
+    # Como estaba y como quedo el registro (en JSON).
     valores_anteriores: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     valores_nuevos: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     realizado_por_id: Mapped[uuid.UUID] = mapped_column(

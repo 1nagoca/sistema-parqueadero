@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# Configuracion del servicio: se lee de variables de entorno (docker-compose o .env).
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Parqueadero - Identidad y verificacion"
     API_V1_PREFIX: str = "/api/v1"
@@ -11,8 +12,10 @@ class Settings(BaseSettings):
     # La clave compartida con la que se firman los tokens: este servicio es el unico que los
     # emite; los demas solo los verifican.
     SECRET_KEY: str
+    # El token dura 8 horas.
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8
 
+    # Paginas que pueden llamar a esta API desde el navegador.
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
 
     # Documentos de verificacion: volumen privado, nunca se sirve como estatico.
@@ -26,4 +29,5 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
+# Objeto unico con la configuracion; se importa donde haga falta.
 settings = Settings()

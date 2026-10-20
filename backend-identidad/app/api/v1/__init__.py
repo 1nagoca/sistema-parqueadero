@@ -1,3 +1,4 @@
+# Junta los routers de este servicio bajo /api/v1 (/interno se monta aparte en main.py).
 from fastapi import APIRouter
 
 from app.api.v1.routers import auth, documentos, usuarios, vehiculos, verificaciones

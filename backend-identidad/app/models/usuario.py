@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.models.documento import Documento
     from app.models.vehiculo import Vehiculo
 
+# Usan los tipos ENUM que ya creo la migracion (create_type=False).
 rol_usuario_enum = ENUM(
     RolUsuario, name="usuario_rol_enum", create_type=False, values_callable=lambda e: [m.value for m in e]
 )
@@ -26,6 +27,7 @@ estado_verificacion_enum = ENUM(
 )
 
 
+# Tabla usuarios: personas del sistema con su rol y estado de verificacion.
 class Usuario(Base):
     __tablename__ = "usuarios"
 
@@ -37,6 +39,7 @@ class Usuario(Base):
     documento_identidad: Mapped[str] = mapped_column(String(30), nullable=False, unique=True)
     telefono: Mapped[str | None] = mapped_column(String(20), nullable=True)
     rol: Mapped[RolUsuario] = mapped_column(rol_usuario_enum, nullable=False)
+    # Contrasena cifrada con bcrypt.
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     universidad: Mapped[str | None] = mapped_column(String(150), nullable=True)
     estado_verificacion: Mapped[EstadoVerificacion] = mapped_column(
@@ -53,6 +56,7 @@ class Usuario(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    # Relaciones: sus vehiculos, sus documentos y las auditorias que hizo.
     vehiculos: Mapped[list["Vehiculo"]] = relationship(
         back_populates="usuario", foreign_keys="Vehiculo.usuario_id"
     )
