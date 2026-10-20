@@ -13,6 +13,7 @@ class VerificacionError(Exception):
     """La resolucion no se puede aplicar (faltan documentos o falta el motivo de rechazo)."""
 
 
+# Guarda un documento nuevo y quita el anterior del mismo tipo.
 def reemplazar_documento(
     db: Session,
     *,
@@ -46,15 +47,18 @@ def reemplazar_documento(
     return rutas_viejas
 
 
+# Borra del disco los archivos de los documentos reemplazados.
 def borrar_archivos(rutas: list[str]) -> None:
     for ruta in rutas:
         documento_service.eliminar_archivo(ruta)
 
 
+# Devuelve que tipos de documento hay en la lista.
 def _tipos_de(documentos: list[Documento]) -> set[TipoDocumento]:
     return {d.tipo for d in documentos}
 
 
+# Aprueba o rechaza a un estudiante; para aprobar exige el carnet.
 def resolver_usuario(
     db: Session, usuario: Usuario, aprobar: bool, motivo: str | None, admin_id: uuid.UUID
 ) -> Usuario:
@@ -63,6 +67,7 @@ def resolver_usuario(
     return _aplicar(db, usuario, "usuarios", aprobar, motivo, admin_id)
 
 
+# Aprueba o rechaza un vehiculo; para aprobar exige foto de placa y tarjeta.
 def resolver_vehiculo(
     db: Session, vehiculo: Vehiculo, aprobar: bool, motivo: str | None, admin_id: uuid.UUID
 ) -> Vehiculo:
@@ -72,6 +77,7 @@ def resolver_vehiculo(
     return _aplicar(db, vehiculo, "vehiculos", aprobar, motivo, admin_id)
 
 
+# Cambia el estado, guarda el motivo y deja la traza en la auditoria.
 def _aplicar(db: Session, entidad, tabla: str, aprobar: bool, motivo: str | None, admin_id: uuid.UUID):
     motivo = (motivo or "").strip() or None
     if not aprobar and motivo is None:

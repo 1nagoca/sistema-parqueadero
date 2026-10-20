@@ -31,9 +31,11 @@ class VehiculoYaAdentroError(Exception):
     """El vehiculo ya tiene un acceso abierto: no puede entrar otra vez sin haber salido."""
 
 
+# Nombre del indice que impide dos accesos abiertos del mismo vehiculo.
 INDICE_ACCESO_ACTIVO = "uq_accesos_vehiculo_activo"
 
 
+# Registra la entrada de un vehiculo: valida, ocupa el cupo y guarda el acceso.
 def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id: uuid.UUID) -> Acceso:
     """RN-01 + RN-03: ocupa el cupo en el servicio de parqueadero y crea el acceso junto con su
     traza de auditoria.
@@ -48,14 +50,17 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
     rechaza antes de tocar el cupo. Si dos entradas simultaneas pasan esa comprobacion, el
     indice unico de acceso activo rechaza la segunda.
     """
+    # 1. Pregunta a identidad por el vehiculo y valida que pueda entrar.
     vehiculo = identidad_client.obtener_vehiculo(datos.vehiculo_id)
     _exigir_vehiculo_verificado(vehiculo, datos.tipo_acceso)
     _exigir_usuarios_existentes(datos)
     if _tiene_acceso_activo(db, datos.vehiculo_id):
         raise VehiculoYaAdentroError("El vehiculo ya tiene un acceso activo")
 
+    # 2. Pide al servicio de parqueadero que ocupe el cupo.
     parqueadero_client.ocupar_cupo(datos.zona_id, datos.espacio_id)
 
+    # 3. Guarda el acceso y su auditoria; si algo falla, devuelve el cupo.
     try:
         acceso = Acceso(
             vehiculo_id=datos.vehiculo_id,
@@ -102,6 +107,7 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
     return acceso
 
 
+# Rechaza la entrada normal si el vehiculo o su dueno no estan aprobados.
 def _exigir_vehiculo_verificado(vehiculo: identidad_client.VehiculoIdentidad, tipo_acceso: TipoAcceso) -> None:
     """Un acceso normal exige vehiculo y propietario aprobados por el administrador; el
     visitante ya pasa por su propio flujo de autorizacion + justificacion."""
@@ -116,6 +122,7 @@ def _exigir_vehiculo_verificado(vehiculo: identidad_client.VehiculoIdentidad, ti
         )
 
 
+# Comprueba en identidad que el conductor y quien autoriza existan.
 def _exigir_usuarios_existentes(datos: AccesoEntradaCreate) -> None:
     """El conductor y quien autoriza deben existir en identidad (no importa si estan activos)."""
     pedidos = [i for i in (datos.usuario_id, datos.autorizado_por_id) if i is not None]
@@ -128,6 +135,7 @@ def _exigir_usuarios_existentes(datos: AccesoEntradaCreate) -> None:
         raise UsuarioNoEncontradoError("Quien autoriza (autorizado_por_id) no existe")
 
 
+# Dice si el vehiculo ya esta adentro (tiene un acceso sin salida).
 def _tiene_acceso_activo(db: Session, vehiculo_id: uuid.UUID) -> bool:
     return (
         db.query(Acceso.id)
@@ -137,6 +145,7 @@ def _tiene_acceso_activo(db: Session, vehiculo_id: uuid.UUID) -> bool:
     )
 
 
+# Registra la salida: cierra el acceso, calcula la duracion y libera el cupo.
 def registrar_salida(db: Session, acceso_id: uuid.UUID, realizado_por_id: uuid.UUID) -> Acceso:
     """RN-02: cierra el acceso (fecha/duracion) y libera el cupo en el servicio de parqueadero.
     El UPDATE condicional (``WHERE fecha_hora_salida IS NULL``) hace que una segunda llamada
@@ -146,6 +155,7 @@ def registrar_salida(db: Session, acceso_id: uuid.UUID, realizado_por_id: uuid.U
     salida se revierte y el acceso sigue abierto; si falla la confirmacion, se compensa
     volviendo a ocupar el cupo.
     """
+    # 1. Cierra el acceso solo si sigue abierto.
     resultado = db.execute(
         update(Acceso)
         .where(Acceso.id == acceso_id, Acceso.fecha_hora_salida.is_(None))
@@ -162,12 +172,14 @@ def registrar_salida(db: Session, acceso_id: uuid.UUID, realizado_por_id: uuid.U
         raise AccesoNoEncontradoOYaCerradoError(f"El acceso {acceso_id} no existe o ya fue cerrado")
     zona_id, espacio_id = acceso.zona_id, acceso.espacio_id
 
+    # 2. Libera el cupo en el servicio de parqueadero.
     try:
         parqueadero_client.liberar_cupo(zona_id, espacio_id)
     except Exception:
         db.rollback()
         raise
 
+    # 3. Guarda la auditoria; si falla, vuelve a ocupar el cupo.
     try:
         auditoria_service.registrar_auditoria(
             db,
@@ -190,6 +202,7 @@ def registrar_salida(db: Session, acceso_id: uuid.UUID, realizado_por_id: uuid.U
     return acceso
 
 
+# Deshace el cambio de cupo cuando algo fallo despues.
 def _compensar(accion, zona_id: uuid.UUID, espacio_id: uuid.UUID | None) -> None:
     """Deshace el movimiento de cupo ya hecho en el servicio de parqueadero. Si la compensacion
     tambien falla no hay mas que hacer aqui: se deja registro para corregir el contador a mano."""

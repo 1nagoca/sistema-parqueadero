@@ -17,6 +17,7 @@ class ArchivoInvalidoError(Exception):
     """El archivo subido esta vacio, es muy grande o no es jpg/png/pdf."""
 
 
+# Reconoce el tipo real del archivo por sus primeros bytes.
 def _detectar_tipo(contenido: bytes) -> tuple[str, str]:
     for firma, content_type, extension in _FIRMAS:
         if contenido.startswith(firma):
@@ -26,6 +27,7 @@ def _detectar_tipo(contenido: bytes) -> tuple[str, str]:
     raise ArchivoInvalidoError("Formato no permitido: solo JPG, PNG, WEBP o PDF")
 
 
+# Valida el archivo subido y lo guarda en disco con un nombre aleatorio.
 async def guardar_archivo(archivo: UploadFile, permitir_pdf: bool = True) -> tuple[str, str, int]:
     """Valida y guarda el archivo con un nombre generado (nunca el que envia el cliente, para
     evitar path traversal). Devuelve (ruta_relativa, content_type, tamano_bytes)."""
@@ -47,6 +49,7 @@ async def guardar_archivo(archivo: UploadFile, permitir_pdf: bool = True) -> tup
     return nombre, content_type, len(contenido)
 
 
+# Convierte la ruta guardada en ruta real, sin salirse de la carpeta de archivos.
 def ruta_absoluta(ruta_relativa: str) -> Path:
     base = Path(settings.UPLOAD_DIR).resolve()
     destino = (base / ruta_relativa).resolve()
@@ -55,6 +58,7 @@ def ruta_absoluta(ruta_relativa: str) -> Path:
     return destino
 
 
+# Borra un archivo del disco si existe.
 def eliminar_archivo(ruta_relativa: str) -> None:
     try:
         ruta_absoluta(ruta_relativa).unlink(missing_ok=True)

@@ -20,6 +20,7 @@ class ZonaEnCapacidadTotalError(Exception):
     """La zona ya esta en su capacidad total; liberar un cupo mas violaria el CHECK de BD."""
 
 
+# Resta un cupo a la zona (y ocupa el espacio si se indico).
 def ocupar_cupo(db: Session, zona_id: uuid.UUID, espacio_id: uuid.UUID | None) -> Zona:
     """RN-01: decremento atomico del contador de cupos de la zona.
 
@@ -38,6 +39,7 @@ def ocupar_cupo(db: Session, zona_id: uuid.UUID, espacio_id: uuid.UUID | None) -
     if zona is None:
         raise SinCuposDisponiblesError(f"La zona {zona_id} no tiene cupos disponibles")
 
+    # Si se pidio un espacio concreto, lo marca como ocupado.
     if espacio_id is not None:
         espacio_resultado = db.execute(
             update(Espacio)
@@ -51,6 +53,7 @@ def ocupar_cupo(db: Session, zona_id: uuid.UUID, espacio_id: uuid.UUID | None) -
     return zona
 
 
+# Suma un cupo a la zona (y libera el espacio si se indico).
 def liberar_cupo(db: Session, zona_id: uuid.UUID, espacio_id: uuid.UUID | None) -> Zona:
     """RN-02: incremento atomico del contador de cupos de la zona."""
     resultado = db.execute(

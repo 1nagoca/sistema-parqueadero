@@ -4,6 +4,7 @@ from app.ws.connection_manager import connection_manager
 from app.ws.events import ZONA_ACTUALIZADA
 
 
+# Avisa por WebSocket a los navegadores que cambiaron los cupos de una zona.
 async def broadcast_actualizacion_zona(zona_id: uuid.UUID, cupos_disponibles: int) -> None:
     """Se llama justo despues de confirmar un cambio de cupo, para que el mapa de usuarios
     refleje el cambio sin necesidad de polling."""

@@ -7,6 +7,7 @@ from app.models.auditoria_acceso import AuditoriaAcceso
 from app.models.enums import AccionAuditoria
 
 
+# Guarda una traza en la bitacora (sin commit: lo hace quien la llama).
 def registrar_auditoria(
     db: Session,
     *,
