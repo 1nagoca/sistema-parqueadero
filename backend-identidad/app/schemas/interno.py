@@ -1,3 +1,4 @@
+# Schemas (Pydantic): la forma de los datos que entran y salen por la API interna (/interno), que solo usa el servicio de accesos; si no cumplen, responde 422.
 import uuid
 
 from pydantic import BaseModel, ConfigDict
@@ -5,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 from app.models.enums import EstadoVerificacion, RolUsuario
 
 
+# Del dueno solo se comparte el id y si esta aprobado.
 class PropietarioInterno(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -12,6 +14,7 @@ class PropietarioInterno(BaseModel):
     estado_verificacion: EstadoVerificacion
 
 
+# Lo minimo de un vehiculo para decidir si puede entrar.
 class VehiculoInterno(BaseModel):
     """Lo que accesos necesita para registrar una entrada. Sin nombres, correos ni documentos."""
 
@@ -24,6 +27,7 @@ class VehiculoInterno(BaseModel):
     propietario: PropietarioInterno | None
 
 
+# Lo minimo de un usuario para saber que existe.
 class UsuarioInterno(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

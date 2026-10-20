@@ -1,3 +1,4 @@
+# Schemas (Pydantic): la forma de los datos que entran y salen por la API de accesos; si no cumplen, responde 422.
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -7,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from app.models.enums import TipoAcceso
 
 
+# Lo que envia el vigilante al registrar una entrada.
 class AccesoEntradaCreate(BaseModel):
     vehiculo_id: uuid.UUID
     zona_id: uuid.UUID
@@ -18,6 +20,7 @@ class AccesoEntradaCreate(BaseModel):
     placa_detectada_por_alpr: bool = False
     confianza_alpr: Decimal | None = None
 
+    # Un visitante exige quien autoriza y la justificacion.
     @model_validator(mode="after")
     def validar_visitante(self) -> "AccesoEntradaCreate":
         """Espejo del CHECK de BD (RN-03): defensa en profundidad, no reemplazo del constraint."""
@@ -29,6 +32,7 @@ class AccesoEntradaCreate(BaseModel):
         return self
 
 
+# Lo que devuelve la API de un acceso.
 class AccesoRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -47,6 +51,7 @@ class AccesoRead(BaseModel):
     confianza_alpr: Decimal | None
 
 
+# Un acceso abierto con su placa y el codigo del espacio, para la lista de vehiculos adentro.
 class AccesoActivoRead(AccesoRead):
     """AccesoRead + datos denormalizados para listar 'vehiculos adentro' sin N+1 requests."""
 

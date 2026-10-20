@@ -1,3 +1,4 @@
+# Schemas (Pydantic): la forma de los datos que entran y salen por la API de vehiculos; si no cumplen, responde 422.
 import uuid
 from datetime import datetime
 
@@ -6,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.models.enums import EstadoVerificacion, TipoVehiculo
 
 
+# Campos comunes de un vehiculo.
 class VehiculoBase(BaseModel):
     placa: str = Field(min_length=1, max_length=10)
     tipo_vehiculo: TipoVehiculo
@@ -13,16 +15,19 @@ class VehiculoBase(BaseModel):
     modelo: str | None = None
     color: str | None = None
 
+    # Guarda la placa sin espacios y en mayusculas.
     @field_validator("placa")
     @classmethod
     def normalizar_placa(cls, valor: str) -> str:
         return valor.strip().upper()
 
 
+# Lo que envia el admin o el vigilante al crear un vehiculo.
 class VehiculoCreate(VehiculoBase):
     usuario_id: uuid.UUID | None = None
     es_visitante: bool = False
 
+    # Debe tener dueno o ser de visitante.
     @model_validator(mode="after")
     def validar_propietario_o_visitante(self) -> "VehiculoCreate":
         """Espejo del CHECK de BD ck_vehiculos_propietario_o_visitante: sin esto la violacion
@@ -32,6 +37,7 @@ class VehiculoCreate(VehiculoBase):
         return self
 
 
+# Lo que devuelve la API de un vehiculo.
 class VehiculoRead(VehiculoBase):
     model_config = ConfigDict(from_attributes=True)
 

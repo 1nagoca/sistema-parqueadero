@@ -1,3 +1,4 @@
+# Schemas (Pydantic): la forma de los datos que entran y salen por la API de auditoria; si no cumplen, responde 422.
 import uuid
 from datetime import datetime
 from typing import Any
@@ -7,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 from app.models.enums import AccionAuditoria
 
 
+# Una traza de la bitacora de verificaciones.
 class AuditoriaIdentidadRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
