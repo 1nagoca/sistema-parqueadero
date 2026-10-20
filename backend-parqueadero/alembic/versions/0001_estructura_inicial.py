@@ -12,16 +12,19 @@ import sqlalchemy as sa
 
 from alembic import op
 
-# revision identifiers, used by Alembic.
+# Identificadores de Alembic: es la primera migracion de este servicio.
 revision: str = "0001_estructura_inicial"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+# Aplica la migracion (alembic upgrade head).
 def upgrade() -> None:
+    # Estados posibles de un espacio.
     op.execute(sa.text("CREATE TYPE espacio_estado_enum AS ENUM ('libre', 'ocupado', 'reservado', 'mantenimiento')"))
 
+    # Zonas con su capacidad y cupos libres (nunca negativos ni mayores a la capacidad).
     op.execute(
         sa.text(
             """
@@ -42,6 +45,7 @@ def upgrade() -> None:
         )
     )
 
+    # Espacios de cada zona; el codigo no se repite dentro de una zona.
     op.execute(
         sa.text(
             """
@@ -61,6 +65,7 @@ def upgrade() -> None:
     op.execute(sa.text("CREATE INDEX idx_espacios_zona_id ON espacios (zona_id)"))
 
 
+# Deshace la migracion (alembic downgrade): borra tablas y tipo en orden inverso.
 def downgrade() -> None:
     op.execute(sa.text("DROP TABLE IF EXISTS espacios"))
     op.execute(sa.text("DROP TABLE IF EXISTS zonas"))

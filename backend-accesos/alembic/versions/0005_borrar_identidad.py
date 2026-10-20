@@ -18,13 +18,16 @@ import sqlalchemy as sa
 
 from alembic import op
 
+# Identificadores de Alembic: esta es la 0005 y va despues de la 0004.
 revision: str = "0005_borrar_identidad"
 down_revision: Union[str, None] = "0004_placa_en_accesos"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+# Aplica la migracion: borra de esta base las tablas que ahora son de identidad.
 def upgrade() -> None:
+    # Si aun hay datos de identidad, se detiene salvo que se confirme con la variable.
     hay_datos = op.get_bind().execute(
         sa.text(
             "SELECT EXISTS (SELECT 1 FROM documentos) OR EXISTS (SELECT 1 FROM vehiculos) "
@@ -38,16 +41,19 @@ def upgrade() -> None:
             "IDENTIDAD_DATOS_MIGRADOS=1 (ver docs/arquitectura.md)."
         )
 
+    # Borra usuarios, vehiculos y documentos.
     op.execute(sa.text("DROP TABLE documentos"))
     op.execute(sa.text("DROP TABLE vehiculos"))
     op.execute(sa.text("DROP TABLE usuarios"))
 
+    # Borra los tipos que solo usaban esas tablas.
     op.execute(sa.text("DROP TYPE documento_tipo_enum"))
     op.execute(sa.text("DROP TYPE vehiculo_tipo_enum"))
     op.execute(sa.text("DROP TYPE verificacion_estado_enum"))
     op.execute(sa.text("DROP TYPE usuario_rol_enum"))
 
 
+# Deshace la migracion: vuelve a crear las tablas de identidad (vacias).
 def downgrade() -> None:
     """Restaura la estructura, sin datos: los usuarios, vehiculos y documentos estan en la base
     del servicio de identidad."""

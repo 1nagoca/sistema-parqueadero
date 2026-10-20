@@ -19,13 +19,16 @@ import sqlalchemy as sa
 
 from alembic import op
 
+# Identificadores de Alembic: esta es la 0003 y va despues de la 0002.
 revision: str = "0003_separar_parqueadero"
 down_revision: Union[str, None] = "0002_verificacion_estudiantes"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+# Aplica la migracion: saca zonas y espacios de esta base.
 def upgrade() -> None:
+    # Si hay zonas sin copiar al servicio de parqueadero, se detiene para no perderlas.
     hay_zonas = op.get_bind().execute(sa.text("SELECT EXISTS (SELECT 1 FROM zonas)")).scalar()
     if hay_zonas and os.environ.get("PARQUEADERO_DATOS_MIGRADOS") != "1":
         raise RuntimeError(
@@ -33,6 +36,7 @@ def upgrade() -> None:
             "y vuelve a correr con PARQUEADERO_DATOS_MIGRADOS=1 (ver docs/arquitectura.md)."
         )
 
+    # Quita las llaves foraneas de accesos y borra zonas, espacios y su tipo.
     op.execute(sa.text("ALTER TABLE accesos DROP CONSTRAINT accesos_zona_id_fkey"))
     op.execute(sa.text("ALTER TABLE accesos DROP CONSTRAINT accesos_espacio_id_fkey"))
     op.execute(sa.text("DROP TABLE espacios"))
@@ -40,6 +44,7 @@ def upgrade() -> None:
     op.execute(sa.text("DROP TYPE espacio_estado_enum"))
 
 
+# Deshace la migracion: vuelve a crear zonas y espacios (vacios).
 def downgrade() -> None:
     """Restaura la estructura; los datos de zonas y espacios hay que traerlos de vuelta desde
     la base del servicio de parqueadero. Las llaves foraneas se crean NOT VALID para que los
@@ -81,6 +86,7 @@ def downgrade() -> None:
         )
     )
     op.execute(sa.text("CREATE INDEX idx_espacios_zona_id ON espacios (zona_id)"))
+    # Recrea las llaves foraneas sin validar los accesos que ya existen.
     op.execute(
         sa.text(
             "ALTER TABLE accesos ADD CONSTRAINT accesos_zona_id_fkey "

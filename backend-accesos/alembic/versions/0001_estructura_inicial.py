@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-# revision identifiers, used by Alembic.
+# Identificadores de Alembic: es la primera migracion, no depende de otra.
 revision: str = "0001_estructura_inicial"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
@@ -25,15 +25,19 @@ depends_on: Union[str, Sequence[str], None] = None
 APP_ROLE = "parqueadero_app"
 
 
+# Aplica la migracion (alembic upgrade head).
 def upgrade() -> None:
+    # Extension que da gen_random_uuid() para los id.
     op.execute(sa.text("CREATE EXTENSION IF NOT EXISTS pgcrypto"))
 
+    # Tipos con valores fijos: roles, tipos de vehiculo, estados de espacio, tipo de acceso y acciones de auditoria.
     op.execute(sa.text("CREATE TYPE usuario_rol_enum AS ENUM ('estudiante', 'docente', 'administrativo', 'vigilante', 'admin')"))
     op.execute(sa.text("CREATE TYPE vehiculo_tipo_enum AS ENUM ('carro', 'moto', 'bicicleta', 'otro')"))
     op.execute(sa.text("CREATE TYPE espacio_estado_enum AS ENUM ('libre', 'ocupado', 'reservado', 'mantenimiento')"))
     op.execute(sa.text("CREATE TYPE acceso_tipo_enum AS ENUM ('normal', 'visitante')"))
     op.execute(sa.text("CREATE TYPE auditoria_accion_enum AS ENUM ('creacion', 'actualizacion', 'eliminacion')"))
 
+    # Usuarios del sistema con su rol y contrasena cifrada.
     op.execute(
         sa.text(
             """
@@ -53,6 +57,7 @@ def upgrade() -> None:
         )
     )
 
+    # Vehiculos: placa unica en mayusculas; si no tiene dueno debe ser de visitante.
     op.execute(
         sa.text(
             """
@@ -75,6 +80,7 @@ def upgrade() -> None:
     )
     op.execute(sa.text("CREATE INDEX idx_vehiculos_usuario_id ON vehiculos (usuario_id)"))
 
+    # Zonas con su capacidad y cupos libres (nunca negativos ni mayores a la capacidad).
     op.execute(
         sa.text(
             """
@@ -95,6 +101,7 @@ def upgrade() -> None:
         )
     )
 
+    # Espacios de cada zona; el codigo no se repite dentro de una zona.
     op.execute(
         sa.text(
             """
@@ -113,6 +120,7 @@ def upgrade() -> None:
     )
     op.execute(sa.text("CREATE INDEX idx_espacios_zona_id ON espacios (zona_id)"))
 
+    # Accesos: entrada y salida de un vehiculo; el visitante exige quien autoriza y por que.
     op.execute(
         sa.text(
             """
@@ -141,15 +149,18 @@ def upgrade() -> None:
             """
         )
     )
+    # Un vehiculo solo puede tener un acceso abierto (sin salida) a la vez.
     op.execute(
         sa.text(
             "CREATE UNIQUE INDEX uq_accesos_vehiculo_activo ON accesos (vehiculo_id) "
             "WHERE fecha_hora_salida IS NULL"
         )
     )
+    # Indices para buscar rapido por zona y por usuario.
     op.execute(sa.text("CREATE INDEX idx_accesos_zona_id ON accesos (zona_id)"))
     op.execute(sa.text("CREATE INDEX idx_accesos_usuario_id ON accesos (usuario_id)"))
 
+    # Bitacora de cambios: que tabla, que registro, quien y cuando.
     op.execute(
         sa.text(
             """
@@ -168,6 +179,7 @@ def upgrade() -> None:
             """
         )
     )
+    # Indices para buscar en la bitacora por registro y por fecha.
     op.execute(
         sa.text("CREATE INDEX idx_auditoria_accesos_registro ON auditoria_accesos (tabla_afectada, registro_id)")
     )
@@ -192,6 +204,7 @@ def upgrade() -> None:
     )
 
 
+# Deshace la migracion (alembic downgrade): borra tablas y tipos en orden inverso.
 def downgrade() -> None:
     op.execute(sa.text("DROP TABLE IF EXISTS auditoria_accesos"))
     op.execute(sa.text("DROP TABLE IF EXISTS accesos"))

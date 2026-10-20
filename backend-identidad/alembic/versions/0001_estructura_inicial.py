@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-# revision identifiers, used by Alembic.
+# Identificadores de Alembic: es la primera migracion de este servicio.
 revision: str = "0001_estructura_inicial"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
@@ -24,15 +24,19 @@ depends_on: Union[str, Sequence[str], None] = None
 APP_ROLE = "parqueadero_app"
 
 
+# Aplica la migracion (alembic upgrade head).
 def upgrade() -> None:
+    # Extension que da gen_random_uuid() para los id.
     op.execute(sa.text("CREATE EXTENSION IF NOT EXISTS pgcrypto"))
 
+    # Tipos con valores fijos: roles, tipos de vehiculo, estado de verificacion, tipo de documento y acciones.
     op.execute(sa.text("CREATE TYPE usuario_rol_enum AS ENUM ('estudiante', 'docente', 'administrativo', 'vigilante', 'admin')"))
     op.execute(sa.text("CREATE TYPE vehiculo_tipo_enum AS ENUM ('carro', 'moto', 'bicicleta', 'otro')"))
     op.execute(sa.text("CREATE TYPE verificacion_estado_enum AS ENUM ('pendiente', 'aprobado', 'rechazado')"))
     op.execute(sa.text("CREATE TYPE documento_tipo_enum AS ENUM ('carnet', 'foto_placa', 'tarjeta_propiedad')"))
     op.execute(sa.text("CREATE TYPE auditoria_accion_enum AS ENUM ('creacion', 'actualizacion', 'eliminacion')"))
 
+    # Usuarios: datos personales, rol, contrasena cifrada y estado de verificacion.
     op.execute(
         sa.text(
             """
@@ -56,6 +60,7 @@ def upgrade() -> None:
         )
     )
 
+    # Vehiculos: placa unica en mayusculas; si no tiene dueno debe ser de visitante.
     op.execute(
         sa.text(
             """
@@ -80,6 +85,7 @@ def upgrade() -> None:
     )
     op.execute(sa.text("CREATE INDEX idx_vehiculos_usuario_id ON vehiculos (usuario_id)"))
 
+    # Documentos de soporte: el carnet es del usuario; la foto de placa y la tarjeta, de un vehiculo.
     op.execute(
         sa.text(
             """
@@ -100,9 +106,11 @@ def upgrade() -> None:
             """
         )
     )
+    # Indices para buscar rapido los documentos de un usuario o de un vehiculo.
     op.execute(sa.text("CREATE INDEX idx_documentos_usuario_id ON documentos (usuario_id)"))
     op.execute(sa.text("CREATE INDEX idx_documentos_vehiculo_id ON documentos (vehiculo_id)"))
 
+    # Bitacora de verificaciones: quien aprobo o rechazo que y cuando.
     op.execute(
         sa.text(
             """
@@ -121,6 +129,7 @@ def upgrade() -> None:
             """
         )
     )
+    # Indices para buscar en la bitacora por registro y por fecha.
     op.execute(
         sa.text("CREATE INDEX idx_auditoria_identidad_registro ON auditoria_identidad (tabla_afectada, registro_id)")
     )
@@ -143,6 +152,7 @@ def upgrade() -> None:
     )
 
 
+# Deshace la migracion (alembic downgrade): borra tablas y tipos en orden inverso.
 def downgrade() -> None:
     op.execute(sa.text("DROP TABLE IF EXISTS auditoria_identidad"))
     op.execute(sa.text("DROP TABLE IF EXISTS documentos"))

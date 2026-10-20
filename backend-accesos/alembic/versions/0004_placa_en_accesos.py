@@ -14,34 +14,41 @@ import sqlalchemy as sa
 
 from alembic import op
 
+# Identificadores de Alembic: esta es la 0004 y va despues de la 0003.
 revision: str = "0004_placa_en_accesos"
 down_revision: Union[str, None] = "0003_separar_parqueadero"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+# Aplica la migracion: accesos guarda la placa y deja de depender de identidad.
 def upgrade() -> None:
+    # Agrega la placa y la copia desde vehiculos.
     op.execute(sa.text("ALTER TABLE accesos ADD COLUMN placa VARCHAR(10)"))
     op.execute(
         sa.text("UPDATE accesos SET placa = vehiculos.placa FROM vehiculos WHERE vehiculos.id = accesos.vehiculo_id")
     )
+    # Si algun acceso quedo sin placa, se detiene.
     sin_placa = op.get_bind().execute(sa.text("SELECT count(*) FROM accesos WHERE placa IS NULL")).scalar()
     if sin_placa:
         raise RuntimeError(
             f"{sin_placa} accesos apuntan a un vehiculo que no esta en la tabla vehiculos: no se "
             "puede saber su placa. Corrigelos antes de volver a correr la migracion."
         )
+    # La placa pasa a ser obligatoria y en mayusculas.
     op.execute(sa.text("ALTER TABLE accesos ALTER COLUMN placa SET NOT NULL"))
     op.execute(
         sa.text("ALTER TABLE accesos ADD CONSTRAINT ck_accesos_placa_mayusculas CHECK (placa = upper(placa))")
     )
 
+    # Quita las llaves foraneas hacia usuarios y vehiculos: quedan solo como id.
     op.execute(sa.text("ALTER TABLE accesos DROP CONSTRAINT accesos_vehiculo_id_fkey"))
     op.execute(sa.text("ALTER TABLE accesos DROP CONSTRAINT accesos_usuario_id_fkey"))
     op.execute(sa.text("ALTER TABLE accesos DROP CONSTRAINT accesos_autorizado_por_id_fkey"))
     op.execute(sa.text("ALTER TABLE auditoria_accesos DROP CONSTRAINT auditoria_accesos_realizado_por_id_fkey"))
 
 
+# Deshace la migracion: recrea las llaves foraneas y borra la placa.
 def downgrade() -> None:
     """Las llaves foraneas se crean NOT VALID para que los accesos y trazas registrados sin
     ellas no bloqueen el downgrade. La placa guardada se pierde."""
