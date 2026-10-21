@@ -188,7 +188,7 @@ function SeccionVerificaciones() {
   );
 }
 
-// Lista de usuarios y formulario para crear vigilantes, docentes, etc.
+// Lista de usuarios y formulario para crear vigilantes o administradores.
 function SeccionUsuarios() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -273,10 +273,8 @@ function SeccionUsuarios() {
             className={campo}
           />
           <select value={rol} onChange={(evento) => setRol(evento.target.value as RolUsuario)} className={campo}>
-            <option value="docente">Docente</option>
-            <option value="administrativo">Administrativo</option>
             <option value="vigilante">Vigilante</option>
-            <option value="admin">Admin</option>
+            <option value="admin">Administrador</option>
           </select>
           <input
             required
@@ -311,7 +309,7 @@ function SeccionUsuarios() {
               <tr key={u.id}>
                 <td className="px-4 py-2">{u.nombre_completo}</td>
                 <td className="px-4 py-2">{u.correo_institucional}</td>
-                <td className="px-4 py-2 capitalize">{u.rol}</td>
+                <td className="px-4 py-2 capitalize">{u.rol === "admin" ? "Administrador" : u.rol}</td>
                 <td className="px-4 py-2">
                   <EstadoBadge estado={u.estado_verificacion} />
                 </td>

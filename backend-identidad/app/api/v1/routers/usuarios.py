@@ -76,7 +76,7 @@ async def subir_carnet(
     return estudiante
 
 
-# POST /usuarios (admin): crea vigilantes, docentes, etc. (los estudiantes se registran solos).
+# POST /usuarios (admin): crea vigilantes o administradores (los estudiantes se registran solos).
 @router.post("", response_model=UsuarioRead, status_code=status.HTTP_201_CREATED)
 def crear_usuario(
     datos: UsuarioCreate,
@@ -87,6 +87,10 @@ def crear_usuario(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Los estudiantes se registran ellos mismos (POST /auth/registro); el administrador no define su contrasena",
+        )
+    if datos.rol not in (RolUsuario.VIGILANTE, RolUsuario.ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Solo se crean vigilantes o administradores"
         )
     existe = db.query(Usuario).filter(Usuario.correo_institucional == datos.correo_institucional).first()
     if existe is not None:

@@ -3,7 +3,8 @@ import enum
 
 
 class RolUsuario(str, enum.Enum):
-    """Roles que emite el servicio de identidad en el token (claim ``rol``)."""
+    """Roles que emite el servicio de identidad en el token (claim ``rol``). La base conserva
+    docente y administrativo, pero solo se usan estudiante, vigilante y admin."""
 
     ESTUDIANTE = "estudiante"
     DOCENTE = "docente"

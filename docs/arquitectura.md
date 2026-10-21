@@ -93,7 +93,7 @@ Solo Identidad emite tokens (`POST /api/v1/auth/login`). Son JWT firmados con HS
 | Claim | Contenido |
 |---|---|
 | `sub` | Identificador del usuario |
-| `rol` | `estudiante`, `docente`, `administrativo`, `vigilante` o `admin` |
+| `rol` | `estudiante`, `vigilante` o `admin` (administrador; RN-07) |
 | `exp` | Vencimiento |
 
 Accesos y Parqueadero autorizan solo con la firma y el `rol` del token, sin consultar a

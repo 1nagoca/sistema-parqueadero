@@ -2,7 +2,7 @@
 import enum
 
 
-# Roles de usuario (llegan en el token).
+# Roles de usuario (llegan en el token); docente y administrativo ya no se usan.
 class RolUsuario(str, enum.Enum):
     ESTUDIANTE = "estudiante"
     DOCENTE = "docente"

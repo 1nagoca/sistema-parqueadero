@@ -117,7 +117,7 @@ def test_usuarios_existentes_devuelve_los_que_identidad_conoce(identidad_respond
             200,
             json=[
                 {"id": str(activo), "rol": "vigilante", "activo": True},
-                {"id": str(inactivo), "rol": "docente", "activo": False},
+                {"id": str(inactivo), "rol": "estudiante", "activo": False},
             ],
         )
     )

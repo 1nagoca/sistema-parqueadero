@@ -16,7 +16,7 @@ Entre bases no hay llaves foráneas. `accesos` y `auditoria_accesos` guardan ide
 
 | Tabla | Base | Propósito |
 |---|---|---|
-| `usuarios` | `parqueadero_identidad` | Personas del sistema (estudiantes, docentes, administrativos, vigilantes, admin) |
+| `usuarios` | `parqueadero_identidad` | Personas del sistema (estudiantes, vigilantes y administradores) |
 | `vehiculos` | `parqueadero_identidad` | Vehículos registrados, de un usuario o de un visitante |
 | `documentos` | `parqueadero_identidad` | Archivos de soporte para verificar estudiantes y vehículos |
 | `auditoria_identidad` | `parqueadero_identidad` | Bitácora de verificaciones (solo se agrega, nunca se modifica ni se borra) |
@@ -59,7 +59,7 @@ Referencias a otra base, sin llave foránea:
 | `correo_institucional` | varchar(150) | No | | Único; sirve para iniciar sesión |
 | `documento_identidad` | varchar(30) | No | | Único |
 | `telefono` | varchar(20) | Sí | | |
-| `rol` | `usuario_rol_enum` | No | | estudiante, docente, administrativo, vigilante, admin |
+| `rol` | `usuario_rol_enum` | No | | estudiante, docente, administrativo, vigilante, admin; solo se usan estudiante, vigilante y admin (RN-07) |
 | `hashed_password` | varchar(255) | No | | Contraseña cifrada con bcrypt, nunca en texto plano |
 | `universidad` | varchar(150) | Sí | | Universidad declarada en el autorregistro |
 | `estado_verificacion` | `verificacion_estado_enum` | No | `aprobado` | pendiente, aprobado, rechazado |

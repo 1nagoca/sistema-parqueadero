@@ -88,13 +88,13 @@ def test_vehiculo_de_visitante_no_tiene_propietario_y_el_inexistente_da_404(clie
 
 def test_usuarios_devuelve_solo_los_que_existen_sin_datos_personales(client, sufijo):
     vigilante_id = _usuario(sufijo, RolUsuario.VIGILANTE)
-    inactivo_id = _usuario(sufijo, RolUsuario.DOCENTE, activo=False)
+    inactivo_id = _usuario(sufijo, RolUsuario.ESTUDIANTE, activo=False)
     inexistente = str(uuid.uuid4())
 
     r = client.get("/interno/usuarios", params={"id": [vigilante_id, inexistente, inactivo_id, vigilante_id]})
     assert r.status_code == 200, r.text
     assert sorted(r.json(), key=lambda u: u["rol"]) == [
-        {"id": inactivo_id, "rol": "docente", "activo": False},
+        {"id": inactivo_id, "rol": "estudiante", "activo": False},
         {"id": vigilante_id, "rol": "vigilante", "activo": True},
     ]
     assert "Nombre Privado" not in r.text and "@ufps.edu.co" not in r.text

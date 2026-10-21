@@ -20,3 +20,6 @@ Se aplican siempre en el backend. Cómo se cumplen entre servicios está en
   entrada, normal o de visitante; sin `espacio_id` la API de accesos responde 422. Parqueadero
   solo ocupa el puesto si está libre y es de la zona de la entrada (si no, 409 y no se descuenta
   el cupo).
+- **RN-07 — Tres roles.** Los usuarios son estudiante, vigilante o administrador (`admin`). El
+  estudiante se registra solo; el administrador crea únicamente vigilantes y administradores
+  (otro rol da 422). La base conserva `docente` y `administrativo` en el enum, pero ya no se usan.

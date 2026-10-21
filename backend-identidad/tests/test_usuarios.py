@@ -105,16 +105,32 @@ def test_admin_no_puede_crear_estudiantes(client, admin, sufijo):
     assert r.status_code == 400
 
 
+def test_admin_no_crea_docentes_ni_administrativos(client, admin, sufijo):
+    for rol, esperado in (("docente", 422), ("administrativo", 422)):
+        r = client.post(
+            f"{API}/usuarios",
+            headers=admin,
+            json={
+                "nombre_completo": "Otro",
+                "correo_institucional": f"{rol}-{sufijo}@ufps.edu.co",
+                "documento_identidad": f"{rol[0].upper()}{sufijo}",
+                "rol": rol,
+                "password": "una-clave-larga",
+            },
+        )
+        assert r.status_code == esperado, r.text  # RN-07
+
+
 def test_login_rechaza_y_emite_token_con_sub_rol_y_exp(client, sufijo):
     usuario_id, correo = _crear_usuario(RolUsuario.VIGILANTE, sufijo, "vigilante-password")
-    _, inactivo = _crear_usuario(RolUsuario.DOCENTE, sufijo, "docente-password", activo=False)
+    _, inactivo = _crear_usuario(RolUsuario.ADMIN, sufijo, "admin-password", activo=False)
 
     def login(username, password):
         return client.post(f"{API}/auth/login", data={"username": username, "password": password})
 
     assert login(correo, "otra-password").status_code == 401
     assert login(f"nadie-{sufijo}@ufps.edu.co", "vigilante-password").status_code == 401
-    assert login(inactivo, "docente-password").status_code == 403
+    assert login(inactivo, "admin-password").status_code == 403
 
     antes = datetime.now(timezone.utc)
     r = login(correo, "vigilante-password")
