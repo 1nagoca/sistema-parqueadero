@@ -24,8 +24,17 @@ class VehiculoBase(BaseModel):
 
 # Lo que envia el admin o el vigilante al crear un vehiculo.
 class VehiculoCreate(VehiculoBase):
+    tipo_vehiculo: TipoVehiculo = TipoVehiculo.MOTO
     usuario_id: uuid.UUID | None = None
     es_visitante: bool = False
+
+    # El parqueadero solo recibe motos.
+    @field_validator("tipo_vehiculo")
+    @classmethod
+    def solo_motos(cls, valor: TipoVehiculo) -> TipoVehiculo:
+        if valor != TipoVehiculo.MOTO:
+            raise ValueError("solo se registran motos")
+        return valor
 
     # Debe tener dueno o ser de visitante.
     @model_validator(mode="after")

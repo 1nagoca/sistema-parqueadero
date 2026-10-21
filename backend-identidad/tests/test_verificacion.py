@@ -93,7 +93,7 @@ def _vehiculo(client, headers, placa, **kw):
     return client.post(
         f"{API}/vehiculos/mis-vehiculos",
         headers=headers,
-        data={"placa": placa, "tipo_vehiculo": "carro", "marca": "Mazda", "color": "Rojo"},
+        data={"placa": placa, "tipo_vehiculo": kw.get("tipo", "moto"), "marca": "Yamaha", "color": "Rojo"},
         files=kw.get("files") or _archivos(),
     )
 
@@ -120,7 +120,9 @@ def test_flujo_completo_registro_aprobacion_y_documentos_privados(client, admin,
     # placa con formato invalido / foto de placa en PDF
     assert _vehiculo(client, est, "12ABC").status_code == 422
     assert _vehiculo(client, est, "ZZ1234").status_code == 422
-    placa = "ABC" + str(uuid.uuid4().int)[:3]
+    assert _vehiculo(client, est, "ABC123").status_code == 422
+    placa = "ABC" + str(uuid.uuid4().int)[:2] + "D"
+    assert _vehiculo(client, est, placa, tipo="carro").status_code == 422
     r = _vehiculo(client, est, placa, files=_archivos(placa=PDF))
     assert r.status_code == 422
     r = _vehiculo(client, est, placa)
@@ -183,7 +185,7 @@ def test_flujo_completo_registro_aprobacion_y_documentos_privados(client, admin,
 def test_vehiculo_rechazado_se_reenvia(client, admin, sufijo):
     _registrar(client, sufijo)
     est = _login(client, f"est-{sufijo}@ufps.edu.co", "clave-segura-1")
-    placa = "XYZ" + str(uuid.uuid4().int)[:3]
+    placa = "XYZ" + str(uuid.uuid4().int)[:2]
     vehiculo = _vehiculo(client, est, placa).json()
 
     # no se puede reenviar si no esta rechazado
@@ -209,7 +211,7 @@ def _estudiante_con_carnet_y_vehiculo(client, sufijo):
     uid = client.get(f"{API}/usuarios/me", headers=est).json()["id"]
     r = client.post(f"{API}/usuarios/me/carnet", headers=est, files={"archivo": ("c.png", PNG, "image/png")})
     assert r.status_code == 200, r.text
-    r = _vehiculo(client, est, "AUD" + str(uuid.uuid4().int)[:3])
+    r = _vehiculo(client, est, "AUD" + str(uuid.uuid4().int)[:2] + "B")
     assert r.status_code == 201, r.text
     return est, uid, r.json()["id"]
 
@@ -293,3 +295,12 @@ def test_auditoria_de_verificaciones_solo_la_lee_el_administrador(client, sufijo
     assert r.status_code == 200, r.text
     assert vehiculo_id in [t["registro_id"] for t in r.json()]
     assert {t["tabla_afectada"] for t in r.json()} == {"vehiculos"}
+
+
+def test_visitante_solo_moto(client, admin):
+    placa = "VIS" + str(uuid.uuid4().int)[:2] + "A"
+    datos = {"placa": placa, "es_visitante": True}
+    assert client.post(f"{API}/vehiculos", headers=admin, json={**datos, "tipo_vehiculo": "carro"}).status_code == 422
+    r = client.post(f"{API}/vehiculos", headers=admin, json=datos)
+    assert r.status_code == 201, r.text
+    assert r.json()["tipo_vehiculo"] == "moto"

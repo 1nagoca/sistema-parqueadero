@@ -12,7 +12,7 @@ import {
   registrarMiVehiculo,
   reenviarDocumentosVehiculo,
 } from "@/services/api/vehiculos";
-import type { Documento, TipoVehiculo, Usuario, VehiculoConDocumentos } from "@/types/api";
+import type { Documento, Usuario, VehiculoConDocumentos } from "@/types/api";
 
 // Estilo comun de los campos y tipos de archivo que se aceptan.
 const campo = "min-h-12 w-full rounded-lg border border-gray-300 px-3 focus:border-emerald-500 focus:outline-none";
@@ -259,7 +259,6 @@ function FilaVehiculo({ vehiculo, onCambio }: { vehiculo: VehiculoConDocumentos;
 function FormularioVehiculo({ onCreado }: { onCreado: () => void }) {
   const [abierto, setAbierto] = useState(false);
   const [placa, setPlaca] = useState("");
-  const [tipo, setTipo] = useState<TipoVehiculo>("carro");
   const [marca, setMarca] = useState("");
   const [modelo, setModelo] = useState("");
   const [color, setColor] = useState("");
@@ -277,7 +276,7 @@ function FormularioVehiculo({ onCreado }: { onCreado: () => void }) {
     try {
       await registrarMiVehiculo({
         placa,
-        tipo_vehiculo: tipo,
+        tipo_vehiculo: "moto",
         marca,
         modelo,
         color,
@@ -312,16 +311,12 @@ function FormularioVehiculo({ onCreado }: { onCreado: () => void }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <input
           required
-          placeholder="Placa (ej. ABC123)"
+          placeholder="Placa de la moto (ej. ABC12D)"
           value={placa}
           maxLength={6}
           onChange={(e) => setPlaca(e.target.value.toUpperCase())}
           className={`${campo} font-mono uppercase`}
         />
-        <select value={tipo} onChange={(e) => setTipo(e.target.value as TipoVehiculo)} className={campo}>
-          <option value="carro">Carro</option>
-          <option value="moto">Moto</option>
-        </select>
         <input placeholder="Marca" value={marca} onChange={(e) => setMarca(e.target.value)} className={campo} />
         <input placeholder="Modelo" value={modelo} onChange={(e) => setModelo(e.target.value)} className={campo} />
         <input placeholder="Color" value={color} onChange={(e) => setColor(e.target.value)} className={campo} />

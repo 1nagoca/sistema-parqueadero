@@ -75,7 +75,7 @@ Referencias a otra base, sin llave foránea:
 |---|---|---|---|---|
 | `id` | uuid | No | `gen_random_uuid()` | PK |
 | `placa` | varchar(10) | No | | Única, siempre en mayúsculas |
-| `tipo_vehiculo` | `vehiculo_tipo_enum` | No | | carro, moto, bicicleta, otro |
+| `tipo_vehiculo` | `vehiculo_tipo_enum` | No | | carro, moto, bicicleta, otro; la API solo acepta moto (RN-05) |
 | `marca` | varchar(50) | Sí | | |
 | `modelo` | varchar(50) | Sí | | |
 | `color` | varchar(30) | Sí | | |

@@ -26,7 +26,7 @@ export default function PlateSearchBar({ onBuscar, buscando }: Props) {
       <input
         value={placa}
         onChange={(evento) => setPlaca(evento.target.value.toUpperCase())}
-        placeholder="Placa (ej. ABC123)"
+        placeholder="Placa (ej. ABC12D)"
         className="min-h-14 flex-1 rounded-xl border border-gray-300 px-4 text-lg uppercase tracking-wider focus:border-emerald-500 focus:outline-none"
         maxLength={10}
       />

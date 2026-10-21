@@ -46,7 +46,7 @@ def _usuario(sufijo, rol, **campos):
 
 def _vehiculo(prefijo, **campos):
     with SessionLocal() as db:
-        vehiculo = Vehiculo(placa=prefijo + str(uuid.uuid4().int)[:3], tipo_vehiculo=TipoVehiculo.CARRO, **campos)
+        vehiculo = Vehiculo(placa=prefijo + str(uuid.uuid4().int)[:2], tipo_vehiculo=TipoVehiculo.MOTO, **campos)
         db.add(vehiculo)
         db.commit()
         return str(vehiculo.id), vehiculo.placa

@@ -16,7 +16,7 @@ import { listarEspacios } from "@/services/api/espacios";
 import { buscarPorPlaca, crearVehiculo } from "@/services/api/vehiculos";
 import type { LecturaPlaca } from "@/services/api/vision";
 import { listarZonas } from "@/services/api/zonas";
-import type { Acceso, AccesoActivo, Espacio, TipoVehiculo, Vehiculo, Zona } from "@/types/api";
+import type { Acceso, AccesoActivo, Espacio, Vehiculo, Zona } from "@/types/api";
 
 // Lo que se muestra al buscar una placa: nada, cargando, ya esta adentro, registrado o no registrado.
 type Resultado =
@@ -299,7 +299,7 @@ export default function GuardDashboard() {
         sinCupos={sinCupos}
         onEntradaNormal={confirmarEntradaNormal}
         onSalida={confirmarSalida}
-        onRegistrarVehiculoVisitante={async (placa, tipoVehiculo, justificacion) => {
+        onRegistrarVehiculoVisitante={async (placa, justificacion) => {
           // Visitante no registrado: primero crea el vehiculo y luego registra la entrada.
           if (!usuario) return;
           setProcesando(true);
@@ -307,7 +307,7 @@ export default function GuardDashboard() {
           try {
             const vehiculo = await crearVehiculo({
               placa,
-              tipo_vehiculo: tipoVehiculo,
+              tipo_vehiculo: "moto",
               es_visitante: true,
             });
             await confirmarEntradaVisitante(vehiculo.id, justificacion);
@@ -328,7 +328,7 @@ interface ResultadoPanelProps {
   sinCupos: boolean;
   onEntradaNormal: (vehiculoId: string) => void;
   onSalida: (accesoId: string) => void;
-  onRegistrarVehiculoVisitante: (placa: string, tipo: TipoVehiculo, justificacion: string) => void;
+  onRegistrarVehiculoVisitante: (placa: string, justificacion: string) => void;
 }
 
 // Muestra el resultado de la busqueda con el boton que corresponde (entrada, salida o visitante).
@@ -407,26 +407,14 @@ function FormularioVisitante({
   placa: string;
   procesando: boolean;
   sinCupos: boolean;
-  onConfirmar: (placa: string, tipo: TipoVehiculo, justificacion: string) => void;
+  onConfirmar: (placa: string, justificacion: string) => void;
 }) {
-  const [tipo, setTipo] = useState<TipoVehiculo>("carro");
   const [justificacion, setJustificacion] = useState("");
 
   return (
     <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
       <p className="text-lg font-semibold text-gray-900">{placa}</p>
-      <p className="text-sm text-amber-600">Vehiculo no registrado — requiere autorizacion de visitante (RN-03).</p>
-
-      <select
-        value={tipo}
-        onChange={(evento) => setTipo(evento.target.value as TipoVehiculo)}
-        className="min-h-12 w-full rounded-lg border border-gray-300 px-3"
-      >
-        <option value="carro">Carro</option>
-        <option value="moto">Moto</option>
-        <option value="bicicleta">Bicicleta</option>
-        <option value="otro">Otro</option>
-      </select>
+      <p className="text-sm text-amber-600">Moto no registrada — requiere autorizacion de visitante (RN-03).</p>
 
       <textarea
         value={justificacion}
@@ -438,7 +426,7 @@ function FormularioVisitante({
       <Button
         className="w-full"
         disabled={procesando || sinCupos || !justificacion.trim()}
-        onClick={() => onConfirmar(placa, tipo, justificacion.trim())}
+        onClick={() => onConfirmar(placa, justificacion.trim())}
       >
         Autorizar entrada de visitante
       </Button>

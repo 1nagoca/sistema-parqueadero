@@ -13,3 +13,6 @@ Se aplican siempre en el backend. Cómo se cumplen entre servicios está en
   requieren autorización manual del vigilante, con la justificación guardada en el sistema.
 - **RN-04 — Auditoría e inmutabilidad.** No se cambia el estado de un cupo ni se elimina un
   registro de acceso sin dejar su traza en `auditoria_accesos`.
+- **RN-05 — Solo motos.** El parqueadero recibe únicamente motos: el registro del estudiante y
+  el del visitante rechazan cualquier otro tipo, y la placa debe tener formato de moto
+  (`ABC12` o `ABC12D`). La base conserva los demás valores del enum, pero la API no los acepta.

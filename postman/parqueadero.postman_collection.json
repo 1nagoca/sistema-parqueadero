@@ -532,7 +532,7 @@
             "url": "{{baseUrl}}/api/v1/espacios",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"codigo\": \"P-01\",\n  \"tipo_espacio\": \"carro\",\n  \"zona_id\": \"{{zona_id}}\"\n}",
+              "raw": "{\n  \"codigo\": \"P-01\",\n  \"tipo_espacio\": \"moto\",\n  \"zona_id\": \"{{zona_id}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -596,7 +596,7 @@
             "url": "{{baseUrl}}/api/v1/vehiculos",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"placa\": \"{{placa_1}}\",\n  \"tipo_vehiculo\": \"carro\",\n  \"marca\": \"Mazda\",\n  \"modelo\": \"2\",\n  \"color\": \"Rojo\",\n  \"usuario_id\": \"{{nuevo_usuario_id}}\"\n}",
+              "raw": "{\n  \"placa\": \"{{placa_1}}\",\n  \"tipo_vehiculo\": \"moto\",\n  \"marca\": \"Yamaha\",\n  \"modelo\": \"FZ\",\n  \"color\": \"Rojo\",\n  \"usuario_id\": \"{{nuevo_usuario_id}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -700,7 +700,7 @@
             "url": "{{baseUrl}}/api/v1/vehiculos",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"placa\": \"SINDUENO\",\n  \"tipo_vehiculo\": \"carro\"\n}",
+              "raw": "{\n  \"placa\": \"SINDUENO\",\n  \"tipo_vehiculo\": \"moto\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -733,7 +733,7 @@
             "url": "{{baseUrl}}/api/v1/vehiculos",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"placa\": \"{{placa_1}}\",\n  \"tipo_vehiculo\": \"carro\",\n  \"es_visitante\": true\n}",
+              "raw": "{\n  \"placa\": \"{{placa_1}}\",\n  \"tipo_vehiculo\": \"moto\",\n  \"es_visitante\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"

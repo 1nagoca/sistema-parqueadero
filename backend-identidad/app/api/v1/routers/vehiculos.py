@@ -15,12 +15,8 @@ from app.services import documento_service, vehiculo_service, verificacion_servi
 
 router = APIRouter(prefix="/vehiculos", tags=["vehiculos"])
 
-# Formatos de placa colombianos: carro ABC123; moto ABC12 o ABC12D.
-# Patron de placa segun el tipo de vehiculo.
-_PLACA_POR_TIPO = {
-    TipoVehiculo.CARRO: re.compile(r"^[A-Z]{3}\d{3}$"),
-    TipoVehiculo.MOTO: re.compile(r"^[A-Z]{3}\d{2}[A-Z]?$"),
-}
+# Placa colombiana de moto: ABC12 o ABC12D.
+_PLACA_MOTO = re.compile(r"^[A-Z]{3}\d{2}[A-Z]?$")
 
 
 # POST /vehiculos (admin, vigilante): registra un vehiculo, por ejemplo de un visitante.
@@ -64,7 +60,7 @@ def listar_mis_vehiculos(
 @router.post("/mis-vehiculos", response_model=VehiculoConDocumentos, status_code=status.HTTP_201_CREATED)
 async def registrar_mi_vehiculo(
     placa: str = Form(...),
-    tipo_vehiculo: TipoVehiculo = Form(...),
+    tipo_vehiculo: TipoVehiculo = Form(TipoVehiculo.MOTO),
     marca: str | None = Form(None, max_length=50),
     modelo: str | None = Form(None, max_length=50),
     color: str | None = Form(None, max_length=30),
@@ -76,15 +72,12 @@ async def registrar_mi_vehiculo(
     """El propio estudiante registra su vehiculo con la foto de la placa y la tarjeta de
     propiedad. Queda ``pendiente`` hasta que el administrador lo apruebe."""
     placa = placa.strip().upper()
-    patron = _PLACA_POR_TIPO.get(tipo_vehiculo)
-    if patron is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Solo se registran carros o motos"
-        )
-    if not patron.match(placa):
+    if tipo_vehiculo != TipoVehiculo.MOTO:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Solo se registran motos")
+    if not _PLACA_MOTO.match(placa):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"La placa {placa} no tiene un formato valido para {tipo_vehiculo.value}",
+            detail=f"La placa {placa} no tiene un formato valido de moto (ABC12 o ABC12D)",
         )
     if vehiculo_service.obtener_por_placa(db, placa) is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La placa ya esta registrada")

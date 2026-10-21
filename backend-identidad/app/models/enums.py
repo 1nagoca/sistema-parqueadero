@@ -12,7 +12,7 @@ class RolUsuario(str, enum.Enum):
     ADMIN = "admin"
 
 
-# Tipos de vehiculo.
+# Tipos de vehiculo; la base conserva todos, pero la API solo acepta motos.
 class TipoVehiculo(str, enum.Enum):
     CARRO = "carro"
     MOTO = "moto"

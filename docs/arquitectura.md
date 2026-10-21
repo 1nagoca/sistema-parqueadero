@@ -112,7 +112,7 @@ documentos.
 ```json
 {
   "id": "…",
-  "placa": "ABC123",
+  "placa": "ABC12D",
   "es_visitante": false,
   "estado_verificacion": "aprobado",
   "propietario": { "id": "…", "estado_verificacion": "aprobado" }

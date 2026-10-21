@@ -54,7 +54,7 @@ flowchart TB
 | Sistema | Valida el registro | Identidad | 422 si el correo no es `@ufps.edu.co`, falta el consentimiento o un dato no cumple el tamaño; 409 si el correo o el documento ya existen |
 | Sistema | Abre la sesión | Frontend → `POST /api/v1/auth/login` y `GET /api/v1/usuarios/me` | Token de 8 horas; el estudiante cae en «Mi cuenta» |
 | Estudiante | Sube el carnet o la captura de Divisist | `POST /api/v1/usuarios/me/carnet` | Cuenta en `pendiente`; reemplaza el carnet anterior. 409 si la identidad ya fue aprobada |
-| Estudiante | Registra su vehículo con foto de la placa y tarjeta de propiedad | `POST /api/v1/vehiculos/mis-vehiculos` | 201: vehículo `pendiente`. 422 si la placa no tiene formato de carro (`ABC123`) o moto (`ABC12`, `ABC12D`); 409 si la placa ya existe |
+| Estudiante | Registra su vehículo con foto de la placa y tarjeta de propiedad | `POST /api/v1/vehiculos/mis-vehiculos` | 201: vehículo `pendiente`. 422 si no es moto o la placa no tiene formato de moto (`ABC12`, `ABC12D`); 409 si la placa ya existe |
 | Sistema | Valida y guarda los archivos | Identidad, volumen `identidad_uploads` | Acepta JPG, PNG, WEBP o PDF (la foto de la placa, solo imagen) hasta 5 MB, comprobando el contenido real; 422 si no cumple |
 | Sistema | Muestra la solicitud en la bandeja | `GET /api/v1/verificaciones/pendientes` (solo administrador) | Estudiantes con carnet por revisar o con vehículos pendientes; quien no ha subido nada no aparece |
 | Administrador | Revisa el carnet y los documentos | `GET /api/v1/documentos/{id}/archivo` | Solo el administrador y el dueño pueden ver el archivo; para los demás, 404 |
