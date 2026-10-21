@@ -126,7 +126,7 @@ def _id_del_token(headers):
 
 def test_entrada_normal_exige_vehiculo_y_propietario_aprobados(client, admin, parqueadero, identidad):
     vehiculo = identidad.vehiculo("QWE", estado="pendiente", propietario_estado="pendiente")
-    entrada = {"vehiculo_id": vehiculo["id"], "zona_id": str(uuid.uuid4()), "tipo_acceso": "normal"}
+    entrada = {"vehiculo_id": vehiculo["id"], "zona_id": str(uuid.uuid4()), "espacio_id": str(uuid.uuid4()), "tipo_acceso": "normal"}
 
     r = client.post(f"{API}/accesos/entrada", headers=admin, json=entrada)
     assert r.status_code == 409 and "verificados" in r.json()["detail"]
@@ -147,8 +147,15 @@ def test_entrada_normal_exige_vehiculo_y_propietario_aprobados(client, admin, pa
 
 def test_entrada_normal_de_vehiculo_aprobado_sin_propietario(client, admin, parqueadero, identidad):
     vehiculo = identidad.vehiculo()
-    entrada = {"vehiculo_id": vehiculo["id"], "zona_id": str(uuid.uuid4())}
+    entrada = {"vehiculo_id": vehiculo["id"], "zona_id": str(uuid.uuid4()), "espacio_id": str(uuid.uuid4())}
     assert client.post(f"{API}/accesos/entrada", headers=admin, json=entrada).status_code == 201
+
+
+def test_entrada_sin_puesto_responde_422(client, admin, parqueadero, identidad):
+    vehiculo = identidad.vehiculo()
+    entrada = {"vehiculo_id": vehiculo["id"], "zona_id": str(uuid.uuid4())}
+    assert client.post(f"{API}/accesos/entrada", headers=admin, json=entrada).status_code == 422  # RN-06
+    assert parqueadero.movimientos == []
 
 
 def _entrada_visitante(client, admin, vehiculo_id):
@@ -158,7 +165,7 @@ def _entrada_visitante(client, admin, vehiculo_id):
         headers=admin,
         json={
             "vehiculo_id": vehiculo_id,
-            "zona_id": str(uuid.uuid4()),
+            "zona_id": str(uuid.uuid4()), "espacio_id": str(uuid.uuid4()),
             "tipo_acceso": "visitante",
             "autorizado_por_id": yo,
             "justificacion": "Visita a decanatura",
@@ -236,7 +243,7 @@ def test_entrada_con_vehiculo_inexistente_responde_404(client, admin, parqueader
     vehiculo_id = str(uuid.uuid4())
 
     normal = client.post(
-        f"{API}/accesos/entrada", headers=admin, json={"vehiculo_id": vehiculo_id, "zona_id": str(uuid.uuid4())}
+        f"{API}/accesos/entrada", headers=admin, json={"vehiculo_id": vehiculo_id, "zona_id": str(uuid.uuid4()), "espacio_id": str(uuid.uuid4())}
     )
     assert normal.status_code == 404, normal.text
     assert normal.json()["detail"] == "El vehiculo no existe"
@@ -254,7 +261,7 @@ def test_entrada_con_conductor_o_autorizador_inexistente_responde_404(client, ad
     identidad.usuarios_inexistentes.add(fantasma)
     visitante = {
         "vehiculo_id": vehiculo["id"],
-        "zona_id": str(uuid.uuid4()),
+        "zona_id": str(uuid.uuid4()), "espacio_id": str(uuid.uuid4()),
         "tipo_acceso": "visitante",
         "autorizado_por_id": _id_del_token(admin),
         "justificacion": "Visita a decanatura",
@@ -281,7 +288,7 @@ def test_identidad_caida_rechaza_toda_entrada_con_503(client, admin, parqueadero
     identidad.caida = True
 
     normal = client.post(
-        f"{API}/accesos/entrada", headers=admin, json={"vehiculo_id": vehiculo["id"], "zona_id": str(uuid.uuid4())}
+        f"{API}/accesos/entrada", headers=admin, json={"vehiculo_id": vehiculo["id"], "zona_id": str(uuid.uuid4()), "espacio_id": str(uuid.uuid4())}
     )
     assert normal.status_code == 503, normal.text
     assert normal.json()["detail"] == "El servicio de identidad no esta disponible"

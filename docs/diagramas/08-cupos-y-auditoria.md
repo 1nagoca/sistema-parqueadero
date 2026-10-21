@@ -49,12 +49,12 @@ flowchart TB
 
 | Carril | Actividad | Sistema / ruta | Resultado |
 |---|---|---|---|
-| Estudiante (o cualquier usuario) | Abre el mapa de cupos | Frontend `/mapa` → `GET /api/v1/zonas` y `GET /api/v1/espacios?zona_id=` (parqueadero) | Zonas activas con `cupos_disponibles/capacidad_total` y el estado de cada espacio; basta una sesión válida, sin importar el rol |
+| Estudiante (o cualquier usuario) | Abre el mapa de cupos | Frontend `/mapa` → `GET /api/v1/zonas` y `GET /api/v1/espacios?zona_id=` (parqueadero) | Zonas activas con `cupos_disponibles/capacidad_total` y el plano del parqueadero con el estado de cada puesto (A-01 … Q-30); basta una sesión válida, sin importar el rol |
 | Sistema | Abre el canal en tiempo real | Navegador → gateway `/ws/*` → parqueadero `/ws/zonas` | Conexión abierta; si se cae, el navegador reintenta con esperas de 1 a 10 s |
 | Vigilante | Registra una entrada o una salida | Procesos [06](06-entrada-y-salida.md) y [07](07-acceso-de-visitante.md) | Parqueadero mueve el cupo |
 | Sistema | Avisa el cambio | Parqueadero, tras `POST /interno/cupos/ocupar` o `liberar` | Evento `zona_actualizada` con la zona y sus cupos, a todos los conectados |
 | Sistema | Refresca el mapa | Frontend: vuelve a pedir zonas y espacios | El usuario ve los cupos al día |
-| Vigilante | Ve los cupos en su panel | Frontend `/vigilante` → `GET /api/v1/zonas` | Se recargan después de cada operación suya (no usa el WebSocket) |
+| Vigilante y administrador | Ven el plano en su panel | Frontend `/vigilante` y `/admin` (pestaña Espacios) → `GET /api/v1/zonas` y `GET /api/v1/espacios?zona_id=` | Se recargan tras cada operación propia y con cada evento de `/ws/zonas` |
 | Administrador | Abre la pestaña Auditoría | Frontend `/admin` → `GET /api/v1/auditoria` (accesos) y `GET /api/v1/verificaciones/auditoria` (identidad) | Solo administrador; las últimas 200 trazas de cada servicio |
 | Administrador | Revisa y filtra | Parámetro `tabla_afectada` en ambas rutas | Una sola lista ordenada por fecha, con el origen de cada traza; si un servicio falla, se muestra el otro con un aviso |
 
@@ -65,5 +65,6 @@ flowchart TB
 
 Verificado contra: `frontend/src/pages/user/ParkingMapPage.tsx`,
 `frontend/src/services/realtime/useActualizacionesZona.ts`, `frontend/src/pages/admin/AdminDashboard.tsx`,
+`frontend/src/pages/guard/GuardDashboard.tsx`, `frontend/src/components/map/{MapaParqueadero.tsx,planoParqueadero.ts}`,
 `backend-parqueadero/app/api/v1/routers/{zonas,espacios,realtime,cupos}.py`,
 `backend-accesos/app/api/v1/routers/auditoria.py` y `backend-identidad/app/api/v1/routers/verificaciones.py`.

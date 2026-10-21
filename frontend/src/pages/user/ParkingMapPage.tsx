@@ -54,16 +54,11 @@ export default function ParkingMapPage() {
         </button>
       </header>
 
-      <div className="mb-4 flex flex-wrap items-center gap-4 rounded-2xl bg-white p-3 text-sm shadow-sm">
-        <Leyenda color="bg-cupo-libre" texto="Libre" />
-        <Leyenda color="bg-cupo-ocupado" texto="Ocupado" />
-        <Leyenda color="bg-cupo-reservado" texto="Reservado / Mantenimiento" />
-        {actualizadoEn && (
-          <span className="ml-auto text-xs text-gray-400">
-            Actualizado {actualizadoEn.toLocaleTimeString("es-CO")}
-          </span>
-        )}
-      </div>
+      {actualizadoEn && (
+        <p className="mb-4 text-right text-xs text-gray-400">
+          Actualizado {actualizadoEn.toLocaleTimeString("es-CO")}
+        </p>
+      )}
 
       {error && <p className="mb-4 rounded-xl bg-red-100 p-3 text-red-800">{error}</p>}
 
@@ -74,15 +69,5 @@ export default function ParkingMapPage() {
         {zonas.length === 0 && !error && <p className="text-center text-gray-400">Cargando zonas...</p>}
       </div>
     </div>
-  );
-}
-
-// Un item de la leyenda de colores.
-function Leyenda({ color, texto }: { color: string; texto: string }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className={`h-3 w-3 rounded-full ${color}`} />
-      {texto}
-    </span>
   );
 }

@@ -1,12 +1,14 @@
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import UsuarioToken, get_current_user, get_db, require_role
 from app.models.enums import RolUsuario
 from app.models.espacio import Espacio
-from app.schemas.espacio import EspacioCreate, EspacioRead
+from app.models.zona import Zona
+from app.schemas.espacio import EspacioCreate, EspacioLoteCreate, EspacioLoteResultado, EspacioRead
+from app.services import espacio_service
 
 router = APIRouter(prefix="/espacios", tags=["espacios"])
 
@@ -37,3 +39,16 @@ def crear_espacio(
     db.commit()
     db.refresh(espacio)
     return espacio
+
+
+# POST /espacios/lote (admin): crea de una vez los puestos del plano que falten en la zona.
+@router.post("/lote", response_model=EspacioLoteResultado)
+def crear_espacios_lote(
+    datos: EspacioLoteCreate,
+    db: Session = Depends(get_db),
+    _: UsuarioToken = Depends(require_role(RolUsuario.ADMIN)),
+):
+    if db.get(Zona, datos.zona_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Zona no encontrada")
+    creados = espacio_service.crear_lote(db, datos.zona_id, datos.codigos)
+    return EspacioLoteResultado(creados=creados, existentes=len(set(datos.codigos)) - creados)

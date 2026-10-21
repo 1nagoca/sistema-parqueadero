@@ -110,3 +110,16 @@ def test_entradas_simultaneas_no_sobrevenden_cupos(client, zona):
         )
     assert codigos.count(200) == 2
     assert codigos.count(409) == 8
+
+
+def test_espacio_de_otra_zona_no_se_ocupa(client, admin, zona):
+    otra = client.post(
+        f"{API}/zonas", headers=admin, json={"nombre": f"Zona {uuid.uuid4().hex[:8]}", "capacidad_total": 2}
+    ).json()
+    espacio = _espacio(client, admin, otra["id"])
+
+    r = client.post("/interno/cupos/ocupar", json={"zona_id": zona["id"], "espacio_id": espacio["id"]})
+    assert r.status_code == 409
+    assert _cupos(client, admin, zona["id"]) == 2
+    estados = {e["id"]: e["estado"] for e in client.get(f"{API}/espacios", headers=admin).json()}
+    assert estados[espacio["id"]] == "libre"

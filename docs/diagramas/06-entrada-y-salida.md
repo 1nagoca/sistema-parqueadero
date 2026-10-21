@@ -12,7 +12,7 @@ flowchart TB
     subgraph VIG["Vigilante"]
         direction TB
         v0(["Inicio: llega un vehículo"])
-        v1["Elige la zona y,<br/>si quiere, un espacio libre"]
+        v1["Elige la zona y toca<br/>un puesto libre en el mapa"]
         v2["Busca la placa: la escribe,<br/>la lee con una foto o escanea un QR"]
         v3["Pulsa Registrar entrada"]
         v4["Pulsa Registrar salida<br/>(resultado de la búsqueda o<br/>lista de vehículos adentro)"]
@@ -68,13 +68,13 @@ flowchart TB
 
 | Carril | Actividad | Sistema / ruta | Resultado |
 |---|---|---|---|
-| Vigilante | Elige la zona y, si quiere, un espacio libre | `GET /api/v1/zonas`, `GET /api/v1/espacios?zona_id=` (parqueadero) | Ve los cupos de la zona; sin espacio, solo se mueve el contador |
+| Vigilante | Elige la zona y toca un puesto libre en el mapa | `GET /api/v1/zonas`, `GET /api/v1/espacios?zona_id=` (parqueadero) | Ve el plano con cada puesto pintado según su estado. El puesto es obligatorio (RN-06): sin él no se habilita la entrada y la API responde 422 |
 | Vigilante | Lee la placa con una foto | `POST /api/v1/alpr/reconocer` (visión; el gateway valida antes la sesión contra identidad) | Placa y confianza. 400 si la imagen no sirve; 422 si no se detecta una placa |
 | Vigilante | Busca la placa (escrita, leída o por QR) | `GET /api/v1/accesos/buscar?placa=` (accesos) y `GET /api/v1/vehiculos/placa/{placa}` (identidad) | Acceso abierto → ofrece la salida; vehículo registrado → ofrece la entrada; no registrado → [proceso 07](07-acceso-de-visitante.md) |
 | Vigilante | Registra la entrada | `POST /api/v1/accesos/entrada` con `tipo_acceso: normal` | 201 con el acceso; guarda si la placa la leyó la cámara y con qué confianza |
 | Sistema | Consulta el vehículo | Accesos → `GET /interno/vehiculos/{id}` (identidad) | **503** si identidad no responde en 5 s; **404** si el vehículo no existe; **409** si el vehículo o su dueño no están aprobados |
 | Sistema | Comprueba que no esté adentro | Accesos, índice único `uq_accesos_vehiculo_activo` | **409** «El vehículo ya tiene un acceso activo» |
-| Sistema | Ocupa el cupo (RN-01) | Accesos → `POST /interno/cupos/ocupar` (parqueadero) | Descuento atómico. **409** si la zona no tiene cupos o el espacio no está libre; 503 si parqueadero no responde |
+| Sistema | Ocupa el cupo (RN-01) | Accesos → `POST /interno/cupos/ocupar` (parqueadero) | Descuento atómico. **409** si la zona no tiene cupos o el espacio no está libre o es de otra zona; 503 si parqueadero no responde |
 | Sistema | Guarda el acceso y su traza (RN-04) | Accesos, tablas `accesos` y `auditoria_accesos` | Acceso con la placa y traza de creación en una sola transacción; si falla, se libera el cupo (compensación) |
 | Vigilante | Registra la salida | `POST /api/v1/accesos/{id}/salida` | 404 si el acceso no existe o ya se cerró |
 | Sistema | Cierra el acceso (RN-02) | Accesos | Hora de salida y minutos de permanencia |

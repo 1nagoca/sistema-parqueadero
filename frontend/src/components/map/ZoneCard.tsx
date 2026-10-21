@@ -1,4 +1,4 @@
-import SpaceCell from "@/components/map/SpaceCell";
+import MapaParqueadero from "@/components/map/MapaParqueadero";
 import type { Espacio, Zona } from "@/types/api";
 
 interface Props {
@@ -6,7 +6,7 @@ interface Props {
   espacios: Espacio[];
 }
 
-/** Si la zona tiene espacios individuales registrados, se muestra la grilla con colores.
+/** Si la zona tiene espacios individuales registrados, se muestra el plano con colores.
  * Si no (zona de solo conteo agregado), se muestra un indicador a nivel de zona. */
 export default function ZoneCard({ zona, espacios }: Props) {
   const sinCupos = zona.cupos_disponibles <= 0;
@@ -24,11 +24,7 @@ export default function ZoneCard({ zona, espacios }: Props) {
       </div>
 
       {espacios.length > 0 ? (
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
-          {espacios.map((espacio) => (
-            <SpaceCell key={espacio.id} codigo={espacio.codigo} estado={espacio.estado} />
-          ))}
-        </div>
+        <MapaParqueadero espacios={espacios} />
       ) : (
         <div
           className={`flex h-16 items-center justify-center rounded-lg font-medium text-white ${

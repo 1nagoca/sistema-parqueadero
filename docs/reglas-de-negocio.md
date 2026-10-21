@@ -16,3 +16,7 @@ Se aplican siempre en el backend. Cómo se cumplen entre servicios está en
 - **RN-05 — Solo motos.** El parqueadero recibe únicamente motos: el registro del estudiante y
   el del visitante rechazan cualquier otro tipo, y la placa debe tener formato de moto
   (`ABC12` o `ABC12D`). La base conserva los demás valores del enum, pero la API no los acepta.
+- **RN-06 — Toda entrada ocupa un puesto.** El vigilante elige un puesto libre del plano en cada
+  entrada, normal o de visitante; sin `espacio_id` la API de accesos responde 422. Parqueadero
+  solo ocupa el puesto si está libre y es de la zona de la entrada (si no, 409 y no se descuenta
+  el cupo).

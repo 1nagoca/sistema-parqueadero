@@ -54,12 +54,12 @@ flowchart TB
 | Carril | Actividad | Sistema / ruta | Resultado |
 |---|---|---|---|
 | Vigilante | Elige la zona y busca la placa | `GET /api/v1/accesos/buscar?placa=` y `GET /api/v1/vehiculos/placa/{placa}` | 404 en ambas: el panel muestra «Vehículo no registrado — requiere autorización de visitante» |
-| Vigilante | Elige el tipo de vehículo y escribe la justificación | Frontend `/vigilante` | El botón no se habilita sin justificación ni cuando la zona no tiene cupos |
+| Vigilante | Toca un puesto libre en el mapa y escribe la justificación | Frontend `/vigilante` | El vehículo se registra como moto (RN-05). El botón no se habilita sin puesto (RN-06), sin justificación ni cuando la zona no tiene cupos |
 | Vigilante | Autoriza la entrada | `POST /api/v1/vehiculos` y luego `POST /api/v1/accesos/entrada` | Dos llamadas seguidas desde el navegador |
 | Sistema | Crea el vehículo de visitante | Identidad, `POST /api/v1/vehiculos` con `es_visitante: true` (solo vigilante o admin) | 201: vehículo sin dueño. 409 si la placa ya existe |
 | Sistema | Exige autorización y justificación (RN-03) | Accesos: validación del cuerpo y restricción `ck_accesos_visitante_requiere_autorizacion` | **422** si falta `autorizado_por_id` o `justificacion` |
 | Sistema | Consulta a identidad | Accesos → `GET /interno/vehiculos/{id}` y `GET /interno/usuarios?id=` | **503** si identidad no responde; **404** si no existen el vehículo o quien autoriza. No se exige que estén verificados |
-| Sistema | Ocupa el cupo (RN-01) | Accesos → `POST /interno/cupos/ocupar` (parqueadero) | **409** si no hay cupos o el espacio no está libre |
+| Sistema | Ocupa el cupo (RN-01) | Accesos → `POST /interno/cupos/ocupar` (parqueadero) | **409** si no hay cupos o el espacio no está libre o es de otra zona |
 | Sistema | Guarda el acceso y su traza | Accesos, `accesos` y `auditoria_accesos` | Acceso de tipo `visitante` con `autorizado_por_id` y `justificacion`; la traza registra el tipo de acceso |
 | Administrador | Autoriza a un visitante | Frontend `/vigilante` (roles vigilante y admin) | Las mismas actividades del vigilante; queda él como quien autoriza |
 | Estudiante | — | — | No participa |

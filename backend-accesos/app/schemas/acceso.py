@@ -12,7 +12,8 @@ from app.models.enums import TipoAcceso
 class AccesoEntradaCreate(BaseModel):
     vehiculo_id: uuid.UUID
     zona_id: uuid.UUID
-    espacio_id: uuid.UUID | None = None
+    # RN-06: toda entrada ocupa un puesto concreto del plano.
+    espacio_id: uuid.UUID
     usuario_id: uuid.UUID | None = None
     tipo_acceso: TipoAcceso = TipoAcceso.NORMAL
     autorizado_por_id: uuid.UUID | None = None

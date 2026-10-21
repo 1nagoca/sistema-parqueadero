@@ -557,6 +557,42 @@
           ]
         },
         {
+          "name": "Crear puestos del plano en lote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/espacios/lote",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"zona_id\": \"{{zona_id}}\",\n  \"codigos\": [\"P-01\", \"P-02\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "// P-01 ya existia: solo se crea P-02.",
+                  "pm.test(\"No duplica los existentes\", () => pm.expect(pm.response.json()).to.eql({ creados: 1, existentes: 1 }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Listar espacios de la zona",
           "request": {
             "method": "GET",
@@ -782,7 +818,7 @@
             "url": "{{baseUrl}}/api/v1/accesos/entrada",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"vehiculo_id\": \"{{vehiculo2_id}}\",\n  \"zona_id\": \"{{zona_id}}\",\n  \"tipo_acceso\": \"visitante\"\n}",
+              "raw": "{\n  \"vehiculo_id\": \"{{vehiculo2_id}}\",\n  \"zona_id\": \"{{zona_id}}\",\n  \"espacio_id\": \"{{espacio_id}}\",\n  \"tipo_acceso\": \"visitante\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -874,7 +910,7 @@
             "url": "{{baseUrl}}/api/v1/accesos/entrada",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"vehiculo_id\": \"{{vehiculo2_id}}\",\n  \"zona_id\": \"{{zona_id}}\",\n  \"tipo_acceso\": \"normal\"\n}",
+              "raw": "{\n  \"vehiculo_id\": \"{{vehiculo2_id}}\",\n  \"zona_id\": \"{{zona_id}}\",\n  \"espacio_id\": \"{{espacio_id}}\",\n  \"tipo_acceso\": \"normal\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -995,7 +1031,7 @@
             "url": "{{baseUrl}}/api/v1/accesos/entrada",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"vehiculo_id\": \"{{vehiculo2_id}}\",\n  \"zona_id\": \"{{zona_id}}\",\n  \"tipo_acceso\": \"visitante\",\n  \"autorizado_por_id\": \"{{admin_id}}\",\n  \"justificacion\": \"Proveedor de mantenimiento\"\n}",
+              "raw": "{\n  \"vehiculo_id\": \"{{vehiculo2_id}}\",\n  \"zona_id\": \"{{zona_id}}\",\n  \"espacio_id\": \"{{espacio_id}}\",\n  \"tipo_acceso\": \"visitante\",\n  \"autorizado_por_id\": \"{{admin_id}}\",\n  \"justificacion\": \"Proveedor de mantenimiento\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

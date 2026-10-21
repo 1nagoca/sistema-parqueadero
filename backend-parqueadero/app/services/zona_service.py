@@ -13,7 +13,7 @@ class SinCuposDisponiblesError(Exception):
 
 
 class EspacioNoDisponibleError(Exception):
-    """El espacio individual solicitado no esta libre."""
+    """El espacio individual solicitado no esta libre o no es de la zona."""
 
 
 class ZonaEnCapacidadTotalError(Exception):
@@ -39,16 +39,16 @@ def ocupar_cupo(db: Session, zona_id: uuid.UUID, espacio_id: uuid.UUID | None) -
     if zona is None:
         raise SinCuposDisponiblesError(f"La zona {zona_id} no tiene cupos disponibles")
 
-    # Si se pidio un espacio concreto, lo marca como ocupado.
+    # Si se pidio un espacio concreto, lo marca como ocupado (solo si es de esta zona).
     if espacio_id is not None:
         espacio_resultado = db.execute(
             update(Espacio)
-            .where(Espacio.id == espacio_id, Espacio.estado == EstadoEspacio.LIBRE)
+            .where(Espacio.id == espacio_id, Espacio.zona_id == zona_id, Espacio.estado == EstadoEspacio.LIBRE)
             .values(estado=EstadoEspacio.OCUPADO)
             .returning(Espacio)
         )
         if espacio_resultado.scalar_one_or_none() is None:
-            raise EspacioNoDisponibleError(f"El espacio {espacio_id} no esta libre")
+            raise EspacioNoDisponibleError(f"El espacio {espacio_id} no esta libre en esta zona")
 
     return zona
 

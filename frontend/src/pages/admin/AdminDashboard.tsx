@@ -1,16 +1,18 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 
-import SpaceCell from "@/components/map/SpaceCell";
+import MapaParqueadero from "@/components/map/MapaParqueadero";
+import { CODIGOS_PLANO } from "@/components/map/planoParqueadero";
 import Button from "@/components/common/Button";
 import DocumentoVisor from "@/components/verificacion/DocumentoVisor";
 import EstadoBadge from "@/components/verificacion/EstadoBadge";
 import { useAuth } from "@/context/AuthContext";
 import { listarAuditoria, listarAuditoriaVerificaciones } from "@/services/api/auditoria";
 import { ApiError } from "@/services/api/client";
-import { crearEspacio, listarEspacios } from "@/services/api/espacios";
+import { crearEspaciosLote, listarEspacios } from "@/services/api/espacios";
 import { crearUsuario, listarUsuarios } from "@/services/api/usuarios";
 import { listarPendientes, resolverUsuario, resolverVehiculo } from "@/services/api/verificaciones";
 import { crearZona, listarZonas } from "@/services/api/zonas";
+import { useActualizacionesZona } from "@/services/realtime/useActualizacionesZona";
 import type { AuditoriaAcceso, Espacio, RolUsuario, SolicitudVerificacion, Usuario, Zona } from "@/types/api";
 
 // Pestanas del panel y su titulo.
@@ -430,7 +432,7 @@ function SeccionZonas() {
   );
 }
 
-// Espacios de una zona y formulario para crear uno.
+// Mapa de los puestos de una zona y boton para crear los del plano.
 function SeccionEspacios() {
   const [zonas, setZonas] = useState<Zona[]>([]);
   const [zonaId, setZonaId] = useState("");
@@ -438,11 +440,9 @@ function SeccionEspacios() {
   const [error, setError] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
-  const [codigo, setCodigo] = useState("");
-  const [tipoEspacio, setTipoEspacio] = useState("");
 
   // Carga las zonas y elige la primera.
-  useEffect(() => {
+  const cargarZonas = useCallback(() => {
     listarZonas()
       .then((datos) => {
         setZonas(datos);
@@ -451,31 +451,41 @@ function SeccionEspacios() {
       .catch(() => setError("No se pudieron cargar las zonas"));
   }, []);
 
-  // Al cambiar de zona carga sus espacios.
-  useEffect(() => {
+  // Trae los espacios de la zona elegida.
+  const cargarEspacios = useCallback(() => {
     if (!zonaId) return;
     listarEspacios(zonaId).then(setEspacios).catch(() => setEspacios([]));
   }, [zonaId]);
 
-  // Crea el espacio en la zona elegida.
-  async function crear(evento: FormEvent) {
-    evento.preventDefault();
+  useEffect(cargarZonas, [cargarZonas]);
+  useEffect(cargarEspacios, [cargarEspacios]);
+
+  // Cada entrada o salida avisa por /ws/zonas y el mapa se refresca.
+  useActualizacionesZona(() => {
+    cargarZonas();
+    cargarEspacios();
+  });
+
+  // Crea en la zona elegida los puestos del plano que falten.
+  async function crearPuestos() {
     if (!zonaId) return;
     setProcesando(true);
     setError(null);
     setMensaje(null);
     try {
-      await crearEspacio({ zona_id: zonaId, codigo, tipo_espacio: tipoEspacio || null });
-      setMensaje("Espacio creado");
-      setCodigo("");
-      setTipoEspacio("");
-      listarEspacios(zonaId).then(setEspacios);
+      const resultado = await crearEspaciosLote({ zona_id: zonaId, codigos: CODIGOS_PLANO });
+      setMensaje(`Puestos creados: ${resultado.creados}. Ya existian: ${resultado.existentes}.`);
+      cargarEspacios();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo crear el espacio");
+      setError(err instanceof ApiError ? err.message : "No se pudieron crear los puestos");
     } finally {
       setProcesando(false);
     }
   }
+
+  const zona = zonas.find((z) => z.id === zonaId);
+  const creados = new Set(espacios.map((espacio) => espacio.codigo));
+  const faltantes = CODIGOS_PLANO.filter((codigo) => !creados.has(codigo)).length;
 
   return (
     <div className="space-y-4">
@@ -490,38 +500,25 @@ function SeccionEspacios() {
         </select>
       </div>
 
-      <form onSubmit={crear} className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="font-semibold text-gray-900">Crear espacio en esta zona</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <input
-            required
-            placeholder="Codigo (ej. A-09)"
-            value={codigo}
-            onChange={(evento) => setCodigo(evento.target.value.toUpperCase())}
-            className={campo}
-          />
-          <input
-            placeholder="Tipo (opcional, ej. discapacidad)"
-            value={tipoEspacio}
-            onChange={(evento) => setTipoEspacio(evento.target.value)}
-            className={campo}
-          />
+      <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-gray-700">
+            Plano: <b>{CODIGOS_PLANO.length}</b> puestos · Zona: <b>{zona?.capacidad_total ?? "—"}</b> cupos · Faltan
+            por crear: <b>{faltantes}</b>
+          </p>
+          <Button onClick={crearPuestos} disabled={procesando || !zonaId || faltantes === 0}>
+            Crear puestos del plano
+          </Button>
         </div>
-        <Button type="submit" disabled={procesando || !zonaId}>
-          Crear espacio
-        </Button>
-      </form>
-
-      {mensaje && <p className="rounded-xl bg-emerald-100 p-3 text-emerald-800">{mensaje}</p>}
-      {error && <p className="rounded-xl bg-red-100 p-3 text-red-800">{error}</p>}
-
-      <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-        {espacios.map((espacio) => (
-          <SpaceCell key={espacio.id} codigo={espacio.codigo} estado={espacio.estado} />
-        ))}
-        {espacios.length === 0 && (
-          <p className="col-span-full text-center text-gray-400">Esta zona no tiene espacios individuales.</p>
+        {zona && zona.capacidad_total !== CODIGOS_PLANO.length && (
+          <p className="rounded-xl bg-amber-100 p-3 text-sm text-amber-800">
+            La capacidad de la zona ({zona.capacidad_total}) no coincide con los puestos del plano (
+            {CODIGOS_PLANO.length}): el contador de cupos y el mapa no van a cuadrar.
+          </p>
         )}
+        {mensaje && <p className="rounded-xl bg-emerald-100 p-3 text-emerald-800">{mensaje}</p>}
+        {error && <p className="rounded-xl bg-red-100 p-3 text-red-800">{error}</p>}
+        <MapaParqueadero espacios={espacios} />
       </div>
     </div>
   );

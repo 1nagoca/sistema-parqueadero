@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import Button from "@/components/common/Button";
+import MapaParqueadero from "@/components/map/MapaParqueadero";
 import PlateReader from "@/components/scanner/PlateReader";
 import PlateSearchBar from "@/components/scanner/PlateSearchBar";
 import QRScanner from "@/components/scanner/QRScanner";
@@ -16,6 +17,7 @@ import { listarEspacios } from "@/services/api/espacios";
 import { buscarPorPlaca, crearVehiculo } from "@/services/api/vehiculos";
 import type { LecturaPlaca } from "@/services/api/vision";
 import { listarZonas } from "@/services/api/zonas";
+import { useActualizacionesZona } from "@/services/realtime/useActualizacionesZona";
 import type { Acceso, AccesoActivo, Espacio, Vehiculo, Zona } from "@/types/api";
 
 // Lo que se muestra al buscar una placa: nada, cargando, ya esta adentro, registrado o no registrado.
@@ -82,6 +84,9 @@ export default function GuardDashboard() {
     }
   }
 
+  // Si otro vigilante registra una entrada o salida, el mapa se refresca solo.
+  useActualizacionesZona(recargarZonaYEspacios);
+
   /** `lectura` solo llega cuando la placa la leyo el microservicio de vision; una busqueda
    * manual o por QR la descarta para no marcar el acceso como detectado por ALPR. */
   async function buscar(placa: string, lectura: LecturaPlaca | null = null) {
@@ -127,7 +132,7 @@ export default function GuardDashboard() {
       registrarEntrada({
         vehiculo_id: vehiculoId,
         zona_id: zonaId,
-        espacio_id: espacioId || null,
+        espacio_id: espacioId,
         tipo_acceso: "normal",
         ...camposAlpr(),
       }),
@@ -141,7 +146,7 @@ export default function GuardDashboard() {
       registrarEntrada({
         vehiculo_id: vehiculoId,
         zona_id: zonaId,
-        espacio_id: espacioId || null,
+        espacio_id: espacioId,
         tipo_acceso: "visitante",
         autorizado_por_id: usuario.id,
         justificacion,
@@ -180,6 +185,8 @@ export default function GuardDashboard() {
   // La zona elegida y si se quedo sin cupos.
   const zonaSeleccionada = zonas.find((z) => z.id === zonaId);
   const sinCupos = zonaSeleccionada !== undefined && zonaSeleccionada.cupos_disponibles <= 0;
+  // El puesto elegido, solo si sigue libre (otro vigilante pudo ocuparlo).
+  const puestoElegido = espaciosZona.find((espacio) => espacio.id === espacioId && espacio.estado === "libre");
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 pb-24 sm:p-6">
@@ -211,28 +218,22 @@ export default function GuardDashboard() {
         </select>
         {sinCupos && <p className="mt-1 text-sm text-red-600">Esta zona no tiene cupos disponibles.</p>}
 
-        {espaciosZona.length > 0 && (
-          <div className="mt-3">
-            <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="espacio">
-              Espacio (opcional)
-            </label>
-            <select
-              id="espacio"
-              value={espacioId}
-              onChange={(evento) => setEspacioId(evento.target.value)}
-              className="min-h-12 w-full rounded-lg border border-gray-300 px-3"
-            >
-              <option value="">Sin espacio especifico (solo contador de la zona)</option>
-              {espaciosZona
-                .filter((espacio) => espacio.estado === "libre")
-                .map((espacio) => (
-                  <option key={espacio.id} value={espacio.id}>
-                    {espacio.codigo}
-                  </option>
-                ))}
-            </select>
-          </div>
-        )}
+        <p className="mt-3 text-sm font-medium text-gray-700">
+          {puestoElegido ? (
+            <>
+              Puesto elegido: <span className="text-blue-900">{puestoElegido.codigo}</span>
+            </>
+          ) : (
+            "Toca un puesto libre (verde) en el mapa para la entrada."
+          )}
+        </p>
+        <div className="mt-2">
+          <MapaParqueadero
+            espacios={espaciosZona}
+            seleccionadoId={puestoElegido?.id}
+            onSeleccionar={(espacio) => setEspacioId(espacio.id)}
+          />
+        </div>
       </section>
 
       <section className="mb-4 space-y-3 rounded-2xl bg-white p-4 shadow-sm">
@@ -297,6 +298,7 @@ export default function GuardDashboard() {
         resultado={resultado}
         procesando={procesando}
         sinCupos={sinCupos}
+        puesto={puestoElegido?.codigo ?? null}
         onEntradaNormal={confirmarEntradaNormal}
         onSalida={confirmarSalida}
         onRegistrarVehiculoVisitante={async (placa, justificacion) => {
@@ -326,6 +328,8 @@ interface ResultadoPanelProps {
   resultado: Resultado;
   procesando: boolean;
   sinCupos: boolean;
+  // Codigo del puesto elegido en el mapa (RN-06: sin puesto no hay entrada).
+  puesto: string | null;
   onEntradaNormal: (vehiculoId: string) => void;
   onSalida: (accesoId: string) => void;
   onRegistrarVehiculoVisitante: (placa: string, justificacion: string) => void;
@@ -336,6 +340,7 @@ function ResultadoPanel({
   resultado,
   procesando,
   sinCupos,
+  puesto,
   onEntradaNormal,
   onSalida,
   onRegistrarVehiculoVisitante,
@@ -378,10 +383,10 @@ function ResultadoPanel({
         <p className="text-sm text-gray-500">{resultado.vehiculo.tipo_vehiculo}</p>
         <Button
           className="mt-4 w-full"
-          disabled={procesando || sinCupos}
+          disabled={procesando || sinCupos || !puesto}
           onClick={() => onEntradaNormal(resultado.vehiculo.id)}
         >
-          Registrar entrada
+          {puesto ? `Registrar entrada en ${puesto}` : "Elige un puesto en el mapa"}
         </Button>
       </div>
     );
@@ -392,6 +397,7 @@ function ResultadoPanel({
       placa={resultado.placa}
       procesando={procesando}
       sinCupos={sinCupos}
+      puesto={puesto}
       onConfirmar={onRegistrarVehiculoVisitante}
     />
   );
@@ -402,11 +408,13 @@ function FormularioVisitante({
   placa,
   procesando,
   sinCupos,
+  puesto,
   onConfirmar,
 }: {
   placa: string;
   procesando: boolean;
   sinCupos: boolean;
+  puesto: string | null;
   onConfirmar: (placa: string, justificacion: string) => void;
 }) {
   const [justificacion, setJustificacion] = useState("");
@@ -425,10 +433,10 @@ function FormularioVisitante({
 
       <Button
         className="w-full"
-        disabled={procesando || sinCupos || !justificacion.trim()}
+        disabled={procesando || sinCupos || !puesto || !justificacion.trim()}
         onClick={() => onConfirmar(placa, justificacion.trim())}
       >
-        Autorizar entrada de visitante
+        {puesto ? `Autorizar entrada de visitante en ${puesto}` : "Elige un puesto en el mapa"}
       </Button>
     </div>
   );

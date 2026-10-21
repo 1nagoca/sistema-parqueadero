@@ -124,7 +124,7 @@ export interface AccesoActivo extends Acceso {
 export interface AccesoEntradaPayload {
   vehiculo_id: string;
   zona_id: string;
-  espacio_id?: string | null;
+  espacio_id: string;
   usuario_id?: string | null;
   tipo_acceso: TipoAcceso;
   autorizado_por_id?: string | null;
@@ -155,6 +155,18 @@ export interface EspacioCreatePayload {
   zona_id: string;
   codigo: string;
   tipo_espacio?: string | null;
+}
+
+// Lo que envia el admin para crear los puestos del plano.
+export interface EspacioLotePayload {
+  zona_id: string;
+  codigos: string[];
+}
+
+// Cuantos puestos se crearon y cuantos ya existian.
+export interface EspacioLoteResultado {
+  creados: number;
+  existentes: number;
 }
 
 // Una traza de auditoria (sirve para las dos bitacoras).

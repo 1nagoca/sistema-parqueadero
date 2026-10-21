@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.enums import EstadoEspacio
 
@@ -27,3 +27,24 @@ class EspacioRead(EspacioBase):
     estado: EstadoEspacio
     creado_en: datetime
     actualizado_en: datetime
+
+
+# Lo que envia el admin para crear de una vez los puestos del plano.
+class EspacioLoteCreate(BaseModel):
+    zona_id: uuid.UUID
+    codigos: list[str] = Field(min_length=1, max_length=1000)
+
+    # Cada codigo sin espacios, en mayusculas y de hasta 20 caracteres.
+    @field_validator("codigos")
+    @classmethod
+    def normalizar_codigos(cls, valores: list[str]) -> list[str]:
+        codigos = [valor.strip().upper() for valor in valores]
+        if any(not codigo or len(codigo) > 20 for codigo in codigos):
+            raise ValueError("cada codigo debe tener entre 1 y 20 caracteres")
+        return codigos
+
+
+# Cuantos puestos se crearon y cuantos ya existian.
+class EspacioLoteResultado(BaseModel):
+    creados: int
+    existentes: int
