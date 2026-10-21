@@ -173,3 +173,4 @@ No bloquean nada, pero conviene arreglarlas.
 - [ ] Un visitante que vuelve a entrar pasa como acceso normal, sin autorización ni justificación (hueco frente a RN-03: su vehículo queda aprobado y sin dueño).
 - [ ] `/ws/zonas` no valida la sesión.
 - [ ] El filtro de auditoría ofrece `espacios` y `zonas`, tablas de las que ningún servicio escribe trazas hoy.
+- [ ] Las pestañas del mismo navegador comparten el token (`localStorage`): si se inicia sesión con otro rol en una, las demás siguen mostrando su panel y la API responde 403, y al recargar todas quedan con el último rol. Guardar el token en `sessionStorage` para que cada pestaña tenga su propia sesión (al cerrar la pestaña hay que volver a iniciar sesión).
