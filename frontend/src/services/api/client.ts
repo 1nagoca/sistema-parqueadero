@@ -1,6 +1,6 @@
 // Direccion del gateway; en el servidor se cambia con VITE_API_BASE_URL.
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
-// Nombre con que se guarda el token en el navegador (localStorage).
+// Nombre con que se guarda el token en sessionStorage (una sesion por pestana).
 const TOKEN_KEY = "parqueadero_token";
 
 // Error de la API con su codigo HTTP (401, 404, 409...).
@@ -15,15 +15,15 @@ export class ApiError extends Error {
 
 // Guardar, leer y borrar el token de sesion.
 export function guardarToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
+  sessionStorage.setItem(TOKEN_KEY, token);
 }
 
 export function obtenerToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return sessionStorage.getItem(TOKEN_KEY);
 }
 
 export function borrarToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
 }
 
 /** FastAPI devuelve `detail` como texto, o como lista de errores de validacion (422). */
