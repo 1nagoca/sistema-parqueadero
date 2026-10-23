@@ -68,6 +68,29 @@ def usuarios_existentes(usuario_ids: list[uuid.UUID]) -> set[uuid.UUID]:
         raise IdentidadNoDisponibleError("El servicio de identidad no esta disponible") from exc
 
 
+# Lo que responde identidad sobre un usuario: su rol y si sigue activo.
+@dataclass(frozen=True)
+class UsuarioIdentidad:
+    id: uuid.UUID
+    rol: str
+    activo: bool
+
+
+# Pide a identidad un usuario por su id; None si no existe.
+def obtener_usuario(usuario_id: uuid.UUID) -> UsuarioIdentidad | None:
+    """Lo usa el cierre de semestre para comprobar que quien lo corre es un administrador activo."""
+    respuesta = _pedir("/interno/usuarios", params={"id": [str(usuario_id)]})
+    try:
+        for usuario in _json(respuesta):
+            if uuid.UUID(usuario["id"]) == usuario_id:
+                return UsuarioIdentidad(
+                    id=usuario_id, rol=str(usuario["rol"]), activo=bool(usuario["activo"])
+                )
+    except (KeyError, TypeError, ValueError, AttributeError) as exc:
+        raise IdentidadNoDisponibleError("El servicio de identidad no esta disponible") from exc
+    return None
+
+
 # Hace el GET con 5 s de espera; si identidad no responde, IdentidadNoDisponibleError.
 def _pedir(ruta: str, **kwargs) -> httpx.Response:
     try:

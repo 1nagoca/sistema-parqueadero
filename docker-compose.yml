@@ -146,6 +146,8 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:5173"]}
     volumes:
       - ./backend-accesos:/code
+      # Archivos del cierre de semestre (RN-10): datos privados, fuera del repo y nunca por HTTP.
+      - archivo_accesos:/archivo
 
   frontend:
     build: ./frontend
@@ -166,3 +168,4 @@ volumes:
   db_parqueadero_data:
   db_identidad_data:
   identidad_uploads:
+  archivo_accesos:
