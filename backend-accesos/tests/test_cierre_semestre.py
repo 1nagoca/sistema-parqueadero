@@ -266,3 +266,48 @@ def test_obtener_usuario_lee_rol_y_activo_de_identidad(monkeypatch):
     assert identidad_client.obtener_usuario(buscado) is None
     with pytest.raises(identidad_client.IdentidadNoDisponibleError):
         identidad_client.obtener_usuario(buscado)
+
+
+def test_volumen_real_sin_limite_de_parametros(admin_id, tmp_path):
+    """Mas de 65 535 accesos (el maximo de parametros de Postgres) se cuentan, archivan y borran."""
+    cantidad = 70_500
+    with SessionLocal() as db:
+        # Accesos cerrados en 2025, una traza por acceso y dos que deben quedarse.
+        db.execute(
+            text(
+                "INSERT INTO accesos (vehiculo_id, placa, zona_id, espacio_id, fecha_hora_entrada, fecha_hora_salida) "
+                "SELECT gen_random_uuid(), 'VOL12A', gen_random_uuid(), gen_random_uuid(), "
+                "timestamptz '2025-03-01 08:00-05' + g * interval '1 minute', "
+                "timestamptz '2025-03-01 09:00-05' + g * interval '1 minute' "
+                "FROM generate_series(1, :cantidad) AS g"
+            ),
+            {"cantidad": cantidad},
+        )
+        db.execute(
+            text(
+                "INSERT INTO auditoria_accesos (tabla_afectada, registro_id, accion, realizado_por_id, fecha_hora) "
+                "SELECT 'accesos', id, 'creacion', gen_random_uuid(), fecha_hora_entrada FROM accesos"
+            )
+        )
+        db.commit()
+        quedan = {
+            _acceso(db, datetime(2025, 2, 1, 8, 0, tzinfo=COLOMBIA), None),
+            _acceso(db, datetime(2026, 3, 1, 8, 0, tzinfo=COLOMBIA), datetime(2026, 3, 1, 9, 0, tzinfo=COLOMBIA)),
+        }
+        db.commit()
+
+    simulacro = _cerrar(admin_id, tmp_path, confirmar=False)
+    assert (simulacro.accesos, simulacro.trazas) == (cantidad, cantidad)
+
+    resultado = _cerrar(admin_id, tmp_path, confirmar=True)
+    assert (resultado.accesos, resultado.trazas) == (cantidad, cantidad)
+    accesos, trazas = _estado()
+    assert accesos == quedan
+    assert [t for t, _ in trazas] == ["cierre_semestre"]
+
+    # el archivo trae la cabecera y todas las filas
+    with gzip.open(resultado.archivo, "rt", encoding="utf-8") as archivo:
+        cabecera = json.loads(archivo.readline())
+        filas = sum(1 for _ in archivo)
+    assert (cabecera["accesos"], cabecera["trazas"], filas) == (cantidad, cantidad, 2 * cantidad)
+    assert hashlib.sha256(resultado.archivo.read_bytes()).hexdigest() == resultado.sha256
