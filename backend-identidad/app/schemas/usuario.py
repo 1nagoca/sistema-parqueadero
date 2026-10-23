@@ -72,3 +72,18 @@ class UsuarioRead(UsuarioBase):
     activo: bool
     creado_en: datetime
     actualizado_en: datetime
+
+
+# Lo que envia el admin al dar de baja: el motivo es obligatorio.
+class UsuarioBaja(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    motivo: str = Field(min_length=3, max_length=200)
+
+
+# Una pagina de la lista de usuarios con el total de resultados.
+class UsuariosPagina(BaseModel):
+    items: list[UsuarioRead]
+    total: int
+    pagina: int
+    por_pagina: int

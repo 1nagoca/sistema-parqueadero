@@ -52,7 +52,7 @@ def _vehiculo(propietario):
 
 
 def test_obtener_vehiculo_con_y_sin_propietario(identidad_responde):
-    propietario = {"id": str(PROPIETARIO_ID), "estado_verificacion": "pendiente"}
+    propietario = {"id": str(PROPIETARIO_ID), "estado_verificacion": "pendiente", "activo": False}
     peticiones = identidad_responde(lambda peticion: httpx.Response(200, json=_vehiculo(propietario)))
 
     vehiculo = identidad_client.obtener_vehiculo(VEHICULO_ID)
@@ -63,6 +63,7 @@ def test_obtener_vehiculo_con_y_sin_propietario(identidad_responde):
         estado_verificacion="aprobado",
         propietario_id=PROPIETARIO_ID,
         propietario_estado_verificacion="pendiente",
+        propietario_activo=False,
     )
     assert str(peticiones[0].url) == f"{settings.IDENTIDAD_URL}/interno/vehiculos/{VEHICULO_ID}"
 
@@ -70,6 +71,7 @@ def test_obtener_vehiculo_con_y_sin_propietario(identidad_responde):
     visitante = identidad_client.obtener_vehiculo(VEHICULO_ID)
     assert visitante.es_visitante is True
     assert visitante.propietario_id is None and visitante.propietario_estado_verificacion is None
+    assert visitante.propietario_activo is None
 
 
 def test_vehiculo_inexistente_no_es_lo_mismo_que_identidad_caida(identidad_responde):
@@ -96,8 +98,11 @@ def _tarda_demasiado(peticion):
         lambda peticion: httpx.Response(200, text="<html>no es json</html>"),
         lambda peticion: httpx.Response(200, json={"id": str(VEHICULO_ID)}),  # faltan campos
         lambda peticion: httpx.Response(200, json=["otra", "forma"]),
+        lambda peticion: httpx.Response(
+            200, json=_vehiculo({"id": str(PROPIETARIO_ID), "estado_verificacion": "aprobado"})
+        ),  # dueno sin activo
     ],
-    ids=["sin-conexion", "timeout", "500", "422", "no-json", "faltan-campos", "otra-forma"],
+    ids=["sin-conexion", "timeout", "500", "422", "no-json", "faltan-campos", "otra-forma", "dueno-sin-activo"],
 )
 def test_cualquier_otra_respuesta_es_identidad_no_disponible(identidad_responde, manejador):
     identidad_responde(manejador)

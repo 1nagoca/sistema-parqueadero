@@ -184,12 +184,75 @@ def test_listar_y_obtener_usuarios_segun_rol(client, admin, sufijo):
     assert client.get(f"{API}/usuarios").status_code == 401
     assert client.get(f"{API}/usuarios", headers=vigilante).status_code == 403
     assert client.get(f"{API}/usuarios", headers=estudiante).status_code == 403
-    r = client.get(f"{API}/usuarios", headers=admin)
+    r = client.get(f"{API}/usuarios", headers=admin, params={"buscar": f"v-{sufijo}"})
     assert r.status_code == 200, r.text
-    assert vigilante_id in [u["id"] for u in r.json()]
+    assert vigilante_id in [u["id"] for u in r.json()["items"]]
 
     # obtener por id: administrador y vigilante
     assert client.get(f"{API}/usuarios/{vigilante_id}", headers=admin).json()["rol"] == "vigilante"
     assert client.get(f"{API}/usuarios/{vigilante_id}", headers=vigilante).status_code == 200
     assert client.get(f"{API}/usuarios/{vigilante_id}", headers=estudiante).status_code == 403
     assert client.get(f"{API}/usuarios/{uuid.uuid4()}", headers=admin).status_code == 404
+
+
+def test_listar_usuarios_pagina_busca_y_filtra_en_el_servidor(client, admin, sufijo):
+    # Cinco usuarios con el sufijo en el nombre; el prefijo fija el orden por nombre.
+    datos = [
+        ("A", RolUsuario.ESTUDIANTE, True),
+        ("B", RolUsuario.VIGILANTE, True),
+        ("C", RolUsuario.ESTUDIANTE, False),
+        ("D", RolUsuario.ESTUDIANTE, True),
+        ("E", RolUsuario.VIGILANTE, True),
+    ]
+    ids = {}
+    with SessionLocal() as db:
+        for letra, rol, activo in datos:
+            usuario = Usuario(
+                nombre_completo=f"{letra} Lista {sufijo}",
+                correo_institucional=f"lista{letra.lower()}-{sufijo}@ufps.edu.co",
+                documento_identidad=f"L{letra}{sufijo}",
+                rol=rol,
+                hashed_password="no-se-usa",
+                activo=activo,
+            )
+            db.add(usuario)
+            db.flush()
+            ids[letra] = str(usuario.id)
+        db.commit()
+
+    clave = f"Lista {sufijo}"
+
+    def listar(**params):
+        r = client.get(f"{API}/usuarios", headers=admin, params=params)
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    def letras(pagina):
+        return [u["nombre_completo"][0] for u in pagina["items"]]
+
+    pagina = listar(buscar=clave, por_pagina=2)
+    assert (pagina["total"], pagina["pagina"], pagina["por_pagina"]) == (5, 1, 2)
+    assert letras(pagina) == ["A", "B"]
+    assert letras(listar(buscar=clave, por_pagina=2, pagina=2)) == ["C", "D"]
+    assert letras(listar(buscar=clave, por_pagina=2, pagina=3)) == ["E"]
+    vacia = listar(buscar=clave, por_pagina=2, pagina=4)
+    assert vacia["items"] == [] and vacia["total"] == 5
+
+    # filtros de rol y estado, solos y juntos
+    assert letras(listar(buscar=clave, rol="vigilante")) == ["B", "E"]
+    assert letras(listar(buscar=clave, activo="false")) == ["C"]
+    assert letras(listar(buscar=clave, rol="estudiante", activo="true")) == ["A", "D"]
+
+    # busca en correo y documento sin importar mayusculas; % y _ se buscan tal cual
+    assert letras(listar(buscar=f"LISTAD-{sufijo}")) == ["D"]
+    assert listar(buscar=f"le{sufijo}")["items"][0]["id"] == ids["E"]
+    assert listar(buscar=f"%{sufijo}")["total"] == 0
+    assert listar(buscar=f"L_{sufijo}")["total"] == 0
+
+    # valores por defecto
+    defecto = listar()
+    assert (defecto["pagina"], defecto["por_pagina"]) == (1, 20) and len(defecto["items"]) <= 20
+
+    # limites de los parametros
+    for params in ({"por_pagina": 101}, {"por_pagina": 0}, {"pagina": 0}, {"rol": "docentes"}):
+        assert client.get(f"{API}/usuarios", headers=admin, params=params).status_code == 422, params

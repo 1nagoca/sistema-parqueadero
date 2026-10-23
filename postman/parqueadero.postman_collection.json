@@ -238,11 +238,11 @@
           ]
         },
         {
-          "name": "Listar usuarios",
+          "name": "Listar usuarios (paginado)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/api/v1/usuarios"
+            "url": "{{baseUrl}}/api/v1/usuarios?pagina=1&por_pagina=20"
           },
           "event": [
             {
@@ -251,7 +251,11 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
-                  "pm.test(\"Es una lista\", () => pm.expect(pm.response.json()).to.be.an(\"array\"));"
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Es una página\", () => pm.expect(json.items).to.be.an(\"array\"));",
+                  "pm.test(\"Trae el total\", () => pm.expect(json.total).to.be.a(\"number\"));",
+                  "pm.test(\"Respeta por_pagina\", () => pm.expect(json.items.length).to.be.at.most(json.por_pagina));"
                 ]
               }
             }
@@ -322,6 +326,93 @@
                 "exec": [
                   "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
                   "pm.test(\"Mismo id\", () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"nuevo_usuario_id\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dar de baja sin motivo (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/usuarios/{{nuevo_usuario_id}}/desactivar",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motivo\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RN-08: dar de baja usuario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/usuarios/{{nuevo_usuario_id}}/desactivar",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motivo\": \"Renunció\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Queda inactivo\", () => pm.expect(pm.response.json().activo).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RN-08: reactivar usuario",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/usuarios/{{nuevo_usuario_id}}/reactivar"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Queda activo\", () => pm.expect(pm.response.json().activo).to.eql(true));"
                 ]
               }
             }

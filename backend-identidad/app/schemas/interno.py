@@ -6,12 +6,13 @@ from pydantic import BaseModel, ConfigDict
 from app.models.enums import EstadoVerificacion, RolUsuario
 
 
-# Del dueno solo se comparte el id y si esta aprobado.
+# Del dueno solo se comparte el id, si esta aprobado y si sigue activo.
 class PropietarioInterno(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     estado_verificacion: EstadoVerificacion
+    activo: bool
 
 
 # Lo minimo de un vehiculo para decidir si puede entrar.

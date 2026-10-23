@@ -107,12 +107,15 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
     return acceso
 
 
-# Rechaza la entrada normal si el vehiculo o su dueno no estan aprobados.
+# Rechaza la entrada normal si el dueno esta dado de baja o si el vehiculo o su dueno no estan aprobados.
 def _exigir_vehiculo_verificado(vehiculo: identidad_client.VehiculoIdentidad, tipo_acceso: TipoAcceso) -> None:
-    """Un acceso normal exige vehiculo y propietario aprobados por el administrador; el
-    visitante ya pasa por su propio flujo de autorizacion + justificacion."""
+    """Un acceso normal exige vehiculo y propietario aprobados por el administrador y un
+    propietario activo (RN-03); el visitante ya pasa por su propio flujo de autorizacion +
+    justificacion."""
     if tipo_acceso != TipoAcceso.NORMAL:
         return
+    if vehiculo.propietario_id is not None and not vehiculo.propietario_activo:
+        raise VehiculoNoVerificadoError("El propietario de la moto esta dado de baja")
     aprobado = EstadoVerificacion.APROBADO.value
     if vehiculo.estado_verificacion != aprobado or (
         vehiculo.propietario_id is not None and vehiculo.propietario_estado_verificacion != aprobado

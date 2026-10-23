@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Fragment, useCallback, useEffect, useState, type FormEvent } from "react";
 
 import MapaParqueadero from "@/components/map/MapaParqueadero";
 import { CODIGOS_PLANO } from "@/components/map/planoParqueadero";
@@ -9,11 +9,19 @@ import { useAuth } from "@/context/AuthContext";
 import { listarAuditoria, listarAuditoriaVerificaciones } from "@/services/api/auditoria";
 import { ApiError } from "@/services/api/client";
 import { crearEspaciosLote, listarEspacios } from "@/services/api/espacios";
-import { crearUsuario, listarUsuarios } from "@/services/api/usuarios";
+import { crearUsuario, darDeBajaUsuario, listarUsuarios, reactivarUsuario } from "@/services/api/usuarios";
 import { listarPendientes, resolverUsuario, resolverVehiculo } from "@/services/api/verificaciones";
 import { crearZona, listarZonas } from "@/services/api/zonas";
 import { useActualizacionesZona } from "@/services/realtime/useActualizacionesZona";
-import type { AuditoriaAcceso, Espacio, RolUsuario, SolicitudVerificacion, Usuario, Zona } from "@/types/api";
+import type {
+  AuditoriaAcceso,
+  Espacio,
+  RolUsuario,
+  SolicitudVerificacion,
+  Usuario,
+  UsuariosPagina,
+  Zona,
+} from "@/types/api";
 
 // Pestanas del panel y su titulo.
 type Pestana = "verificaciones" | "usuarios" | "zonas" | "espacios" | "auditoria";
@@ -188,9 +196,29 @@ function SeccionVerificaciones() {
   );
 }
 
-// Lista de usuarios y formulario para crear vigilantes o administradores.
+// Motivos sugeridos de baja segun el rol; siempre se puede escribir otro.
+const MOTIVOS_BAJA: Partial<Record<RolUsuario, string[]>> = {
+  estudiante: ["Se graduó", "Se retiró de la universidad"],
+  vigilante: ["Despedido", "Renunció"],
+};
+const OTRO_MOTIVO = "Otro";
+const USUARIOS_POR_PAGINA = 20;
+
+// Lista paginada de usuarios con buscador, filtros, baja y reactivacion, y formulario para crear personal.
 function SeccionUsuarios() {
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const { usuario: yo } = useAuth();
+  const [pagina, setPagina] = useState<UsuariosPagina | null>(null);
+  const [numeroPagina, setNumeroPagina] = useState(1);
+  const [buscar, setBuscar] = useState("");
+  const [buscarAplicado, setBuscarAplicado] = useState("");
+  const [filtroRol, setFiltroRol] = useState<"" | RolUsuario>("");
+  const [filtroActivo, setFiltroActivo] = useState<"" | "true" | "false">("");
+  const [recarga, setRecarga] = useState(0);
+  const [cargando, setCargando] = useState(true);
+  const [errorLista, setErrorLista] = useState<string | null>(null);
+  const [bajaAbierta, setBajaAbierta] = useState<string | null>(null);
+  const [reactivando, setReactivando] = useState<string | null>(null);
+
   const [error, setError] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
@@ -201,17 +229,50 @@ function SeccionUsuarios() {
   const [rol, setRol] = useState<RolUsuario>("vigilante");
   const [password, setPassword] = useState("");
 
+  // Espera 300 ms despues de la ultima tecla y vuelve a la primera pagina.
   useEffect(() => {
-    cargar();
-  }, []);
+    const espera = setTimeout(() => {
+      setBuscarAplicado(buscar);
+      setNumeroPagina(1);
+    }, 300);
+    return () => clearTimeout(espera);
+  }, [buscar]);
 
-  // Trae todos los usuarios.
-  async function cargar() {
-    try {
-      setUsuarios(await listarUsuarios());
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudieron cargar los usuarios");
-    }
+  useEffect(() => {
+    // Si los filtros cambian antes de que llegue la respuesta, esa respuesta ya no se usa.
+    let vigente = true;
+    setCargando(true);
+    listarUsuarios({
+      pagina: numeroPagina,
+      por_pagina: USUARIOS_POR_PAGINA,
+      buscar: buscarAplicado,
+      rol: filtroRol || undefined,
+      activo: filtroActivo === "" ? undefined : filtroActivo === "true",
+    })
+      .then((resultado) => {
+        if (!vigente) return;
+        // Si la pagina quedo vacia (por ejemplo tras una baja) vuelve a la anterior.
+        if (resultado.items.length === 0 && numeroPagina > 1) {
+          setNumeroPagina(numeroPagina - 1);
+          return;
+        }
+        setPagina(resultado);
+        setErrorLista(null);
+      })
+      .catch((err) => {
+        if (vigente) setErrorLista(err instanceof ApiError ? err.message : "No se pudieron cargar los usuarios");
+      })
+      .finally(() => {
+        if (vigente) setCargando(false);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [numeroPagina, buscarAplicado, filtroRol, filtroActivo, recarga]);
+
+  // Vuelve a pedir la pagina actual.
+  function recargar() {
+    setRecarga((n) => n + 1);
   }
 
   // Crea el usuario y recarga la lista.
@@ -233,13 +294,46 @@ function SeccionUsuarios() {
       setCorreo("");
       setDocumento("");
       setPassword("");
-      cargar();
+      recargar();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo crear el usuario");
     } finally {
       setProcesando(false);
     }
   }
+
+  // Reactiva al usuario; el estudiante debe volver a subir sus documentos.
+  async function reactivar(u: Usuario) {
+    setReactivando(u.id);
+    setError(null);
+    setMensaje(null);
+    try {
+      await reactivarUsuario(u.id);
+      setMensaje(
+        u.rol === "estudiante"
+          ? `${u.nombre_completo} fue reactivado: debe subir de nuevo su carnet y los documentos de sus motos.`
+          : `${u.nombre_completo} fue reactivado.`,
+      );
+      recargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo reactivar al usuario");
+    } finally {
+      setReactivando(null);
+    }
+  }
+
+  // Cierra el panel de baja, avisa y recarga la lista.
+  function bajaHecha(u: Usuario) {
+    setBajaAbierta(null);
+    setError(null);
+    setMensaje(`${u.nombre_completo} quedó dado de baja y se borraron sus documentos.`);
+    recargar();
+  }
+
+  const items = pagina?.items ?? [];
+  const total = pagina?.total ?? 0;
+  const desde = pagina && total > 0 ? (pagina.pagina - 1) * pagina.por_pagina + 1 : 0;
+  const hasta = pagina ? (pagina.pagina - 1) * pagina.por_pagina + items.length : 0;
 
   return (
     <div className="space-y-4">
@@ -293,32 +387,213 @@ function SeccionUsuarios() {
       {mensaje && <p className="rounded-xl bg-emerald-100 p-3 text-emerald-800">{mensaje}</p>}
       {error && <p className="rounded-xl bg-red-100 p-3 text-red-800">{error}</p>}
 
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 text-gray-500">
-            <tr>
-              <th className="px-4 py-2">Nombre</th>
-              <th className="px-4 py-2">Correo</th>
-              <th className="px-4 py-2">Rol</th>
-              <th className="px-4 py-2">Verificacion</th>
-              <th className="px-4 py-2">Activo</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {usuarios.map((u) => (
-              <tr key={u.id}>
-                <td className="px-4 py-2">{u.nombre_completo}</td>
-                <td className="px-4 py-2">{u.correo_institucional}</td>
-                <td className="px-4 py-2 capitalize">{u.rol === "admin" ? "Administrador" : u.rol}</td>
-                <td className="px-4 py-2">
-                  <EstadoBadge estado={u.estado_verificacion} />
-                </td>
-                <td className="px-4 py-2">{u.activo ? "Si" : "No"}</td>
+      <div className="rounded-2xl bg-white shadow-sm">
+        <div className="grid gap-3 p-4 sm:grid-cols-[1fr_auto_auto]">
+          <input
+            type="search"
+            placeholder="Buscar por nombre, correo o documento"
+            value={buscar}
+            onChange={(evento) => setBuscar(evento.target.value)}
+            className={campo}
+          />
+          <select
+            value={filtroRol}
+            onChange={(evento) => {
+              setFiltroRol(evento.target.value as "" | RolUsuario);
+              setNumeroPagina(1);
+            }}
+            className={campo}
+          >
+            <option value="">Todos los roles</option>
+            <option value="estudiante">Estudiante</option>
+            <option value="vigilante">Vigilante</option>
+            <option value="admin">Administrador</option>
+          </select>
+          <select
+            value={filtroActivo}
+            onChange={(evento) => {
+              setFiltroActivo(evento.target.value as "" | "true" | "false");
+              setNumeroPagina(1);
+            }}
+            className={campo}
+          >
+            <option value="">Activos y dados de baja</option>
+            <option value="true">Activos</option>
+            <option value="false">Dados de baja</option>
+          </select>
+        </div>
+
+        {errorLista && <p className="mx-4 mb-4 rounded-xl bg-red-100 p-3 text-red-800">{errorLista}</p>}
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50 text-gray-500">
+              <tr>
+                <th className="px-4 py-2">Nombre</th>
+                <th className="px-4 py-2">Correo</th>
+                <th className="px-4 py-2">Rol</th>
+                <th className="px-4 py-2">Verificacion</th>
+                <th className="px-4 py-2">Activo</th>
+                <th className="px-4 py-2">Acción</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {usuarios.length === 0 && <p className="p-4 text-center text-gray-400">Sin usuarios todavia.</p>}
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {items.map((u) => (
+                <Fragment key={u.id}>
+                  <tr>
+                    <td className="px-4 py-2">{u.nombre_completo}</td>
+                    <td className="px-4 py-2">{u.correo_institucional}</td>
+                    <td className="px-4 py-2 capitalize">{u.rol === "admin" ? "Administrador" : u.rol}</td>
+                    <td className="px-4 py-2">
+                      <EstadoBadge estado={u.estado_verificacion} />
+                    </td>
+                    <td className="px-4 py-2">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          u.activo ? "bg-emerald-100 text-emerald-800" : "bg-gray-200 text-gray-700"
+                        }`}
+                      >
+                        {u.activo ? "Activo" : "De baja"}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2">
+                      {u.id === yo?.id ? (
+                        <span className="text-xs text-gray-400">Tu cuenta</span>
+                      ) : !MOTIVOS_BAJA[u.rol] ? (
+                        <span className="text-gray-300">—</span>
+                      ) : u.activo ? (
+                        <button
+                          onClick={() => setBajaAbierta(bajaAbierta === u.id ? null : u.id)}
+                          className="rounded-lg border border-red-300 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-50"
+                        >
+                          Dar de baja
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => reactivar(u)}
+                          disabled={reactivando === u.id}
+                          className="rounded-lg border border-emerald-300 px-3 py-1 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                        >
+                          Reactivar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                  {bajaAbierta === u.id && (
+                    <tr>
+                      <td colSpan={6} className="bg-red-50 px-4 py-3">
+                        <PanelBaja usuario={u} onHecho={() => bajaHecha(u)} onCancelar={() => setBajaAbierta(null)} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {!cargando && items.length === 0 && !errorLista && (
+          <p className="p-4 text-center text-gray-400">Sin usuarios con esos filtros.</p>
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 p-4 text-sm">
+          <span className="text-gray-500">{cargando ? "Cargando..." : `Mostrando ${desde}–${hasta} de ${total}`}</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setNumeroPagina(numeroPagina - 1)}
+              disabled={cargando || numeroPagina <= 1}
+              className="rounded-lg bg-gray-100 px-3 py-1 text-gray-700 disabled:opacity-40"
+            >
+              ← Anterior
+            </button>
+            <button
+              onClick={() => setNumeroPagina(numeroPagina + 1)}
+              disabled={cargando || hasta >= total}
+              className="rounded-lg bg-gray-100 px-3 py-1 text-gray-700 disabled:opacity-40"
+            >
+              Siguiente →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Formulario de baja en la fila: motivo sugerido segun el rol u otro escrito a mano.
+function PanelBaja({
+  usuario,
+  onHecho,
+  onCancelar,
+}: {
+  usuario: Usuario;
+  onHecho: () => void;
+  onCancelar: () => void;
+}) {
+  const sugeridos = MOTIVOS_BAJA[usuario.rol] ?? [];
+  const [opcion, setOpcion] = useState(sugeridos[0] ?? OTRO_MOTIVO);
+  const [otro, setOtro] = useState("");
+  const [procesando, setProcesando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const motivo = opcion === OTRO_MOTIVO ? otro.trim() : opcion;
+  const motivoValido = motivo.length >= 3 && motivo.length <= 200;
+
+  // Envia la baja; si falla, muestra el error en el mismo panel.
+  async function confirmar() {
+    setProcesando(true);
+    setError(null);
+    try {
+      await darDeBajaUsuario(usuario.id, motivo);
+      onHecho();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo dar de baja al usuario");
+      setProcesando(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="font-medium text-gray-900">Dar de baja a {usuario.nombre_completo}</p>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {[...sugeridos, OTRO_MOTIVO].map((valor) => (
+          <label key={valor} className="flex items-center gap-1">
+            <input
+              type="radio"
+              name={`motivo-${usuario.id}`}
+              checked={opcion === valor}
+              onChange={() => setOpcion(valor)}
+            />
+            {valor}
+          </label>
+        ))}
+        {opcion === OTRO_MOTIVO && (
+          <input
+            autoFocus
+            maxLength={200}
+            placeholder="Escribe el motivo"
+            value={otro}
+            onChange={(evento) => setOtro(evento.target.value)}
+            className="min-h-10 flex-1 rounded-lg border border-gray-300 px-3"
+          />
+        )}
+      </div>
+      <p className="text-xs text-gray-600">
+        {usuario.rol === "estudiante"
+          ? "Se borrarán su carnet y los documentos de sus motos. Sus motos y su historial de accesos se conservan."
+          : "No podrá iniciar sesión. Su historial se conserva."}
+      </p>
+      {error && <p className="rounded-lg bg-red-100 p-2 text-red-800">{error}</p>}
+      <div className="flex gap-2">
+        <button
+          onClick={confirmar}
+          disabled={procesando || !motivoValido}
+          className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-50"
+        >
+          Confirmar baja
+        </button>
+        <button onClick={onCancelar} disabled={procesando} className="rounded-lg bg-gray-200 px-4 py-2 text-gray-800">
+          Cancelar
+        </button>
       </div>
     </div>
   );

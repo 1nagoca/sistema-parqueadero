@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_role
@@ -9,8 +9,8 @@ from app.models.documento import Documento
 from app.models.enums import EstadoVerificacion, RolUsuario, TipoDocumento
 from app.models.usuario import Usuario
 from app.schemas.documento import DocumentoRead
-from app.schemas.usuario import UsuarioCreate, UsuarioRead
-from app.services import documento_service, verificacion_service
+from app.schemas.usuario import UsuarioBaja, UsuarioCreate, UsuarioRead, UsuariosPagina
+from app.services import documento_service, usuario_service, verificacion_service
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
@@ -110,13 +110,54 @@ def crear_usuario(
     return usuario
 
 
-# GET /usuarios (admin): lista todos los usuarios.
-@router.get("", response_model=list[UsuarioRead])
+# GET /usuarios (admin): una pagina de usuarios con buscador y filtros de rol y estado.
+@router.get("", response_model=UsuariosPagina)
 def listar_usuarios(
+    pagina: int = Query(1, ge=1),
+    por_pagina: int = Query(20, ge=1, le=100),
+    buscar: str | None = Query(None, max_length=100),
+    rol: RolUsuario | None = None,
+    activo: bool | None = None,
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_role(RolUsuario.ADMIN)),
-):
-    return db.query(Usuario).order_by(Usuario.nombre_completo).all()
+) -> UsuariosPagina:
+    items, total = usuario_service.listar_usuarios(
+        db, pagina=pagina, por_pagina=por_pagina, buscar=buscar, rol=rol, activo=activo
+    )
+    return UsuariosPagina(
+        items=[UsuarioRead.model_validate(u) for u in items], total=total, pagina=pagina, por_pagina=por_pagina
+    )
+
+
+# POST /usuarios/{id}/desactivar (admin): da de baja con motivo y borra sus documentos (RN-08).
+@router.post("/{usuario_id}/desactivar", response_model=UsuarioRead)
+def desactivar_usuario(
+    usuario_id: uuid.UUID,
+    datos: UsuarioBaja,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(require_role(RolUsuario.ADMIN)),
+) -> Usuario:
+    try:
+        return usuario_service.dar_de_baja(db, usuario_id, datos.motivo, admin.id)
+    except usuario_service.UsuarioNoEncontradoError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except usuario_service.UsuarioConflictoError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+# POST /usuarios/{id}/reactivar (admin): vuelve a activar a un usuario dado de baja (RN-08).
+@router.post("/{usuario_id}/reactivar", response_model=UsuarioRead)
+def reactivar_usuario(
+    usuario_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(require_role(RolUsuario.ADMIN)),
+) -> Usuario:
+    try:
+        return usuario_service.reactivar(db, usuario_id, admin.id)
+    except usuario_service.UsuarioNoEncontradoError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except usuario_service.UsuarioConflictoError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 # GET /usuarios/{id} (admin, vigilante): los datos de un usuario.

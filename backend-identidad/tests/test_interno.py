@@ -63,10 +63,19 @@ def test_vehiculo_con_propietario_solo_expone_lo_del_contrato(client, sufijo):
         "placa": placa,
         "es_visitante": False,
         "estado_verificacion": "aprobado",
-        "propietario": {"id": propietario_id, "estado_verificacion": "pendiente"},
+        "propietario": {"id": propietario_id, "estado_verificacion": "pendiente", "activo": True},
     }
     # sin nombres, correos ni documentos
     assert "Nombre Privado" not in r.text and "@ufps.edu.co" not in r.text
+
+
+def test_vehiculo_de_propietario_dado_de_baja_lo_indica(client, sufijo):
+    propietario_id = _usuario(sufijo, RolUsuario.ESTUDIANTE, activo=False)
+    vehiculo_id, _ = _vehiculo("BAJ", usuario_id=uuid.UUID(propietario_id))
+
+    r = client.get(f"/interno/vehiculos/{vehiculo_id}")
+    assert r.status_code == 200, r.text
+    assert r.json()["propietario"] == {"id": propietario_id, "estado_verificacion": "aprobado", "activo": False}
 
 
 def test_vehiculo_de_visitante_no_tiene_propietario_y_el_inexistente_da_404(client):

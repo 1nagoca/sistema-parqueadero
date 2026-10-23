@@ -27,6 +27,8 @@ class VehiculoIdentidad:
     # None cuando el vehiculo no tiene dueno registrado (visitante).
     propietario_id: uuid.UUID | None
     propietario_estado_verificacion: str | None
+    # False si el dueno fue dado de baja (RN-08).
+    propietario_activo: bool | None
 
 
 # Pide a identidad un vehiculo por su id (si no existe, VehiculoNoEncontradoError).
@@ -48,6 +50,7 @@ def obtener_vehiculo(vehiculo_id: uuid.UUID) -> VehiculoIdentidad:
             propietario_estado_verificacion=(
                 str(propietario["estado_verificacion"]) if propietario is not None else None
             ),
+            propietario_activo=bool(propietario["activo"]) if propietario is not None else None,
         )
     except (KeyError, TypeError, ValueError, AttributeError) as exc:
         raise IdentidadNoDisponibleError("El servicio de identidad no esta disponible") from exc

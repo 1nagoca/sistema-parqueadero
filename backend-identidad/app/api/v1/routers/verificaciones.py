@@ -31,7 +31,7 @@ def listar_pendientes(
     _: Usuario = Depends(require_role(RolUsuario.ADMIN)),
 ):
     """Bandeja del administrador: estudiantes con el carnet por revisar y/o vehiculos
-    pendientes. Un estudiante que se registro pero aun no sube nada no aparece."""
+    pendientes. Un estudiante que se registro pero aun no sube nada no aparece, ni uno dado de baja."""
     con_carnet = (
         db.query(Documento.usuario_id).filter(Documento.tipo == TipoDocumento.CARNET).scalar_subquery()
     )
@@ -43,10 +43,11 @@ def listar_pendientes(
     usuarios = (
         db.query(Usuario)
         .filter(
+            Usuario.activo.is_(True),
             or_(
                 (Usuario.estado_verificacion == EstadoVerificacion.PENDIENTE) & Usuario.id.in_(con_carnet),
                 Usuario.id.in_(con_vehiculo_pendiente),
-            )
+            ),
         )
         .order_by(Usuario.creado_en)
         .all()

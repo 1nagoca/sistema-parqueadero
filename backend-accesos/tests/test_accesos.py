@@ -79,6 +79,7 @@ def identidad(monkeypatch):
                 estado_verificacion=estado,
                 propietario_id=uuid.uuid4() if propietario_estado is not None else None,
                 propietario_estado_verificacion=propietario_estado,
+                propietario_activo=True if propietario_estado is not None else None,
             )
             self.vehiculos[vehiculo.id] = vehiculo
             return {"id": str(vehiculo.id), "placa": vehiculo.placa}
@@ -149,6 +150,30 @@ def test_entrada_normal_de_vehiculo_aprobado_sin_propietario(client, admin, parq
     vehiculo = identidad.vehiculo()
     entrada = {"vehiculo_id": vehiculo["id"], "zona_id": str(uuid.uuid4()), "espacio_id": str(uuid.uuid4())}
     assert client.post(f"{API}/accesos/entrada", headers=admin, json=entrada).status_code == 201
+
+
+def test_entrada_normal_con_propietario_dado_de_baja_responde_409(client, admin, parqueadero, identidad):
+    vehiculo = identidad.vehiculo("BAJ", propietario_estado="aprobado")
+    identidad.cambiar(vehiculo["id"], propietario_activo=False)
+    entrada = {"vehiculo_id": vehiculo["id"], "zona_id": str(uuid.uuid4()), "espacio_id": str(uuid.uuid4())}
+
+    r = client.post(f"{API}/accesos/entrada", headers=admin, json=entrada)
+    assert r.status_code == 409
+    assert r.json()["detail"] == "El propietario de la moto esta dado de baja"  # RN-03 y RN-08
+    assert parqueadero.movimientos == []
+
+
+def test_salida_funciona_aunque_el_propietario_este_dado_de_baja(client, admin, parqueadero, identidad):
+    vehiculo = identidad.vehiculo("SAL", propietario_estado="aprobado")
+    entrada = {"vehiculo_id": vehiculo["id"], "zona_id": str(uuid.uuid4()), "espacio_id": str(uuid.uuid4())}
+    r = client.post(f"{API}/accesos/entrada", headers=admin, json=entrada)
+    assert r.status_code == 201, r.text
+
+    # lo dan de baja mientras la moto esta adentro: sale igual y libera el cupo
+    identidad.cambiar(vehiculo["id"], propietario_activo=False)
+    r = client.post(f"{API}/accesos/{r.json()['id']}/salida", headers=admin)
+    assert r.status_code == 200, r.text
+    assert parqueadero.movimientos == ["ocupar", "liberar"]
 
 
 def test_entrada_sin_puesto_responde_422(client, admin, parqueadero, identidad):

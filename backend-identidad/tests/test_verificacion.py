@@ -3,6 +3,7 @@ DATABASE_URL / SECRET_KEY en el entorno; la base de pruebas la prepara conftest.
 
 import os
 import uuid
+from pathlib import Path
 
 import pytest
 
@@ -17,8 +18,10 @@ from app.core.security import hashear_password  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.auditoria_identidad import AuditoriaIdentidad  # noqa: E402
+from app.models.documento import Documento  # noqa: E402
 from app.models.enums import RolUsuario  # noqa: E402
 from app.models.usuario import Usuario  # noqa: E402
+from app.models.vehiculo import Vehiculo  # noqa: E402
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
@@ -211,7 +214,8 @@ def _estudiante_con_carnet_y_vehiculo(client, sufijo):
     uid = client.get(f"{API}/usuarios/me", headers=est).json()["id"]
     r = client.post(f"{API}/usuarios/me/carnet", headers=est, files={"archivo": ("c.png", PNG, "image/png")})
     assert r.status_code == 200, r.text
-    r = _vehiculo(client, est, "AUD" + str(uuid.uuid4().int)[:2] + "B")
+    # Placa al azar (ABC12D) para que no choque con otra de la misma corrida.
+    r = _vehiculo(client, est, "AUD" + str(uuid.uuid4().int)[:2] + chr(ord("A") + uuid.uuid4().int % 26))
     assert r.status_code == 201, r.text
     return est, uid, r.json()["id"]
 
@@ -304,3 +308,117 @@ def test_visitante_solo_moto(client, admin):
     r = client.post(f"{API}/vehiculos", headers=admin, json=datos)
     assert r.status_code == 201, r.text
     assert r.json()["tipo_vehiculo"] == "moto"
+
+
+def _archivos_en_disco():
+    carpeta = Path(settings.UPLOAD_DIR)
+    return sorted(p.name for p in carpeta.iterdir()) if carpeta.exists() else []
+
+
+def _documentos_de(usuario_id):
+    with SessionLocal() as db:
+        return db.query(Documento).filter(Documento.usuario_id == uuid.UUID(usuario_id)).count()
+
+
+def test_baja_de_estudiante_borra_documentos_conserva_vehiculos_y_deja_traza(client, sufijo):
+    admin_id, admin = _personal(client, RolUsuario.ADMIN, sufijo)
+    est, uid, vehiculo_id = _estudiante_con_carnet_y_vehiculo(client, sufijo)
+    assert len(_archivos_en_disco()) == 3 and _documentos_de(uid) == 3
+    pendientes = client.get(f"{API}/verificaciones/pendientes", headers=admin).json()
+    assert uid in [s["usuario"]["id"] for s in pendientes]
+
+    r = client.post(f"{API}/usuarios/{uid}/desactivar", headers=admin, json={"motivo": "  Se graduó  "})
+    assert r.status_code == 200, r.text
+    assert r.json()["activo"] is False
+
+    # documentos fuera de la base y del disco; el vehiculo se conserva
+    assert _documentos_de(uid) == 0 and _archivos_en_disco() == []
+    with SessionLocal() as db:
+        vehiculo = db.get(Vehiculo, uuid.UUID(vehiculo_id))
+        assert vehiculo is not None and str(vehiculo.usuario_id) == uid
+
+    (traza,) = _trazas(uid)
+    assert traza.tabla_afectada == "usuarios" and traza.accion.value == "actualizacion"
+    assert traza.valores_anteriores == {"activo": True} and traza.valores_nuevos == {"activo": False}
+    assert traza.motivo == "Se graduó" and str(traza.realizado_por_id) == admin_id
+
+    # no entra, su token ya no sirve en identidad y sale de la bandeja
+    r = client.post(f"{API}/auth/login", data={"username": f"est-{sufijo}@ufps.edu.co", "password": "clave-segura-1"})
+    assert r.status_code == 403
+    assert client.get(f"{API}/usuarios/me", headers=est).status_code == 401
+    pendientes = client.get(f"{API}/verificaciones/pendientes", headers=admin).json()
+    assert uid not in [s["usuario"]["id"] for s in pendientes]
+
+
+def test_baja_y_reactivacion_validan_motivo_permisos_rol_y_estado(client, sufijo):
+    admin_id, admin = _personal(client, RolUsuario.ADMIN, sufijo)
+    vigilante_id, vigilante = _personal(client, RolUsuario.VIGILANTE, sufijo)
+    otro_admin_id, _ = _personal(client, RolUsuario.ADMIN, uuid.uuid4().hex[:8])
+    assert _registrar(client, sufijo).status_code == 201
+    est = _login(client, f"est-{sufijo}@ufps.edu.co", "clave-segura-1")
+    baja = f"{API}/usuarios/{vigilante_id}/desactivar"
+
+    # motivo obligatorio de 3 a 200 caracteres
+    for cuerpo in ({}, {"motivo": "   "}, {"motivo": "ab"}, {"motivo": "x" * 201}):
+        assert client.post(baja, headers=admin, json=cuerpo).status_code == 422, cuerpo
+    assert _trazas(vigilante_id) == []
+
+    # solo el administrador
+    assert client.post(baja, json={"motivo": "Renunció"}).status_code == 401
+    assert client.post(baja, headers=vigilante, json={"motivo": "Renunció"}).status_code == 403
+    assert client.post(baja, headers=est, json={"motivo": "Renunció"}).status_code == 403
+    assert client.post(f"{API}/usuarios/{vigilante_id}/reactivar", headers=est).status_code == 403
+
+    # ni a si mismo ni a otro administrador; el inexistente da 404
+    r = client.post(f"{API}/usuarios/{admin_id}/desactivar", headers=admin, json={"motivo": "Prueba"})
+    assert r.status_code == 409 and "ti mismo" in r.json()["detail"]
+    r = client.post(f"{API}/usuarios/{otro_admin_id}/desactivar", headers=admin, json={"motivo": "Prueba"})
+    assert r.status_code == 409
+    assert client.post(f"{API}/usuarios/{uuid.uuid4()}/desactivar", headers=admin, json={"motivo": "Prueba"}).status_code == 404
+    assert client.post(f"{API}/usuarios/{uuid.uuid4()}/reactivar", headers=admin).status_code == 404
+
+    # reactivar a alguien activo o dar de baja dos veces: 409
+    assert client.post(f"{API}/usuarios/{vigilante_id}/reactivar", headers=admin).status_code == 409
+    r = client.post(baja, headers=admin, json={"motivo": "Renunció"})
+    assert r.status_code == 200 and r.json()["activo"] is False
+    assert client.post(baja, headers=admin, json={"motivo": "Renunció"}).status_code == 409
+
+    # el vigilante vuelve sin tocar su verificacion
+    r = client.post(f"{API}/usuarios/{vigilante_id}/reactivar", headers=admin)
+    assert r.status_code == 200, r.text
+    assert r.json()["activo"] is True and r.json()["estado_verificacion"] == "aprobado"
+    _, reactivacion = _trazas(vigilante_id)
+    assert reactivacion.valores_anteriores == {"activo": False} and reactivacion.valores_nuevos == {"activo": True}
+    assert reactivacion.motivo == "Cuenta reactivada por el administrador"
+    assert str(reactivacion.realizado_por_id) == admin_id
+    assert len(_trazas(otro_admin_id)) == 0
+
+
+def test_reactivar_estudiante_lo_deja_pendiente_y_sus_vehiculos_rechazados(client, sufijo):
+    _, admin = _personal(client, RolUsuario.ADMIN, sufijo)
+    _, uid, vehiculo_id = _estudiante_con_carnet_y_vehiculo(client, sufijo)
+    client.post(f"{API}/verificaciones/usuarios/{uid}/resolver", headers=admin, json={"aprobar": True})
+    client.post(f"{API}/verificaciones/vehiculos/{vehiculo_id}/resolver", headers=admin, json={"aprobar": True})
+    assert client.post(f"{API}/usuarios/{uid}/desactivar", headers=admin, json={"motivo": "Se retiró"}).status_code == 200
+
+    r = client.post(f"{API}/usuarios/{uid}/reactivar", headers=admin)
+    assert r.status_code == 200, r.text
+    cuerpo = r.json()
+    assert cuerpo["activo"] is True and cuerpo["estado_verificacion"] == "pendiente" and cuerpo["motivo_rechazo"] is None
+    traza = _trazas(uid)[-1]
+    assert traza.valores_anteriores == {"activo": False, "estado_verificacion": "aprobado"}
+    assert traza.valores_nuevos == {"activo": True, "estado_verificacion": "pendiente"}
+
+    # vuelve a entrar, ve su vehiculo rechazado con el motivo y puede reenviar todo
+    est = _login(client, f"est-{sufijo}@ufps.edu.co", "clave-segura-1")
+    (vehiculo,) = client.get(f"{API}/vehiculos/mis-vehiculos", headers=est).json()
+    assert vehiculo["estado_verificacion"] == "rechazado" and vehiculo["documentos"] == []
+    assert vehiculo["motivo_rechazo"] == (
+        "Cuenta reactivada: vuelve a subir la foto de la placa y la tarjeta de propiedad"
+    )
+    r = client.post(f"{API}/vehiculos/mis-vehiculos/{vehiculo_id}/reenviar", headers=est, files=_archivos())
+    assert r.status_code == 200 and r.json()["estado_verificacion"] == "pendiente"
+    r = client.post(f"{API}/usuarios/me/carnet", headers=est, files={"archivo": ("c.png", PNG, "image/png")})
+    assert r.status_code == 200 and r.json()["estado_verificacion"] == "pendiente"
+    pendientes = client.get(f"{API}/verificaciones/pendientes", headers=admin).json()
+    assert uid in [s["usuario"]["id"] for s in pendientes]

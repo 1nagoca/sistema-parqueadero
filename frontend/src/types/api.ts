@@ -133,6 +133,23 @@ export interface AccesoEntradaPayload {
   confianza_alpr?: number | null;
 }
 
+// Una pagina de la lista de usuarios (admin).
+export interface UsuariosPagina {
+  items: Usuario[];
+  total: number;
+  pagina: number;
+  por_pagina: number;
+}
+
+// Filtros de la lista de usuarios; los vacios no se envian.
+export interface FiltrosUsuarios {
+  pagina?: number;
+  por_pagina?: number;
+  buscar?: string;
+  rol?: RolUsuario;
+  activo?: boolean;
+}
+
 // Lo que envia el admin al crear un usuario.
 export interface UsuarioCreatePayload {
   nombre_completo: string;
