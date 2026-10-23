@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Button from "@/components/common/Button";
 import MapaParqueadero from "@/components/map/MapaParqueadero";
@@ -86,6 +86,17 @@ export default function GuardDashboard() {
 
   // Si otro vigilante registra una entrada o salida, el mapa se refresca solo.
   useActualizacionesZona(recargarZonaYEspacios);
+
+  // Puestos ocupados por un visitante, para pintarlos distinto en el mapa.
+  const espaciosVisitante = useMemo(
+    () =>
+      new Set(
+        accesosActivos
+          .filter((acceso) => acceso.tipo_acceso === "visitante" && acceso.espacio_id)
+          .map((acceso) => acceso.espacio_id as string),
+      ),
+    [accesosActivos],
+  );
 
   /** `lectura` solo llega cuando la placa la leyo el microservicio de vision; una busqueda
    * manual o por QR la descarta para no marcar el acceso como detectado por ALPR. */
@@ -232,6 +243,7 @@ export default function GuardDashboard() {
             espacios={espaciosZona}
             seleccionadoId={puestoElegido?.id}
             onSeleccionar={(espacio) => setEspacioId(espacio.id)}
+            espaciosVisitante={espaciosVisitante}
           />
         </div>
       </section>
@@ -274,6 +286,11 @@ export default function GuardDashboard() {
                     {acceso.placa}
                     {acceso.espacio_codigo && (
                       <span className="ml-2 text-sm font-normal text-gray-500">({acceso.espacio_codigo})</span>
+                    )}
+                    {acceso.tipo_acceso === "visitante" && (
+                      <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800">
+                        Visitante
+                      </span>
                     )}
                   </p>
                   <p className="text-xs text-gray-500">

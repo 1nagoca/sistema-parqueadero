@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useState, type FormEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import MapaParqueadero from "@/components/map/MapaParqueadero";
 import { CODIGOS_PLANO } from "@/components/map/planoParqueadero";
@@ -6,6 +6,7 @@ import Button from "@/components/common/Button";
 import DocumentoVisor from "@/components/verificacion/DocumentoVisor";
 import EstadoBadge from "@/components/verificacion/EstadoBadge";
 import { useAuth } from "@/context/AuthContext";
+import { listarAccesosActivos } from "@/services/api/accesos";
 import { listarAuditoria, listarAuditoriaVerificaciones } from "@/services/api/auditoria";
 import { ApiError } from "@/services/api/client";
 import { crearEspaciosLote, listarEspacios } from "@/services/api/espacios";
@@ -14,6 +15,7 @@ import { listarPendientes, resolverUsuario, resolverVehiculo } from "@/services/
 import { crearZona, listarZonas } from "@/services/api/zonas";
 import { useActualizacionesZona } from "@/services/realtime/useActualizacionesZona";
 import type {
+  AccesoActivo,
   AuditoriaPagina,
   Espacio,
   FiltrosAuditoria,
@@ -739,6 +741,7 @@ function SeccionEspacios() {
   const [zonas, setZonas] = useState<Zona[]>([]);
   const [zonaId, setZonaId] = useState("");
   const [espacios, setEspacios] = useState<Espacio[]>([]);
+  const [accesosActivos, setAccesosActivos] = useState<AccesoActivo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
@@ -759,14 +762,33 @@ function SeccionEspacios() {
     listarEspacios(zonaId).then(setEspacios).catch(() => setEspacios([]));
   }, [zonaId]);
 
+  // Trae las motos adentro de la zona; si falla, el mapa queda sin marcas de visitante.
+  const cargarAccesos = useCallback(() => {
+    if (!zonaId) return;
+    listarAccesosActivos(zonaId).then(setAccesosActivos).catch(() => setAccesosActivos([]));
+  }, [zonaId]);
+
   useEffect(cargarZonas, [cargarZonas]);
   useEffect(cargarEspacios, [cargarEspacios]);
+  useEffect(cargarAccesos, [cargarAccesos]);
 
   // Cada entrada o salida avisa por /ws/zonas y el mapa se refresca.
   useActualizacionesZona(() => {
     cargarZonas();
     cargarEspacios();
+    cargarAccesos();
   });
+
+  // Puestos ocupados por un visitante, para pintarlos distinto en el mapa.
+  const espaciosVisitante = useMemo(
+    () =>
+      new Set(
+        accesosActivos
+          .filter((acceso) => acceso.tipo_acceso === "visitante" && acceso.espacio_id)
+          .map((acceso) => acceso.espacio_id as string),
+      ),
+    [accesosActivos],
+  );
 
   // Crea en la zona elegida los puestos del plano que falten.
   async function crearPuestos() {
@@ -820,7 +842,7 @@ function SeccionEspacios() {
         )}
         {mensaje && <p className="rounded-xl bg-emerald-100 p-3 text-emerald-800">{mensaje}</p>}
         {error && <p className="rounded-xl bg-red-100 p-3 text-red-800">{error}</p>}
-        <MapaParqueadero espacios={espacios} />
+        <MapaParqueadero espacios={espacios} espaciosVisitante={espaciosVisitante} />
       </div>
     </div>
   );

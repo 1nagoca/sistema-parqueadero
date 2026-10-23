@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import {
   ALTO,
@@ -21,6 +21,10 @@ const colorPorEstado: Record<EstadoEspacio, string> = {
   mantenimiento: "#eab308",
 };
 const COLOR_SIN_CREAR = "#d1d5db";
+const COLOR_VISITANTE = "#8b5cf6";
+// Muestra de la leyenda: mitad ocupado y mitad visitante.
+const MUESTRA_VISITANTE = `linear-gradient(135deg, ${colorPorEstado.ocupado} 50%, ${COLOR_VISITANTE} 50%)`;
+const TEXTO_VISITANTE = "Ocupado por visitante";
 
 // Texto de cada estado.
 const etiquetaPorEstado: Record<EstadoEspacio, string> = {
@@ -35,11 +39,15 @@ interface Props {
   // Si se pasa, tocar un puesto libre lo elige (vigilante).
   onSeleccionar?: (espacio: Espacio) => void;
   seleccionadoId?: string;
+  // Ids de los espacios que ocupa un visitante; sin esta prop no se marcan (mapa publico).
+  espaciosVisitante?: Set<string>;
 }
 
 // Plano del parqueadero con cada puesto pintado segun su estado.
-export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoId }: Props) {
+export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoId, espaciosVisitante }: Props) {
   const [consultado, setConsultado] = useState<string | null>(null);
+  // Id unico del degradado por si hay dos mapas en la misma pagina.
+  const idVisitante = `puesto-visitante-${useId().replace(/:/g, "")}`;
 
   // Espacios de la base por codigo.
   const porCodigo = useMemo(() => new Map(espacios.map((espacio) => [espacio.codigo, espacio])), [espacios]);
@@ -62,6 +70,17 @@ export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoI
     if (onSeleccionar && espacio?.estado === "libre") onSeleccionar(espacio);
   }
 
+  // Solo cuenta como de visitante si el puesto sigue ocupado.
+  function esDeVisitante(espacio: Espacio | undefined): boolean {
+    return espacio?.estado === "ocupado" && espaciosVisitante?.has(espacio.id) === true;
+  }
+
+  // Texto del estado de un puesto.
+  function textoDe(espacio: Espacio | undefined): string {
+    if (!espacio) return "Sin crear";
+    return esDeVisitante(espacio) ? TEXTO_VISITANTE : etiquetaPorEstado[espacio.estado];
+  }
+
   const espacioConsultado = consultado ? porCodigo.get(consultado) : undefined;
   const libresTotales = resumen.reduce((suma, fila) => suma + fila.libres, 0);
 
@@ -70,6 +89,7 @@ export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoI
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
         <Leyenda color={colorPorEstado.libre} texto="Libre" />
         <Leyenda color={colorPorEstado.ocupado} texto="Ocupado" />
+        {espaciosVisitante && <Leyenda color={MUESTRA_VISITANTE} texto={TEXTO_VISITANTE} />}
         <Leyenda color={colorPorEstado.mantenimiento} texto="Reservado / Mantenimiento" />
         <Leyenda color={COLOR_SIN_CREAR} texto="Sin crear" />
         <span className="font-medium text-gray-800">
@@ -79,6 +99,13 @@ export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoI
 
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} className="w-full min-w-[52rem]" role="img" aria-label="Mapa del parqueadero">
+          <defs>
+            {/* Mitad roja arriba a la izquierda y mitad morada abajo a la derecha, partidas en diagonal. */}
+            <linearGradient id={idVisitante} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="50%" stopColor={colorPorEstado.ocupado} />
+              <stop offset="50%" stopColor={COLOR_VISITANTE} />
+            </linearGradient>
+          </defs>
           {PAREDES.map((pared, indice) => (
             <line key={indice} {...pared} stroke="#1f2937" strokeWidth={2} strokeLinecap="round" />
           ))}
@@ -118,13 +145,19 @@ export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoI
                 width={PUESTO}
                 height={PUESTO}
                 rx={3}
-                fill={espacio ? colorPorEstado[espacio.estado] : COLOR_SIN_CREAR}
+                fill={
+                  esDeVisitante(espacio)
+                    ? `url(#${idVisitante})`
+                    : espacio
+                      ? colorPorEstado[espacio.estado]
+                      : COLOR_SIN_CREAR
+                }
                 stroke={elegido ? "#1e3a8a" : consultado === puesto.codigo ? "#111827" : "none"}
                 strokeWidth={elegido ? 3 : 1.5}
                 className={elegible ? "cursor-pointer hover:opacity-70" : "cursor-default"}
                 onClick={() => tocar(puesto.codigo)}
               >
-                <title>{`${puesto.codigo} — ${espacio ? etiquetaPorEstado[espacio.estado] : "Sin crear"}`}</title>
+                <title>{`${puesto.codigo} — ${textoDe(espacio)}`}</title>
               </rect>
             );
           })}
@@ -133,7 +166,7 @@ export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoI
 
       <p className="min-h-5 text-sm text-gray-700">
         {consultado
-          ? `Puesto ${consultado}: ${espacioConsultado ? etiquetaPorEstado[espacioConsultado.estado] : "sin crear"}`
+          ? `Puesto ${consultado}: ${espacioConsultado ? textoDe(espacioConsultado) : "sin crear"}`
           : "Toca un puesto para ver su estado."}
       </p>
 
@@ -148,11 +181,11 @@ export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoI
   );
 }
 
-// Un item de la leyenda de colores.
+// Un item de la leyenda; el color puede ser un degradado.
 function Leyenda({ color, texto }: { color: string; texto: string }) {
   return (
     <span className="flex items-center gap-1.5">
-      <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: color }} />
+      <span className="h-3 w-3 rounded-sm" style={{ background: color }} />
       {texto}
     </span>
   );
