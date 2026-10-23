@@ -280,7 +280,7 @@ def test_auditoria_de_verificaciones_solo_la_lee_el_administrador(client, sufijo
 
     r = client.get(f"{API}/verificaciones/auditoria", headers=admin)
     assert r.status_code == 200, r.text
-    trazas = r.json()
+    trazas = r.json()["items"]
     assert {uid, vehiculo_id} <= {t["registro_id"] for t in trazas}
     assert set(trazas[0]) == {
         "id",
@@ -297,8 +297,8 @@ def test_auditoria_de_verificaciones_solo_la_lee_el_administrador(client, sufijo
 
     r = client.get(f"{API}/verificaciones/auditoria", headers=admin, params={"tabla_afectada": "vehiculos"})
     assert r.status_code == 200, r.text
-    assert vehiculo_id in [t["registro_id"] for t in r.json()]
-    assert {t["tabla_afectada"] for t in r.json()} == {"vehiculos"}
+    assert vehiculo_id in [t["registro_id"] for t in r.json()["items"]]
+    assert {t["tabla_afectada"] for t in r.json()["items"]} == {"vehiculos"}
 
 
 def test_visitante_solo_moto(client, admin):
@@ -422,3 +422,35 @@ def test_reactivar_estudiante_lo_deja_pendiente_y_sus_vehiculos_rechazados(clien
     assert r.status_code == 200 and r.json()["estado_verificacion"] == "pendiente"
     pendientes = client.get(f"{API}/verificaciones/pendientes", headers=admin).json()
     assert uid in [s["usuario"]["id"] for s in pendientes]
+
+
+def test_reactivar_estudiante_con_dos_motos_deja_una_traza_por_vehiculo(client, sufijo):
+    admin_id, admin = _personal(client, RolUsuario.ADMIN, sufijo)
+    est, uid, primera = _estudiante_con_carnet_y_vehiculo(client, sufijo)
+    r = _vehiculo(client, est, "DOS" + str(uuid.uuid4().int)[:2] + chr(ord("A") + uuid.uuid4().int % 26))
+    assert r.status_code == 201, r.text
+    segunda = r.json()["id"]
+    client.post(f"{API}/verificaciones/vehiculos/{primera}/resolver", headers=admin, json={"aprobar": True})
+    assert client.post(f"{API}/usuarios/{uid}/desactivar", headers=admin, json={"motivo": "Se retiró"}).status_code == 200
+
+    assert client.post(f"{API}/usuarios/{uid}/reactivar", headers=admin).status_code == 200
+
+    # una traza del usuario por la reactivacion y una por cada vehiculo, con su estado anterior
+    assert _trazas(uid)[-1].valores_nuevos == {"activo": True, "estado_verificacion": "pendiente"}
+    for vehiculo_id, anterior in ((primera, "aprobado"), (segunda, "pendiente")):
+        traza = _trazas(vehiculo_id)[-1]
+        assert traza.tabla_afectada == "vehiculos" and traza.accion.value == "actualizacion"
+        assert traza.valores_anteriores == {"estado_verificacion": anterior}
+        assert traza.valores_nuevos == {"estado_verificacion": "rechazado"}
+        assert traza.motivo == "Cuenta reactivada: vuelve a subir la foto de la placa y la tarjeta de propiedad"
+        assert str(traza.realizado_por_id) == admin_id
+    with SessionLocal() as db:
+        de_la_reactivacion = (
+            db.query(AuditoriaIdentidad)
+            .filter(
+                AuditoriaIdentidad.registro_id.in_([uuid.UUID(primera), uuid.UUID(segunda)]),
+                AuditoriaIdentidad.motivo.like("Cuenta reactivada:%"),
+            )
+            .count()
+        )
+    assert de_la_reactivacion == 2

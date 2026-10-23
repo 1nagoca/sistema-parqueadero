@@ -115,9 +115,21 @@ def reactivar(db: Session, usuario_id: uuid.UUID, admin_id: uuid.UUID) -> Usuari
         usuario.estado_verificacion = EstadoVerificacion.PENDIENTE
         usuario.motivo_rechazo = None
         nuevos["estado_verificacion"] = EstadoVerificacion.PENDIENTE.value
+        # Cada vehiculo que pasa a rechazado deja su propia traza.
         for vehiculo in usuario.vehiculos:
+            estado_anterior = vehiculo.estado_verificacion.value
             vehiculo.estado_verificacion = EstadoVerificacion.RECHAZADO
             vehiculo.motivo_rechazo = MOTIVO_VEHICULO_REACTIVADO
+            auditoria_service.registrar_auditoria(
+                db,
+                tabla_afectada="vehiculos",
+                registro_id=vehiculo.id,
+                accion=AccionAuditoria.ACTUALIZACION,
+                realizado_por_id=admin_id,
+                valores_anteriores={"estado_verificacion": estado_anterior},
+                valores_nuevos={"estado_verificacion": EstadoVerificacion.RECHAZADO.value},
+                motivo=MOTIVO_VEHICULO_REACTIVADO,
+            )
 
     auditoria_service.registrar_auditoria(
         db,

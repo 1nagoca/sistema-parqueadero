@@ -1,16 +1,16 @@
 import uuid
+from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_role
-from app.models.auditoria_identidad import AuditoriaIdentidad
 from app.models.documento import Documento
 from app.models.enums import EstadoVerificacion, RolUsuario, TipoDocumento
 from app.models.usuario import Usuario
 from app.models.vehiculo import Vehiculo
-from app.schemas.auditoria_identidad import AuditoriaIdentidadRead
+from app.schemas.auditoria_identidad import AuditoriaIdentidadPagina, AuditoriaIdentidadRead
 from app.schemas.documento import (
     ResolverVerificacion,
     SolicitudVerificacion,
@@ -19,7 +19,7 @@ from app.schemas.documento import (
 )
 from app.schemas.usuario import UsuarioRead
 from app.schemas.vehiculo import VehiculoRead
-from app.services import verificacion_service
+from app.services import auditoria_service, verificacion_service
 
 router = APIRouter(prefix="/verificaciones", tags=["verificaciones"])
 
@@ -100,19 +100,34 @@ def resolver_vehiculo(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-# GET /verificaciones/auditoria (admin): las ultimas 200 trazas de verificaciones.
-@router.get("/auditoria", response_model=list[AuditoriaIdentidadRead])
+# GET /verificaciones/auditoria (admin): trazas de verificaciones entre dos fechas (por defecto el semestre actual), paginadas.
+@router.get("/auditoria", response_model=AuditoriaIdentidadPagina)
 def listar_auditoria(
+    desde: date | None = None,
+    hasta: date | None = None,
     tabla_afectada: str | None = None,
+    pagina: int = Query(1, ge=1),
+    por_pagina: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_role(RolUsuario.ADMIN)),
-):
+) -> AuditoriaIdentidadPagina:
     """Solo lectura: la tabla es append-only, no existen endpoints de escritura directa (las
     trazas las genera exclusivamente el servicio de verificacion)."""
-    consulta = db.query(AuditoriaIdentidad).order_by(AuditoriaIdentidad.fecha_hora.desc())
-    if tabla_afectada is not None:
-        consulta = consulta.filter(AuditoriaIdentidad.tabla_afectada == tabla_afectada)
-    return consulta.limit(200).all()
+    try:
+        desde, hasta = auditoria_service.resolver_rango(desde, hasta)
+    except auditoria_service.RangoInvalidoError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    items, total = auditoria_service.listar_auditoria(
+        db, desde=desde, hasta=hasta, tabla_afectada=tabla_afectada, pagina=pagina, por_pagina=por_pagina
+    )
+    return AuditoriaIdentidadPagina(
+        items=[AuditoriaIdentidadRead.model_validate(t) for t in items],
+        total=total,
+        pagina=pagina,
+        por_pagina=por_pagina,
+        desde=desde,
+        hasta=hasta,
+    )
 
 
 # Arma la respuesta del estudiante solo con su carnet.

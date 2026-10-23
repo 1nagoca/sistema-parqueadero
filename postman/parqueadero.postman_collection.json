@@ -1186,7 +1186,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/api/v1/auditoria?tabla_afectada=accesos"
+            "url": "{{baseUrl}}/api/v1/auditoria?tabla_afectada=accesos&pagina=1&por_pagina=200"
           },
           "event": [
             {
@@ -1197,10 +1197,58 @@
                   "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
                   "",
                   "const json = pm.response.json();",
-                  "const trazas = json.filter(t => t.registro_id === pm.collectionVariables.get(\"acceso_id\"));",
+                  "pm.test(\"Sin fechas usa el semestre actual\", () => pm.expect(json.desde).to.match(/-(01|07)-01$/));",
+                  "const trazas = json.items.filter(t => t.registro_id === pm.collectionVariables.get(\"acceso_id\"));",
                   "pm.test(\"Entrada y salida quedaron auditadas\", () => {",
                   "    pm.expect(trazas.map(t => t.accion)).to.include.members([\"creacion\", \"actualizacion\"]);",
                   "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RN-04: auditoría de verificaciones (semestre actual)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/verificaciones/auditoria?pagina=1&por_pagina=50"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Es una página\", () => pm.expect(json.items).to.be.an(\"array\"));",
+                  "pm.test(\"Trae el total y el rango\", () => {",
+                  "    pm.expect(json.total).to.be.a(\"number\");",
+                  "    pm.expect(json.desde).to.be.a(\"string\");",
+                  "    pm.expect(json.hasta).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Auditoría con rango de más de 184 días (422)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auditoria?desde=2026-01-01&hasta=2026-07-04"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Explica el límite\", () => pm.expect(pm.response.json().detail).to.include(\"184 dias\"));"
                 ]
               }
             }

@@ -186,6 +186,25 @@ export interface EspacioLoteResultado {
   existentes: number;
 }
 
+// Filtros de una bitacora de auditoria; las fechas van como AAAA-MM-DD.
+export interface FiltrosAuditoria {
+  desde?: string;
+  hasta?: string;
+  tabla_afectada?: string;
+  pagina?: number;
+  por_pagina?: number;
+}
+
+// Una pagina de una bitacora con el rango de fechas que se consulto.
+export interface AuditoriaPagina {
+  items: AuditoriaAcceso[];
+  total: number;
+  pagina: number;
+  por_pagina: number;
+  desde: string;
+  hasta: string;
+}
+
 // Una traza de auditoria (sirve para las dos bitacoras).
 export interface AuditoriaAcceso {
   id: string;

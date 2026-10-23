@@ -14,8 +14,9 @@ import { listarPendientes, resolverUsuario, resolverVehiculo } from "@/services/
 import { crearZona, listarZonas } from "@/services/api/zonas";
 import { useActualizacionesZona } from "@/services/realtime/useActualizacionesZona";
 import type {
-  AuditoriaAcceso,
+  AuditoriaPagina,
   Espacio,
+  FiltrosAuditoria,
   RolUsuario,
   SolicitudVerificacion,
   Usuario,
@@ -37,6 +38,29 @@ const ETIQUETAS: Record<Pestana, string> = {
 // Estilo comun de los campos.
 const campo = "min-h-12 rounded-lg border border-gray-300 px-3";
 
+// Colombia es UTC-5 fijo (no tiene horario de verano).
+const DESFASE_COLOMBIA_MS = 5 * 60 * 60 * 1000;
+
+// Fecha de hoy en Colombia como AAAA-MM-DD.
+function hoyEnColombia(): string {
+  return new Date(Date.now() - DESFASE_COLOMBIA_MS).toISOString().slice(0, 10);
+}
+
+// Suma dias a una fecha AAAA-MM-DD (con negativos resta).
+function sumarDias(fecha: string, dias: number): string {
+  const dia = new Date(`${fecha}T00:00:00Z`);
+  dia.setUTCDate(dia.getUTCDate() + dias);
+  return dia.toISOString().slice(0, 10);
+}
+
+// Semestre de una fecha: enero a junio es AAAA-1 y julio a diciembre AAAA-2.
+function semestreDe(fecha: string): { nombre: string; desde: string; hasta: string } {
+  const anio = fecha.slice(0, 4);
+  return Number(fecha.slice(5, 7)) <= 6
+    ? { nombre: `${anio}-1`, desde: `${anio}-01-01`, hasta: `${anio}-06-30` }
+    : { nombre: `${anio}-2`, desde: `${anio}-07-01`, hasta: `${anio}-12-31` };
+}
+
 // Panel del administrador: una pestana por tarea.
 export default function AdminDashboard() {
   const { usuario, cerrarSesion } = useAuth();
@@ -47,7 +71,12 @@ export default function AdminDashboard() {
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">Panel de Administracion</h1>
-          {usuario && <p className="text-sm text-gray-500">{usuario.nombre_completo}</p>}
+          <p className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+            {usuario && <span>{usuario.nombre_completo}</span>}
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+              Semestre {semestreDe(hoyEnColombia()).nombre}
+            </span>
+          </p>
         </div>
         <button onClick={cerrarSesion} className="text-sm text-gray-500 underline">
           Cerrar sesion
@@ -797,100 +826,235 @@ function SeccionEspacios() {
   );
 }
 
-// Las dos bitacoras que se muestran juntas.
-type OrigenAuditoria = "accesos" | "verificaciones";
+// Las dos bitacoras: cada una vive en su microservicio y se pide y pagina por separado.
+type Bitacora = "accesos" | "verificaciones";
 
-/** Cada origen es un microservicio distinto: accesos guarda entradas y salidas; identidad, las
- * verificaciones. Se cargan por separado para que la caida de uno no oculte al otro. */
-const ORIGENES: Record<
-  OrigenAuditoria,
-  { etiqueta: string; estilo: string; listar: (tabla?: string) => Promise<AuditoriaAcceso[]>; error: string }
+const BITACORAS: Record<
+  Bitacora,
+  { etiqueta: string; tablas: string[]; listar: (filtros: FiltrosAuditoria) => Promise<AuditoriaPagina>; error: string }
 > = {
   accesos: {
     etiqueta: "Accesos",
-    estilo: "bg-sky-100 text-sky-800",
+    tablas: ["accesos"],
     listar: listarAuditoria,
-    error: "No se pudo cargar la auditoria de accesos. Se muestran solo las verificaciones.",
+    error: "No se pudo cargar la auditoria de accesos: el servicio no responde.",
   },
   verificaciones: {
     etiqueta: "Verificaciones",
-    estilo: "bg-amber-100 text-amber-800",
+    tablas: ["usuarios", "vehiculos"],
     listar: listarAuditoriaVerificaciones,
-    error: "No se pudo cargar la auditoria de verificaciones. Se muestran solo los accesos.",
+    error: "No se pudo cargar la auditoria de verificaciones: el servicio no responde.",
   },
 };
 
-const ORIGENES_AUDITORIA = Object.keys(ORIGENES) as OrigenAuditoria[];
+// Atajos de periodo de la auditoria.
+type Periodo = "semestre" | "anterior" | "mes" | "quince" | "personalizado";
 
-// Estado de carga de cada bitacora.
-type CargaAuditoria = { registros: AuditoriaAcceso[]; error: boolean; cargando: boolean };
+const AUDITORIA_POR_PAGINA = 50;
 
-const CARGA_INICIAL: Record<OrigenAuditoria, CargaAuditoria> = {
-  accesos: { registros: [], error: false, cargando: true },
-  verificaciones: { registros: [], error: false, cargando: true },
-};
+// Rango de fechas de cada atajo; en personalizado hacen falta las dos fechas.
+function rangoDe(
+  periodo: Periodo,
+  hoy: string,
+  desdeManual: string,
+  hastaManual: string,
+): { desde: string; hasta: string } | null {
+  const actual = semestreDe(hoy);
+  switch (periodo) {
+    case "semestre":
+      return { desde: actual.desde, hasta: actual.hasta };
+    case "anterior": {
+      const anterior = semestreDe(sumarDias(actual.desde, -1));
+      return { desde: anterior.desde, hasta: anterior.hasta };
+    }
+    case "mes":
+      return { desde: `${hoy.slice(0, 8)}01`, hasta: hoy };
+    case "quince":
+      return { desde: sumarDias(hoy, -14), hasta: hoy };
+    case "personalizado":
+      return desdeManual && hastaManual ? { desde: desdeManual, hasta: hastaManual } : null;
+  }
+}
 
-// Muestra juntas las trazas de accesos y de verificaciones, de la mas nueva a la mas vieja.
+// Auditoria de una bitacora por periodo y tabla, paginada en el servidor.
 function SeccionAuditoria() {
-  const [cargas, setCargas] = useState(CARGA_INICIAL);
-  const [filtro, setFiltro] = useState("");
+  const [bitacora, setBitacora] = useState<Bitacora>("accesos");
+  const [periodo, setPeriodo] = useState<Periodo>("semestre");
+  const [desdeManual, setDesdeManual] = useState("");
+  const [hastaManual, setHastaManual] = useState("");
+  const [tabla, setTabla] = useState("");
+  const [numeroPagina, setNumeroPagina] = useState(1);
+  const [pagina, setPagina] = useState<AuditoriaPagina | null>(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const hoy = hoyEnColombia();
+  const semestreActual = semestreDe(hoy);
+  const semestreAnterior = semestreDe(sumarDias(semestreActual.desde, -1));
+  const rango = rangoDe(periodo, hoy, desdeManual, hastaManual);
+  const desde = rango?.desde ?? "";
+  const hasta = rango?.hasta ?? "";
 
   useEffect(() => {
-    // Si el filtro cambia antes de que llegue una respuesta, esa respuesta ya no se usa.
-    let vigente = true;
-    setCargas(CARGA_INICIAL);
-    for (const origen of ORIGENES_AUDITORIA) {
-      ORIGENES[origen]
-        .listar(filtro || undefined)
-        .then((registros) => ({ registros, error: false, cargando: false }))
-        .catch(() => ({ registros: [], error: true, cargando: false }))
-        .then((carga) => {
-          if (vigente) setCargas((actual) => ({ ...actual, [origen]: carga }));
-        });
+    // Sin las dos fechas no se pide nada.
+    if (!desde || !hasta) {
+      setPagina(null);
+      setError(null);
+      setCargando(false);
+      return;
     }
+    // Si los filtros cambian antes de que llegue la respuesta, esa respuesta ya no se usa.
+    let vigente = true;
+    setCargando(true);
+    setError(null);
+    BITACORAS[bitacora]
+      .listar({
+        desde,
+        hasta,
+        tabla_afectada: tabla || undefined,
+        pagina: numeroPagina,
+        por_pagina: AUDITORIA_POR_PAGINA,
+      })
+      .then((resultado) => {
+        if (vigente) setPagina(resultado);
+      })
+      .catch((err) => {
+        if (!vigente) return;
+        setPagina(null);
+        setError(err instanceof ApiError && err.status === 422 ? err.message : BITACORAS[bitacora].error);
+      })
+      .finally(() => {
+        if (vigente) setCargando(false);
+      });
     return () => {
       vigente = false;
     };
-  }, [filtro]);
+  }, [bitacora, desde, hasta, tabla, numeroPagina]);
 
-  // Une las dos bitacoras y las ordena por fecha.
-  const registros = ORIGENES_AUDITORIA.flatMap((origen) =>
-    cargas[origen].registros.map((registro) => ({ origen, registro })),
-  ).sort((a, b) => new Date(b.registro.fecha_hora).getTime() - new Date(a.registro.fecha_hora).getTime());
-  const cargando = ORIGENES_AUDITORIA.some((origen) => cargas[origen].cargando);
+  // Cambiar la bitacora conserva el periodo y vuelve a todas las tablas.
+  function cambiarBitacora(nueva: Bitacora) {
+    setBitacora(nueva);
+    setTabla("");
+    setNumeroPagina(1);
+  }
+
+  // Cambiar el periodo vuelve a la primera pagina.
+  function cambiarPeriodo(nuevo: Periodo) {
+    setPeriodo(nuevo);
+    setNumeroPagina(1);
+  }
+
+  const atajos: { valor: Periodo; etiqueta: string }[] = [
+    { valor: "semestre", etiqueta: `Semestre actual (${semestreActual.nombre})` },
+    { valor: "anterior", etiqueta: `Semestre anterior (${semestreAnterior.nombre})` },
+    { valor: "mes", etiqueta: "Este mes" },
+    { valor: "quince", etiqueta: "Últimos 15 días" },
+    { valor: "personalizado", etiqueta: "Personalizado" },
+  ];
+  const items = pagina?.items ?? [];
+  const total = pagina?.total ?? 0;
+  const inicio = pagina && total > 0 ? (pagina.pagina - 1) * pagina.por_pagina + 1 : 0;
+  const fin = pagina ? (pagina.pagina - 1) * pagina.por_pagina + items.length : 0;
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl bg-white p-4 shadow-sm">
-        <label className="mb-1 block text-sm font-medium text-gray-700">Filtrar por tabla</label>
-        <select value={filtro} onChange={(evento) => setFiltro(evento.target.value)} className={`${campo} w-full`}>
-          <option value="">Todas</option>
-          <option value="accesos">accesos</option>
-          <option value="usuarios">usuarios</option>
-          <option value="vehiculos">vehiculos</option>
-          <option value="espacios">espacios</option>
-          <option value="zonas">zonas</option>
-        </select>
+      <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="w-16 text-sm font-medium text-gray-700">Bitácora</span>
+          {(Object.keys(BITACORAS) as Bitacora[]).map((valor) => (
+            <button
+              key={valor}
+              onClick={() => cambiarBitacora(valor)}
+              className={`rounded-full px-4 py-2 text-sm font-medium ${
+                bitacora === valor ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-700"
+              }`}
+            >
+              {BITACORAS[valor].etiqueta}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="w-16 text-sm font-medium text-gray-700">Periodo</span>
+          {atajos.map(({ valor, etiqueta }) => (
+            <button
+              key={valor}
+              onClick={() => cambiarPeriodo(valor)}
+              className={`rounded-full px-3 py-1.5 text-sm ${
+                periodo === valor ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"
+              }`}
+            >
+              {etiqueta}
+            </button>
+          ))}
+        </div>
+
+        {periodo === "personalizado" && (
+          <div className="flex flex-wrap items-center gap-3 sm:pl-[4.5rem]">
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              Desde
+              <input
+                type="date"
+                value={desdeManual}
+                onChange={(evento) => {
+                  setDesdeManual(evento.target.value);
+                  setNumeroPagina(1);
+                }}
+                className={campo}
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              Hasta
+              <input
+                type="date"
+                value={hastaManual}
+                onChange={(evento) => {
+                  setHastaManual(evento.target.value);
+                  setNumeroPagina(1);
+                }}
+                className={campo}
+              />
+            </label>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="w-16 text-sm font-medium text-gray-700">Tabla</span>
+          <select
+            value={tabla}
+            onChange={(evento) => {
+              setTabla(evento.target.value);
+              setNumeroPagina(1);
+            }}
+            className={`${campo} flex-1 sm:flex-none`}
+          >
+            <option value="">Todas</option>
+            {BITACORAS[bitacora].tablas.map((valor) => (
+              <option key={valor} value={valor}>
+                {valor}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {ORIGENES_AUDITORIA.filter((origen) => cargas[origen].error).map((origen) => (
-        <p key={origen} className="rounded-xl bg-red-100 p-3 text-red-800">
-          {ORIGENES[origen].error}
+      {error && <p className="rounded-xl bg-red-100 p-3 text-red-800">{error}</p>}
+      {!rango && <p className="text-center text-gray-400">Elige las dos fechas.</p>}
+      {pagina && (
+        <p className="text-sm text-gray-500">
+          Del {pagina.desde} al {pagina.hasta}
         </p>
-      ))}
+      )}
 
       <div className="space-y-2">
-        {registros.map(({ origen, registro }) => (
-          <div key={`${origen}-${registro.id}`} className="rounded-xl bg-white p-3 text-sm shadow-sm">
+        {items.map((registro) => (
+          <div key={registro.id} className="rounded-xl bg-white p-3 text-sm shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-medium text-gray-900">
                 {registro.tabla_afectada} · {registro.accion}
               </p>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ORIGENES[origen].estilo}`}>
-                {ORIGENES[origen].etiqueta}
-              </span>
+              <p className="text-xs text-gray-500">{new Date(registro.fecha_hora).toLocaleString("es-CO")}</p>
             </div>
-            <p className="text-xs text-gray-500">{new Date(registro.fecha_hora).toLocaleString("es-CO")}</p>
             {registro.motivo && <p className="mt-1 text-xs text-gray-700">Motivo: {registro.motivo}</p>}
             {registro.valores_nuevos && (
               <pre className="mt-1 overflow-x-auto text-xs text-gray-600">
@@ -899,9 +1063,33 @@ function SeccionAuditoria() {
             )}
           </div>
         ))}
-        {cargando && registros.length === 0 && <p className="text-center text-gray-400">Cargando...</p>}
-        {!cargando && registros.length === 0 && <p className="text-center text-gray-400">Sin registros.</p>}
+        {cargando && items.length === 0 && <p className="text-center text-gray-400">Cargando...</p>}
+        {!cargando && pagina && items.length === 0 && (
+          <p className="text-center text-gray-400">Sin registros en ese periodo.</p>
+        )}
       </div>
+
+      {pagina && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-white p-4 text-sm shadow-sm">
+          <span className="text-gray-500">{cargando ? "Cargando..." : `Mostrando ${inicio}–${fin} de ${total}`}</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setNumeroPagina(numeroPagina - 1)}
+              disabled={cargando || numeroPagina <= 1}
+              className="rounded-lg bg-gray-100 px-3 py-1 text-gray-700 disabled:opacity-40"
+            >
+              ← Anterior
+            </button>
+            <button
+              onClick={() => setNumeroPagina(numeroPagina + 1)}
+              disabled={cargando || fin >= total}
+              className="rounded-lg bg-gray-100 px-3 py-1 text-gray-700 disabled:opacity-40"
+            >
+              Siguiente →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
