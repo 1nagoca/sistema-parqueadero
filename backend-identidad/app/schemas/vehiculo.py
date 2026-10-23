@@ -56,3 +56,9 @@ class VehiculoRead(VehiculoBase):
     estado_verificacion: EstadoVerificacion
     motivo_rechazo: str | None
     creado_en: datetime
+
+
+# Lo que ve el vigilante del dueno de una moto al buscar su placa (RN-09): sin correo, documento, telefono ni ids.
+class PropietarioVigilante(BaseModel):
+    nombre_completo: str
+    tiene_carnet: bool

@@ -815,6 +815,74 @@
           ]
         },
         {
+          "name": "RN-09: dueño de la moto (vigilante)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_vigilante}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/vehiculos/placa/{{placa_1}}/propietario"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// 200 si la moto y su dueño están aprobados y activos; si no, 404 sin decir por qué.",
+                  "pm.test(\"Status 200 o 404\", () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"Solo nombre y tiene_carnet\", () => pm.expect(Object.keys(pm.response.json()).sort()).to.eql([\"nombre_completo\", \"tiene_carnet\"]));",
+                  "} else {",
+                  "    pm.test(\"Mensaje genérico\", () => pm.expect(pm.response.json().detail).to.eql(\"Propietario no disponible\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RN-09: carnet del dueño (vigilante)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_vigilante}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/vehiculos/placa/{{placa_1}}/carnet"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// 200 con el archivo si hay carnet; si no, 404 genérico.",
+                  "pm.test(\"Status 200 o 404\", () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"No se guarda en caché\", () => pm.expect(pm.response.headers.get(\"Cache-Control\")).to.eql(\"private, no-store\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Vehículo sin dueño ni visitante (422)",
           "request": {
             "method": "POST",

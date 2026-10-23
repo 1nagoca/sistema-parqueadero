@@ -40,6 +40,12 @@ export interface Vehiculo {
   creado_en: string;
 }
 
+// Lo que ve el vigilante del dueno de una moto (RN-09).
+export interface PropietarioVigilante {
+  nombre_completo: string;
+  tiene_carnet: boolean;
+}
+
 // Documento subido, sin la ruta del archivo.
 export interface Documento {
   id: string;

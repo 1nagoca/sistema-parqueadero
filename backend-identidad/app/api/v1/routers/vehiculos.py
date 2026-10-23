@@ -2,6 +2,7 @@ import re
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -10,7 +11,7 @@ from app.models.enums import EstadoVerificacion, RolUsuario, TipoDocumento, Tipo
 from app.models.usuario import Usuario
 from app.models.vehiculo import Vehiculo
 from app.schemas.documento import VehiculoConDocumentos
-from app.schemas.vehiculo import VehiculoCreate, VehiculoRead
+from app.schemas.vehiculo import PropietarioVigilante, VehiculoCreate, VehiculoRead
 from app.services import documento_service, vehiculo_service, verificacion_service
 
 router = APIRouter(prefix="/vehiculos", tags=["vehiculos"])
@@ -30,6 +31,40 @@ def crear_vehiculo(
     if existe is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La placa ya esta registrada")
     return vehiculo_service.crear_vehiculo(db, datos)
+
+
+# GET /vehiculos/placa/{placa}/propietario (admin, vigilante): nombre del dueno y si hay carnet para mostrar (RN-09).
+@router.get("/placa/{placa}/propietario", response_model=PropietarioVigilante)
+def ver_propietario(
+    placa: str,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role(RolUsuario.ADMIN, RolUsuario.VIGILANTE)),
+) -> PropietarioVigilante:
+    try:
+        dueno, carnet = vehiculo_service.propietario_para_vigilante(db, placa)
+    except vehiculo_service.PropietarioNoVisibleError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return PropietarioVigilante(nombre_completo=dueno.nombre_completo, tiene_carnet=carnet is not None)
+
+
+# GET /vehiculos/placa/{placa}/carnet (admin, vigilante): el carnet del dueno para confirmar quien trae la moto (RN-09).
+@router.get("/placa/{placa}/carnet")
+def ver_carnet_propietario(
+    placa: str,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role(RolUsuario.ADMIN, RolUsuario.VIGILANTE)),
+) -> FileResponse:
+    try:
+        _dueno, carnet = vehiculo_service.propietario_para_vigilante(db, placa)
+    except vehiculo_service.PropietarioNoVisibleError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    if carnet is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Propietario no disponible")
+    return FileResponse(
+        carnet.ruta,
+        media_type=carnet.content_type,
+        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 # GET /vehiculos/placa/{placa} (admin, vigilante): busca un vehiculo por su placa.

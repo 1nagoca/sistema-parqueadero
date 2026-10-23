@@ -5,6 +5,7 @@ import MapaParqueadero from "@/components/map/MapaParqueadero";
 import PlateReader from "@/components/scanner/PlateReader";
 import PlateSearchBar from "@/components/scanner/PlateSearchBar";
 import QRScanner from "@/components/scanner/QRScanner";
+import CarnetPropietario from "@/components/verificacion/CarnetPropietario";
 import { useAuth } from "@/context/AuthContext";
 import { ApiError } from "@/services/api/client";
 import {
@@ -381,6 +382,7 @@ function ResultadoPanel({
         <p className="text-sm text-gray-500">
           Dentro desde {new Date(resultado.acceso.fecha_hora_entrada).toLocaleString("es-CO")}
         </p>
+        {!resultado.vehiculo.es_visitante && <CarnetPropietario placa={resultado.vehiculo.placa} />}
         <Button
           variante="peligro"
           className="mt-4 w-full"
@@ -398,6 +400,7 @@ function ResultadoPanel({
       <div className="rounded-2xl bg-white p-4 shadow-sm">
         <p className="text-lg font-semibold text-gray-900">{resultado.vehiculo.placa}</p>
         <p className="text-sm text-gray-500">{resultado.vehiculo.tipo_vehiculo}</p>
+        {!resultado.vehiculo.es_visitante && <CarnetPropietario placa={resultado.vehiculo.placa} />}
         <Button
           className="mt-4 w-full"
           disabled={procesando || sinCupos || !puesto}
