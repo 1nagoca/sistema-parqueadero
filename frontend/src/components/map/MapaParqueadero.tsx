@@ -1,30 +1,17 @@
-import { useId, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import {
-  ALTO,
-  ANCHO,
-  ENTRADA,
-  FILAS,
-  PAREDES,
-  PUERTA,
-  PUESTO,
-  PUESTOS,
-  SALIDA,
-} from "@/components/map/planoParqueadero";
+import DibujoPlano, { colorPorEstado, COLOR_SIN_CREAR, COLOR_VISITANTE } from "@/components/map/DibujoPlano";
+import { ANCHO, BLOQUES, FILAS, PLANO, PUESTOS } from "@/components/map/planoParqueadero";
 import type { Espacio, EstadoEspacio } from "@/types/api";
 
-// Color de cada estado; gris si el puesto del plano aun no existe en la base.
-const colorPorEstado: Record<EstadoEspacio, string> = {
-  libre: "#22c55e",
-  ocupado: "#ef4444",
-  reservado: "#eab308",
-  mantenimiento: "#eab308",
-};
-const COLOR_SIN_CREAR = "#d1d5db";
-const COLOR_VISITANTE = "#8b5cf6";
 // Muestra de la leyenda: mitad ocupado y mitad visitante.
 const MUESTRA_VISITANTE = `linear-gradient(135deg, ${colorPorEstado.ocupado} 50%, ${COLOR_VISITANTE} 50%)`;
 const TEXTO_VISITANTE = "Ocupado por visitante";
+
+// Pixeles por unidad del plano: un bloque en grande deja cada puesto entre 24 y 28 px; el plano completo crece hasta 1.25.
+const ESCALA_BLOQUE_MINIMA = 24 / 14;
+const ESCALA_BLOQUE_MAXIMA = 2;
+const ESCALA_PLANO_MAXIMA = 1.25;
 
 // Texto de cada estado.
 const etiquetaPorEstado: Record<EstadoEspacio, string> = {
@@ -43,11 +30,12 @@ interface Props {
   espaciosVisitante?: Set<string>;
 }
 
-// Plano del parqueadero con cada puesto pintado segun su estado.
+// Plano del parqueadero con cada puesto pintado segun su estado; en celular se elige un bloque para verlo en grande.
 export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoId, espaciosVisitante }: Props) {
   const [consultado, setConsultado] = useState<string | null>(null);
-  // Id unico del degradado por si hay dos mapas en la misma pagina.
-  const idVisitante = `puesto-visitante-${useId().replace(/:/g, "")}`;
+  // Bloque en grande; null es el plano completo.
+  const [bloqueId, setBloqueId] = useState<string | null>(null);
+  const pantallaGrande = usePantallaGrande();
 
   // Espacios de la base por codigo.
   const porCodigo = useMemo(() => new Map(espacios.map((espacio) => [espacio.codigo, espacio])), [espacios]);
@@ -61,6 +49,20 @@ export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoI
         return { letra: fila.letra, libres, total: puestos.length };
       }),
     [porCodigo],
+  );
+
+  // Libres y total de cada bloque, sumando sus letras.
+  const resumenBloques = useMemo(
+    () =>
+      BLOQUES.map((bloque) => {
+        const filas = resumen.filter((fila) => bloque.letras.includes(fila.letra));
+        return {
+          bloque,
+          libres: filas.reduce((suma, fila) => suma + fila.libres, 0),
+          total: filas.reduce((suma, fila) => suma + fila.total, 0),
+        };
+      }),
+    [resumen],
   );
 
   // Al tocar un puesto: lo muestra y, si es libre y se puede elegir, lo elige.
@@ -83,6 +85,23 @@ export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoI
 
   const espacioConsultado = consultado ? porCodigo.get(consultado) : undefined;
   const libresTotales = resumen.reduce((suma, fila) => suma + fila.libres, 0);
+  const bloque = BLOQUES.find((opcion) => opcion.id === bloqueId);
+  const interaccion = { onTocar: tocar, textoDe, consultado, seleccionadoId, sePuedeElegir: onSeleccionar !== undefined };
+
+  // Boton de un bloque con sus libres y su total.
+  const botonesBloques = resumenBloques.map(({ bloque: opcion, libres, total }) => (
+    <BotonBloque
+      key={opcion.id}
+      activo={bloqueId === opcion.id}
+      onClick={() => setBloqueId(opcion.id)}
+      tamano={pantallaGrande ? "px-3 text-sm" : "px-2.5 text-xs"}
+    >
+      <span>{opcion.nombre}</span>
+      <span className="tabular-nums">
+        {libres}/{total}
+      </span>
+    </BotonBloque>
+  ));
 
   return (
     <div className="space-y-3">
@@ -97,72 +116,54 @@ export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoI
         </span>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-        <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} className="w-full min-w-[52rem]" role="img" aria-label="Mapa del parqueadero">
-          <defs>
-            {/* Mitad roja arriba a la izquierda y mitad morada abajo a la derecha, partidas en diagonal. */}
-            <linearGradient id={idVisitante} x1="0" y1="0" x2="1" y2="1">
-              <stop offset="50%" stopColor={colorPorEstado.ocupado} />
-              <stop offset="50%" stopColor={COLOR_VISITANTE} />
-            </linearGradient>
-          </defs>
-          {PAREDES.map((pared, indice) => (
-            <line key={indice} {...pared} stroke="#1f2937" strokeWidth={2} strokeLinecap="round" />
-          ))}
-          <path d={PUERTA} fill="none" stroke="#1f2937" strokeWidth={2} />
+      {pantallaGrande ? (
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
+          <BotonBloque activo={bloqueId === null} onClick={() => setBloqueId(null)} tamano="px-3 text-sm">
+            Plano completo
+          </BotonBloque>
+          {botonesBloques}
+        </div>
+      ) : (
+        <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-3">
+          <DibujoPlano
+            vista={PLANO}
+            porCodigo={porCodigo}
+            esDeVisitante={esDeVisitante}
+            bloques={{ elegido: bloqueId, onElegir: setBloqueId }}
+            className="block w-full rounded-lg border border-gray-200 bg-white"
+          />
+          <div className="flex flex-col gap-1.5">{botonesBloques}</div>
+        </div>
+      )}
 
-          {[ENTRADA, SALIDA].map((caja) => (
-            <g key={caja.texto}>
-              <rect x={caja.x} y={caja.y} width={caja.ancho} height={caja.alto} rx={5} fill="#f3f4f6" stroke="#6b7280" />
-              <text x={caja.x + caja.ancho / 2} y={caja.y + caja.alto / 2 + 4} textAnchor="middle" fontSize={12} fill="#374151">
-                {caja.texto}
-              </text>
-            </g>
-          ))}
-
-          {FILAS.map((fila) => {
-            const inicio = fila.tramos[0];
-            return fila.vertical ? (
-              <text key={fila.letra} x={inicio.x + PUESTO / 2} y={inicio.y - 6} textAnchor="middle" fontSize={11} fontWeight={700} fill="#374151">
-                {fila.letra}
-              </text>
-            ) : (
-              <text key={fila.letra} x={inicio.x - 5} y={inicio.y + 11} textAnchor="end" fontSize={11} fontWeight={700} fill="#374151">
-                {fila.letra}
-              </text>
-            );
-          })}
-
-          {PUESTOS.map((puesto) => {
-            const espacio = porCodigo.get(puesto.codigo);
-            const elegible = onSeleccionar !== undefined && espacio?.estado === "libre";
-            const elegido = espacio !== undefined && espacio.id === seleccionadoId;
-            return (
-              <rect
-                key={puesto.codigo}
-                x={puesto.x}
-                y={puesto.y}
-                width={PUESTO}
-                height={PUESTO}
-                rx={3}
-                fill={
-                  esDeVisitante(espacio)
-                    ? `url(#${idVisitante})`
-                    : espacio
-                      ? colorPorEstado[espacio.estado]
-                      : COLOR_SIN_CREAR
-                }
-                stroke={elegido ? "#1e3a8a" : consultado === puesto.codigo ? "#111827" : "none"}
-                strokeWidth={elegido ? 3 : 1.5}
-                className={elegible ? "cursor-pointer hover:opacity-70" : "cursor-default"}
-                onClick={() => tocar(puesto.codigo)}
-              >
-                <title>{`${puesto.codigo} — ${textoDe(espacio)}`}</title>
-              </rect>
-            );
-          })}
-        </svg>
-      </div>
+      {bloque ? (
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <DibujoPlano
+            vista={bloque}
+            letras={bloque.letras}
+            porCodigo={porCodigo}
+            esDeVisitante={esDeVisitante}
+            interaccion={interaccion}
+            className="mx-auto block w-full"
+            style={{ minWidth: bloque.ancho * ESCALA_BLOQUE_MINIMA, maxWidth: bloque.ancho * ESCALA_BLOQUE_MAXIMA }}
+          />
+        </div>
+      ) : pantallaGrande ? (
+        <div className="rounded-xl border border-gray-200 bg-white">
+          <DibujoPlano
+            vista={PLANO}
+            porCodigo={porCodigo}
+            esDeVisitante={esDeVisitante}
+            interaccion={interaccion}
+            className="mx-auto block w-full"
+            style={{ maxWidth: ANCHO * ESCALA_PLANO_MAXIMA }}
+          />
+        </div>
+      ) : (
+        <p className="rounded-xl border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500">
+          Toca un bloque del plano para ver sus puestos.
+        </p>
+      )}
 
       <p className="min-h-5 text-sm text-gray-700">
         {consultado
@@ -178,6 +179,34 @@ export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoI
         ))}
       </div>
     </div>
+  );
+}
+
+// Verdadero en pantallas lg o mas anchas.
+function usePantallaGrande(): boolean {
+  const consulta = "(min-width: 1024px)";
+  const [grande, setGrande] = useState(() => window.matchMedia(consulta).matches);
+  useEffect(() => {
+    const lista = window.matchMedia(consulta);
+    const cambiar = () => setGrande(lista.matches);
+    lista.addEventListener("change", cambiar);
+    return () => lista.removeEventListener("change", cambiar);
+  }, []);
+  return grande;
+}
+
+// Boton del selector de bloques.
+function BotonBloque({ activo, onClick, tamano, children }: { activo: boolean; onClick: () => void; tamano: string; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center justify-between gap-2 whitespace-nowrap rounded-full py-1.5 font-medium ${tamano} ${
+        activo ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-700"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
