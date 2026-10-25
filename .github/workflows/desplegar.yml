@@ -1,6 +1,6 @@
 # Cada push a main actualiza el servidor por SSH.
 # La llave solo puede ejecutar el script de despliegue del servidor (forzado en authorized_keys).
-# Secretos del repo: SERVIDOR_HOST, SERVIDOR_USUARIO, SERVIDOR_LLAVE_SSH, SERVIDOR_KNOWN_HOSTS.
+# Secretos del repo: SERVIDOR_HOST, SERVIDOR_USUARIO, SERVIDOR_LLAVE_SSH (en base64, una linea), SERVIDOR_KNOWN_HOSTS.
 name: Desplegar
 
 on:
@@ -25,8 +25,10 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           install -m 600 /dev/null ~/.ssh/id_ed25519
-          printf '%s\n' "$LLAVE" > ~/.ssh/id_ed25519
+          printf '%s' "$LLAVE" | tr -d ' \r\n' | base64 -d > ~/.ssh/id_ed25519
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # Solo la huella publica, para comparar con la del servidor
+          ssh-keygen -lf ~/.ssh/id_ed25519
 
       - name: Actualizar el servidor
         run: ssh "${{ secrets.SERVIDOR_USUARIO }}@${{ secrets.SERVIDOR_HOST }}"
