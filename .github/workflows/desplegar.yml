@@ -1,0 +1,32 @@
+# Cada push a main actualiza el servidor por SSH.
+# La llave solo puede ejecutar el script de despliegue del servidor (forzado en authorized_keys).
+# Secretos del repo: SERVIDOR_HOST, SERVIDOR_USUARIO, SERVIDOR_LLAVE_SSH, SERVIDOR_KNOWN_HOSTS.
+name: Desplegar
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Nunca dos despliegues a la vez
+concurrency:
+  group: desplegar
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Preparar llave SSH
+        env:
+          LLAVE: ${{ secrets.SERVIDOR_LLAVE_SSH }}
+          KNOWN_HOSTS: ${{ secrets.SERVIDOR_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          install -m 600 /dev/null ~/.ssh/id_ed25519
+          printf '%s\n' "$LLAVE" > ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Actualizar el servidor
+        run: ssh "${{ secrets.SERVIDOR_USUARIO }}@${{ secrets.SERVIDOR_HOST }}"
