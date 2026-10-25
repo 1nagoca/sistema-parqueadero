@@ -800,6 +800,8 @@ function SeccionEspacios() {
       const resultado = await crearEspaciosLote({ zona_id: zonaId, codigos: CODIGOS_PLANO });
       setMensaje(`Puestos creados: ${resultado.creados}. Ya existian: ${resultado.existentes}.`);
       cargarEspacios();
+      // El lote puede subir la capacidad de la zona.
+      cargarZonas();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudieron crear los puestos");
     } finally {
