@@ -1,16 +1,19 @@
 import logging
 import uuid
+from datetime import datetime
 
 from sqlalchemy import Integer, cast, func, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.identidad_client import client as identidad_client
 from app.models.acceso import Acceso
 from app.models.enums import AccionAuditoria, EstadoVerificacion, TipoAcceso
 from app.parqueadero_client import client as parqueadero_client
 from app.schemas.acceso import AccesoEntradaCreate
 from app.services import auditoria_service
+from app.services.auditoria_service import COLOMBIA
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +34,24 @@ class VehiculoYaAdentroError(Exception):
     """El vehiculo ya tiene un acceso abierto: no puede entrar otra vez sin haber salido."""
 
 
+class ParqueaderoCerradoError(Exception):
+    """Fuera del horario del parqueadero no se registran entradas (RN-11)."""
+
+
 # Nombre del indice que impide dos accesos abiertos del mismo vehiculo.
 INDICE_ACCESO_ACTIVO = "uq_accesos_vehiculo_activo"
+
+
+# Hora actual en Colombia; unico punto que los tests fijan con monkeypatch.
+def ahora_en_colombia() -> datetime:
+    return datetime.now(COLOMBIA)
+
+
+# Abierto de HORARIO_APERTURA a HORARIO_CIERRE (el cierre ya cuenta como cerrado).
+def parqueadero_abierto(ahora: datetime) -> bool:
+    if not settings.HORARIO_RESTRINGIDO:
+        return True
+    return settings.HORARIO_APERTURA <= ahora.astimezone(COLOMBIA).time() < settings.HORARIO_CIERRE
 
 
 # Registra la entrada de un vehiculo: valida, ocupa el cupo y guarda el acceso.
@@ -49,7 +68,17 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
     comprobar nada. Un vehiculo que no existe, que no esta verificado o que ya esta adentro se
     rechaza antes de tocar el cupo. Si dos entradas simultaneas pasan esa comprobacion, el
     indice unico de acceso activo rechaza la segunda.
+
+    Fuera del horario del parqueadero (RN-11) se rechaza antes de todo: no se consulta a
+    identidad ni se toca el cupo.
     """
+    # 0. Fuera de horario no entra nadie, sea normal o visitante (RN-11).
+    if not parqueadero_abierto(ahora_en_colombia()):
+        raise ParqueaderoCerradoError(
+            f"El parqueadero esta cerrado: las entradas se registran de "
+            f"{settings.HORARIO_APERTURA:%H:%M} a {settings.HORARIO_CIERRE:%H:%M}"
+        )
+
     # 1. Pregunta a identidad por el vehiculo y valida que pueda entrar.
     vehiculo = identidad_client.obtener_vehiculo(datos.vehiculo_id)
     _exigir_vehiculo_verificado(vehiculo, datos.tipo_acceso)

@@ -38,9 +38,18 @@ export function mensajeDeDetalle(detalle: unknown): string | undefined {
   return undefined;
 }
 
+// Si el token guardado ya no sirve (vencio o es invalido), lo borra y manda al login con aviso.
+function cerrarSesionVencida(respuesta: Response): void {
+  if (respuesta.status === 401 && obtenerToken()) {
+    borrarToken();
+    window.location.assign("/login?sesion=vencida");
+  }
+}
+
 // Si la respuesta es un error lanza ApiError con el mensaje del backend; si no, devuelve el JSON.
 async function manejarRespuesta<T>(respuesta: Response): Promise<T> {
   if (!respuesta.ok) {
+    cerrarSesionVencida(respuesta);
     let detalle = respuesta.statusText;
     try {
       const cuerpo = await respuesta.json();
@@ -88,6 +97,7 @@ export async function apiPostForm<T>(ruta: string, cuerpo: FormData): Promise<T>
 export async function apiGetBlob(ruta: string): Promise<Blob> {
   const respuesta = await fetch(`${BASE_URL}${ruta}`, { headers: encabezadosAuth() });
   if (!respuesta.ok) {
+    cerrarSesionVencida(respuesta);
     throw new ApiError(respuesta.status, respuesta.statusText);
   }
   return respuesta.blob();

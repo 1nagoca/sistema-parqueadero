@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import Button from "@/components/common/Button";
 import { useAuth } from "@/context/AuthContext";
@@ -10,6 +10,9 @@ import { rutaInicioPara } from "@/utils/rutas";
 export default function Login() {
   const { iniciarSesion } = useAuth();
   const navigate = useNavigate();
+  // Llega con ?sesion=vencida cuando el token dejo de servir (client.ts).
+  const [parametros] = useSearchParams();
+  const sesionVencida = parametros.get("sesion") === "vencida";
   const [correo, setCorreo] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +36,11 @@ export default function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
       <form onSubmit={manejarSubmit} className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-sm">
+        {sesionVencida && (
+          <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+            Tu sesión terminó. Si eres estudiante, recuerda que el parqueadero funciona de 05:45 a 22:00.
+          </p>
+        )}
         <h1 className="text-xl font-semibold text-gray-900">Parqueadero</h1>
         <p className="text-sm text-gray-500">Inicia sesion con tu correo institucional.</p>
 

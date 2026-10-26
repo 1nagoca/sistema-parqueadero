@@ -79,7 +79,11 @@ def registrar_entrada(
         return acceso_service.registrar_entrada(db, datos, realizado_por_id=vigilante.id)
     except (VehiculoNoEncontradoError, acceso_service.UsuarioNoEncontradoError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except (acceso_service.VehiculoNoVerificadoError, acceso_service.VehiculoYaAdentroError) as exc:
+    except (
+        acceso_service.ParqueaderoCerradoError,
+        acceso_service.VehiculoNoVerificadoError,
+        acceso_service.VehiculoYaAdentroError,
+    ) as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except IdentidadNoDisponibleError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc

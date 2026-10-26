@@ -1,3 +1,5 @@
+from datetime import time
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +19,11 @@ class Settings(BaseSettings):
     # Direcciones internas de los otros servicios (red de Docker).
     PARQUEADERO_URL: str = "http://backend-parqueadero:8002"
     IDENTIDAD_URL: str = "http://backend-identidad:8003"
+
+    # Horario del parqueadero en hora de Colombia; debe coincidir con el de identidad.
+    HORARIO_APERTURA: time = time(5, 45)
+    HORARIO_CIERRE: time = time(22, 0)
+    HORARIO_RESTRINGIDO: bool = True
 
     # Paginas que pueden llamar a esta API desde el navegador.
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]

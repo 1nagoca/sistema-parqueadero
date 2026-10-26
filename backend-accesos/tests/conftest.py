@@ -5,6 +5,7 @@ migra con Alembic y se vacia al empezar cada corrida.
 Para usar otra base, definir TEST_DATABASE_URL (su nombre debe terminar en ``_test``)."""
 
 import os
+from datetime import date, datetime, time
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,8 @@ from sqlalchemy.engine import URL, make_url
 
 SUFIJO = "_test"
 RAIZ = Path(__file__).resolve().parent.parent
+# Dia fijo para que la suite no dependa del reloj (solo importa la hora).
+DIA_FIJO = date(2099, 1, 15)
 
 
 def _url_de_pruebas() -> URL | None:
@@ -90,3 +93,28 @@ def base_de_pruebas():
     command.upgrade(configuracion, "head")
     _vaciar_tablas(URL_PRUEBAS)
     yield
+
+
+@pytest.fixture(autouse=True)
+def hora_fija(monkeypatch):
+    """La suite no depende del reloj ni del entorno: horario de 05:45 a 22:00 y las 12:00 en
+    Colombia. Devuelve ``fijar(hora, minuto)`` para cambiar la hora dentro de un test."""
+    if not os.environ.get("DATABASE_URL"):
+        yield None
+        return
+
+    from app.core.config import settings
+    from app.services import acceso_service
+    from app.services.auditoria_service import COLOMBIA
+
+    monkeypatch.setattr(settings, "HORARIO_APERTURA", time(5, 45))
+    monkeypatch.setattr(settings, "HORARIO_CIERRE", time(22, 0))
+    monkeypatch.setattr(settings, "HORARIO_RESTRINGIDO", True)
+
+    def fijar(hora: int, minuto: int = 0) -> datetime:
+        momento = datetime.combine(DIA_FIJO, time(hora, minuto), tzinfo=COLOMBIA)
+        monkeypatch.setattr(acceso_service, "ahora_en_colombia", lambda: momento)
+        return momento
+
+    fijar(12)
+    yield fijar
