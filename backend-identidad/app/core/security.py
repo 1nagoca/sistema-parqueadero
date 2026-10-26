@@ -9,6 +9,17 @@ from app.core.config import settings
 # bcrypt para cifrar contrasenas (nunca se guardan en texto plano).
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# Hora local de Colombia para el horario de servicio.
+COLOMBIA = timezone(timedelta(hours=-5))
+
+
+def horario_atencion_activo() -> bool:
+    """La API solo acepta accesos dentro del horario del parqueadero."""
+    if not settings.TOKEN_HORARIO_RESTRINGIDO:
+        return True
+    ahora = datetime.now(COLOMBIA)
+    return settings.TOKEN_HORARIO_INICIO <= ahora.hour < settings.TOKEN_HORARIO_FIN
+
 
 # Cifra una contrasena para guardarla.
 def hashear_password(password: str) -> str:

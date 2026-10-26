@@ -1,16 +1,18 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from fastapi import HTTPException, status
 
-from app.api.deps import get_db
-from app.core.config import settings
-from app.core.security import crear_access_token, hashear_password, verificar_password
+from app.core.security import horario_atencion_activo
 from app.models.enums import EstadoVerificacion, RolUsuario
 from app.models.usuario import Usuario
 from app.schemas.usuario import EstudianteRegistro, UsuarioRead
+from app.core.config import settings
+from app.core.security import crear_access_token, hashear_password, verificar_password
+from app.api.deps import get_db
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -18,6 +20,12 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # POST /auth/login (publico): revisa correo y contrasena y devuelve el token JWT.
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)) -> dict:
+    if not horario_atencion_activo():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="La sesion solo esta permitida en horario de atencion del parqueadero (06:00 a 22:00).",
+        )
+
     usuario = db.query(Usuario).filter(Usuario.correo_institucional == form_data.username).first()
     if usuario is None or not verificar_password(form_data.password, usuario.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales invalidas")

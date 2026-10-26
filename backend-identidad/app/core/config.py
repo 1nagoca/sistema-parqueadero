@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     # El token dura 8 horas.
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8
 
+    # Horario de servicio para la aplicacion. El acceso a la API solo se habilita dentro de este
+    # bloque para reflejar la restriccion del caso de uso del parqueadero (6:00 a. m. a 10:00 p. m.).
+    TOKEN_HORARIO_INICIO: int = 6
+    TOKEN_HORARIO_FIN: int = 22
+    TOKEN_HORARIO_RESTRINGIDO: bool = True
+
     # Paginas que pueden llamar a esta API desde el navegador.
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
 
