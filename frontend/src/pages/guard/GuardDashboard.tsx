@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import Button from "@/components/common/Button";
 import MapaParqueadero from "@/components/map/MapaParqueadero";
@@ -25,7 +25,7 @@ import type { Acceso, AccesoActivo, Espacio, Vehiculo, Zona } from "@/types/api"
 type Resultado =
   | { estado: "vacio" }
   | { estado: "cargando" }
-  | { estado: "con_acceso_activo"; vehiculo: Vehiculo; acceso: Acceso }
+  | { estado: "con_acceso_activo"; placa: string; acceso: Acceso }
   | { estado: "vehiculo_registrado"; vehiculo: Vehiculo }
   | { estado: "no_registrado"; placa: string };
 
@@ -38,6 +38,8 @@ export default function GuardDashboard() {
   const [espacioId, setEspacioId] = useState("");
   const [accesosActivos, setAccesosActivos] = useState<AccesoActivo[]>([]);
   const [resultado, setResultado] = useState<Resultado>({ estado: "vacio" });
+  // Contenedor del resultado, para bajar hasta el carnet al verificar una salida.
+  const resultadoRef = useRef<HTMLDivElement>(null);
   const [mostrarScanner, setMostrarScanner] = useState(false);
   const [lecturaAlpr, setLecturaAlpr] = useState<LecturaPlaca | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -111,8 +113,8 @@ export default function GuardDashboard() {
       // Primero mira si ya esta adentro (ofrece salida); si no, si esta registrado (ofrece entrada).
       const accesoActivo = await buscarAccesoActivoPorPlaca(placa);
       if (accesoActivo) {
-        const vehiculo = await buscarPorPlaca(placa);
-        setResultado({ estado: "con_acceso_activo", vehiculo, acceso: accesoActivo });
+        // La salida no consulta a identidad para que funcione aunque identidad este caida.
+        setResultado({ estado: "con_acceso_activo", placa, acceso: accesoActivo });
         return;
       }
       try {
@@ -170,6 +172,12 @@ export default function GuardDashboard() {
   // Salida de un vehiculo que esta adentro.
   async function confirmarSalida(accesoId: string) {
     await conCargando(() => registrarSalida(accesoId));
+  }
+
+  // Desde la lista abre la misma verificacion que la busqueda (carnet del dueno, RN-09) y baja hasta ella.
+  async function verificarSalida(placa: string) {
+    await buscar(placa);
+    resultadoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   // Ejecuta la accion mostrando que esta procesando; al terminar limpia y refresca.
@@ -299,12 +307,12 @@ export default function GuardDashboard() {
                   </p>
                 </div>
                 <Button
-                  variante="peligro"
+                  variante="secundaria"
                   disabled={procesando}
                   className="min-h-10 px-4 py-2 text-sm"
-                  onClick={() => confirmarSalida(acceso.id)}
+                  onClick={() => verificarSalida(acceso.placa)}
                 >
-                  Registrar salida
+                  Verificar salida
                 </Button>
               </li>
             ))}
@@ -312,31 +320,33 @@ export default function GuardDashboard() {
         )}
       </section>
 
-      <ResultadoPanel
-        resultado={resultado}
-        procesando={procesando}
-        sinCupos={sinCupos}
-        puesto={puestoElegido?.codigo ?? null}
-        onEntradaNormal={confirmarEntradaNormal}
-        onSalida={confirmarSalida}
-        onRegistrarVehiculoVisitante={async (placa, justificacion) => {
-          // Visitante no registrado: primero crea el vehiculo y luego registra la entrada.
-          if (!usuario) return;
-          setProcesando(true);
-          setError(null);
-          try {
-            const vehiculo = await crearVehiculo({
-              placa,
-              tipo_vehiculo: "moto",
-              es_visitante: true,
-            });
-            await confirmarEntradaVisitante(vehiculo.id, justificacion);
-          } catch (err) {
-            setError(err instanceof ApiError ? err.message : "No se pudo registrar el vehiculo");
-            setProcesando(false);
-          }
-        }}
-      />
+      <div ref={resultadoRef} className="scroll-mt-4">
+        <ResultadoPanel
+          resultado={resultado}
+          procesando={procesando}
+          sinCupos={sinCupos}
+          puesto={puestoElegido?.codigo ?? null}
+          onEntradaNormal={confirmarEntradaNormal}
+          onSalida={confirmarSalida}
+          onRegistrarVehiculoVisitante={async (placa, justificacion) => {
+            // Visitante no registrado: primero crea el vehiculo y luego registra la entrada.
+            if (!usuario) return;
+            setProcesando(true);
+            setError(null);
+            try {
+              const vehiculo = await crearVehiculo({
+                placa,
+                tipo_vehiculo: "moto",
+                es_visitante: true,
+              });
+              await confirmarEntradaVisitante(vehiculo.id, justificacion);
+            } catch (err) {
+              setError(err instanceof ApiError ? err.message : "No se pudo registrar el vehiculo");
+              setProcesando(false);
+            }
+          }}
+        />
+      </div>
     </div>
   );
 }
@@ -378,11 +388,11 @@ function ResultadoPanel({
   if (resultado.estado === "con_acceso_activo") {
     return (
       <div className="rounded-2xl bg-white p-4 shadow-sm">
-        <p className="text-lg font-semibold text-gray-900">{resultado.vehiculo.placa}</p>
+        <p className="text-lg font-semibold text-gray-900">{resultado.placa}</p>
         <p className="text-sm text-gray-500">
           Dentro desde {new Date(resultado.acceso.fecha_hora_entrada).toLocaleString("es-CO")}
         </p>
-        {!resultado.vehiculo.es_visitante && <CarnetPropietario placa={resultado.vehiculo.placa} />}
+        {resultado.acceso.tipo_acceso !== "visitante" && <CarnetPropietario placa={resultado.placa} />}
         <Button
           variante="peligro"
           className="mt-4 w-full"
