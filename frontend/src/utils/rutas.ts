@@ -4,8 +4,6 @@ import type { RolUsuario } from "@/types/api";
 export function rutaInicioPara(rol: RolUsuario): string {
   if (rol === "admin") return "/admin";
   if (rol === "vigilante") return "/vigilante";
-  if (rol === "docente") return "/docente";
-  if (rol === "administrativo") return "/administrativo";
   if (rol === "estudiante") return "/estudiante";
   return "/mapa";
 }

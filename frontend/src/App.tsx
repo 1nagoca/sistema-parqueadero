@@ -3,7 +3,6 @@ import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-d
 
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
-import DocentePanel from "@/pages/teacher/DocentePanel";
 import Login from "@/pages/auth/Login";
 import Registro from "@/pages/auth/Registro";
 import GuardDashboard from "@/pages/guard/GuardDashboard";
@@ -54,22 +53,6 @@ function Rutas() {
         element={
           <RutaProtegida rolesPermitidos={["estudiante"]}>
             <EstudiantePanel />
-          </RutaProtegida>
-        }
-      />
-      <Route
-        path="/docente"
-        element={
-          <RutaProtegida rolesPermitidos={["docente"]}>
-            <DocentePanel />
-          </RutaProtegida>
-        }
-      />
-      <Route
-        path="/administrativo"
-        element={
-          <RutaProtegida rolesPermitidos={["administrativo"]}>
-            <ParkingMapPage />
           </RutaProtegida>
         }
       />

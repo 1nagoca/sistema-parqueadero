@@ -9,16 +9,25 @@ from app.core.config import settings
 # bcrypt para cifrar contrasenas (nunca se guardan en texto plano).
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Hora local de Colombia para el horario de servicio.
+# Hora de Colombia: UTC-5 fijo, sin horario de verano.
 COLOMBIA = timezone(timedelta(hours=-5))
 
 
-def horario_atencion_activo() -> bool:
-    """La API solo acepta accesos dentro del horario del parqueadero."""
-    if not settings.TOKEN_HORARIO_RESTRINGIDO:
+# Hora actual en Colombia; unico punto que los tests fijan con monkeypatch.
+def ahora_en_colombia() -> datetime:
+    return datetime.now(COLOMBIA)
+
+
+# Abierto de HORARIO_APERTURA a HORARIO_CIERRE (el cierre ya cuenta como cerrado).
+def parqueadero_abierto(ahora: datetime) -> bool:
+    if not settings.HORARIO_RESTRINGIDO:
         return True
-    ahora = datetime.now(COLOMBIA)
-    return settings.TOKEN_HORARIO_INICIO <= ahora.hour < settings.TOKEN_HORARIO_FIN
+    return settings.HORARIO_APERTURA <= ahora.astimezone(COLOMBIA).time() < settings.HORARIO_CIERRE
+
+
+# Hora de cierre del mismo dia de `ahora`, en hora de Colombia.
+def cierre_de_hoy(ahora: datetime) -> datetime:
+    return datetime.combine(ahora.astimezone(COLOMBIA).date(), settings.HORARIO_CIERRE, tzinfo=COLOMBIA)
 
 
 # Cifra una contrasena para guardarla.
@@ -32,10 +41,12 @@ def verificar_password(password: str, hashed_password: str) -> bool:
 
 
 # Crea el token JWT con el id y el rol del usuario, firmado con SECRET_KEY.
-def crear_access_token(subject: str, rol: str, expires_delta: timedelta | None = None) -> str:
+def crear_access_token(
+    subject: str, rol: str, expires_delta: timedelta | None = None, expira_en: datetime | None = None
+) -> str:
     """El rol viaja en el token para que los demas microservicios autoricen sin consultar la
     base de datos de usuarios."""
-    expira = datetime.now(timezone.utc) + (
+    expira = expira_en or datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     payload: dict[str, Any] = {"sub": subject, "rol": rol, "exp": expira}
