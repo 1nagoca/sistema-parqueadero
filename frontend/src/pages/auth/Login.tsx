@@ -13,6 +13,8 @@ export default function Login() {
   // Llega con ?sesion=vencida cuando el token dejo de servir (client.ts).
   const [parametros] = useSearchParams();
   const sesionVencida = parametros.get("sesion") === "vencida";
+  // Llega con ?registro=fuera-de-horario si la cuenta se creo con el parqueadero cerrado (Registro.tsx).
+  const registroFueraDeHorario = parametros.get("registro") === "fuera-de-horario";
   const [correo, setCorreo] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +41,11 @@ export default function Login() {
         {sesionVencida && (
           <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
             Tu sesión terminó. Si eres estudiante, recuerda que el parqueadero funciona de 05:45 a 22:00.
+          </p>
+        )}
+        {registroFueraDeHorario && (
+          <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
+            Tu cuenta quedó creada. Podrás iniciar sesión desde las 05:45; el parqueadero funciona de 05:45 a 22:00.
           </p>
         )}
         <h1 className="text-xl font-semibold text-gray-900">Parqueadero</h1>

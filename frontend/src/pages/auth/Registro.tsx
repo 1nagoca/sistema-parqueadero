@@ -24,7 +24,7 @@ export default function Registro() {
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
-  // Revisa que las contrasenas coincidan, crea la cuenta e inicia sesion.
+  // Crea la cuenta e inicia sesion; si el parqueadero esta cerrado lleva al login con aviso.
   async function manejarSubmit(evento: FormEvent) {
     evento.preventDefault();
     setError(null);
@@ -33,6 +33,7 @@ export default function Registro() {
       return;
     }
     setEnviando(true);
+    let cuentaCreada = false;
     try {
       await registrarEstudiante({
         nombre_completo: nombre,
@@ -42,10 +43,16 @@ export default function Registro() {
         password,
         acepta_tratamiento_datos: acepta,
       });
+      cuentaCreada = true;
       // Entra directo a su panel para subir el carnet y registrar su vehiculo.
       const usuarioActual = await iniciarSesion(correo, password);
       navigate(rutaInicioPara(usuarioActual.rol));
     } catch (err) {
+      // Un 403 tras crear la cuenta solo puede ser el horario (RN-11).
+      if (cuentaCreada && err instanceof ApiError && err.status === 403) {
+        navigate("/login?registro=fuera-de-horario");
+        return;
+      }
       setError(err instanceof ApiError ? err.message : "No se pudo completar el registro");
     } finally {
       setEnviando(false);
