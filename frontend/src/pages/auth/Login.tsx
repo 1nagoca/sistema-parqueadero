@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import Button from "@/components/common/Button";
+import PasswordInput from "@/components/common/PasswordInput";
 import { useAuth } from "@/context/AuthContext";
 import { ApiError } from "@/services/api/client";
 import { rutaInicioPara } from "@/utils/rutas";
@@ -69,14 +70,7 @@ export default function Login() {
           <label className="text-sm font-medium text-gray-700" htmlFor="password">
             Contraseña
           </label>
-          <input
-            id="password"
-            type="password"
-            required
-            value={password}
-            onChange={(evento) => setPassword(evento.target.value)}
-            className="min-h-12 w-full rounded-lg border border-gray-300 px-3 focus:border-emerald-500 focus:outline-none"
-          />
+          <PasswordInput id="password" required value={password} onChange={(evento) => setPassword(evento.target.value)} />
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

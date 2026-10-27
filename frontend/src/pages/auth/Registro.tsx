@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import Button from "@/components/common/Button";
+import PasswordInput from "@/components/common/PasswordInput";
 import { useAuth } from "@/context/AuthContext";
 import { registrarEstudiante } from "@/services/api/auth";
 import { ApiError } from "@/services/api/client";
@@ -85,22 +86,18 @@ export default function Registro() {
           className={campo}
         />
         <input placeholder="Teléfono (opcional)" value={telefono} onChange={(e) => setTelefono(e.target.value)} className={campo} />
-        <input
+        <PasswordInput
           required
-          type="password"
           minLength={8}
           placeholder="Contraseña (mínimo 8 caracteres)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className={campo}
         />
-        <input
+        <PasswordInput
           required
-          type="password"
           placeholder="Confirma la contraseña"
           value={confirmacion}
           onChange={(e) => setConfirmacion(e.target.value)}
-          className={campo}
         />
 
         <label className="flex items-start gap-2 text-sm text-gray-700">
