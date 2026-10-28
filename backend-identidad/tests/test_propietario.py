@@ -2,6 +2,8 @@
 DATABASE_URL / SECRET_KEY en el entorno; la base de pruebas la prepara conftest."""
 
 import os
+import random
+import string
 import uuid
 from pathlib import Path
 
@@ -75,7 +77,9 @@ def admin(client):
 
 
 def _placa():
-    return "PRO" + str(uuid.uuid4().int)[:2] + chr(ord("A") + uuid.uuid4().int % 26)
+    # Placa de moto con letras y numeros al azar: con un prefijo fijo chocaban dentro de una corrida.
+    letras = string.ascii_uppercase
+    return "".join(random.choices(letras, k=3)) + f"{random.randrange(100):02d}" + random.choice(letras)
 
 
 def _moto(*, dueno_estado=APROBADO, dueno_activo=True, moto_estado=APROBADO, carnet=PNG, en_disco=True):

@@ -1,6 +1,7 @@
 """Accesos y auditoria, con dobles de los servicios de parqueadero e identidad. Requiere
 DATABASE_URL / SECRET_KEY en el entorno; la base de pruebas la prepara conftest."""
 
+import logging
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -214,6 +215,24 @@ def test_entrada_y_salida_mueven_el_cupo_en_parqueadero(client, admin, parqueade
     # Segunda salida sobre el mismo acceso: no existe abierto y no vuelve a liberar el cupo.
     assert client.post(f"{API}/accesos/{acceso_id}/salida", headers=admin).status_code == 404
     assert parqueadero.movimientos == ["ocupar", "liberar"]
+
+
+def test_arranque_entrada_rechazo_y_salida_quedan_en_la_consola(client, admin, parqueadero, identidad, caplog):
+    caplog.set_level(logging.INFO)
+    with TestClient(app):
+        pass
+    assert "Accesos: base de datos" in caplog.text and "conectada" in caplog.text
+
+    vehiculo = identidad.vehiculo()
+    r = _entrada_visitante(client, admin, vehiculo["id"])
+    assert r.status_code == 201, r.text
+    assert f"entrada registrada de la moto {vehiculo['placa']} (visitante)" in caplog.text
+
+    assert _entrada_visitante(client, admin, vehiculo["id"]).status_code == 409
+    assert "entrada rechazada (409): El vehiculo ya tiene un acceso activo" in caplog.text
+
+    assert client.post(f"{API}/accesos/{r.json()['id']}/salida", headers=admin).status_code == 200
+    assert f"salida registrada de la moto {vehiculo['placa']}" in caplog.text
 
 
 def test_sin_cupos_no_crea_el_acceso(client, admin, parqueadero, identidad):

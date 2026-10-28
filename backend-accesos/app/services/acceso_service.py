@@ -133,6 +133,7 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
         raise
 
     db.refresh(acceso)
+    logger.info("Accesos: entrada registrada de la moto %s (%s)", acceso.placa, acceso.tipo_acceso.value)
     return acceso
 
 
@@ -231,6 +232,7 @@ def registrar_salida(db: Session, acceso_id: uuid.UUID, realizado_por_id: uuid.U
         raise
 
     db.refresh(acceso)
+    logger.info("Accesos: salida registrada de la moto %s tras %s min", acceso.placa, acceso.duracion_minutos)
     return acceso
 
 

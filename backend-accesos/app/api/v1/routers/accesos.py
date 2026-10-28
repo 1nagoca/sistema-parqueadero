@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -13,6 +14,7 @@ from app.parqueadero_client.client import CupoNoDisponibleError, ParqueaderoNoDi
 from app.services import acceso_service
 
 router = APIRouter(prefix="/accesos", tags=["accesos"])
+logger = logging.getLogger(__name__)
 
 
 # GET /accesos (vigilante, admin): vehiculos que estan adentro, con el codigo de su espacio.
@@ -78,19 +80,25 @@ def registrar_entrada(
     try:
         return acceso_service.registrar_entrada(db, datos, realizado_por_id=vigilante.id)
     except (VehiculoNoEncontradoError, acceso_service.UsuarioNoEncontradoError) as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise _entrada_rechazada(status.HTTP_404_NOT_FOUND, exc) from exc
     except (
         acceso_service.ParqueaderoCerradoError,
         acceso_service.VehiculoNoVerificadoError,
         acceso_service.VehiculoYaAdentroError,
     ) as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        raise _entrada_rechazada(status.HTTP_409_CONFLICT, exc) from exc
     except IdentidadNoDisponibleError as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        raise _entrada_rechazada(status.HTTP_503_SERVICE_UNAVAILABLE, exc) from exc
     except CupoNoDisponibleError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        raise _entrada_rechazada(status.HTTP_409_CONFLICT, exc) from exc
     except ParqueaderoNoDisponibleError as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        raise _entrada_rechazada(status.HTTP_503_SERVICE_UNAVAILABLE, exc) from exc
+
+
+# Deja en la consola por que se rechazo la entrada y arma la respuesta de error.
+def _entrada_rechazada(codigo: int, exc: Exception) -> HTTPException:
+    logger.warning("Accesos: entrada rechazada (%s): %s", codigo, exc)
+    return HTTPException(status_code=codigo, detail=str(exc))
 
 
 # POST /accesos/{id}/salida (vigilante, admin): registra la salida y libera el cupo.

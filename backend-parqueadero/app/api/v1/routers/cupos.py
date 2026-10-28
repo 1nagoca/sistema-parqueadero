@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
@@ -13,6 +14,7 @@ from app.services import realtime_service, zona_service
 # API interna entre microservicios: la usa el servicio de accesos al registrar entradas y
 # salidas. El gateway no publica /interno, asi que no es alcanzable desde el navegador.
 router = APIRouter(prefix="/interno", tags=["interno"])
+logger = logging.getLogger(__name__)
 
 
 # POST /interno/cupos/ocupar (lo llama accesos): resta un cupo y avisa al mapa.
@@ -23,7 +25,9 @@ def ocupar_cupo(datos: CupoSolicitud, background_tasks: BackgroundTasks, db: Ses
     except (zona_service.SinCuposDisponiblesError, zona_service.EspacioNoDisponibleError) as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    return _confirmar_y_avisar(db, zona, background_tasks)
+    zona = _confirmar_y_avisar(db, zona, background_tasks)
+    _anotar(db, "ocupado", zona, datos.espacio_id)
+    return zona
 
 
 # POST /interno/cupos/liberar (lo llama accesos): suma un cupo y avisa al mapa.
@@ -34,7 +38,9 @@ def liberar_cupo(datos: CupoSolicitud, background_tasks: BackgroundTasks, db: Se
     except zona_service.ZonaEnCapacidadTotalError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    return _confirmar_y_avisar(db, zona, background_tasks)
+    zona = _confirmar_y_avisar(db, zona, background_tasks)
+    _anotar(db, "liberado", zona, datos.espacio_id)
+    return zona
 
 
 # GET /interno/espacios?id= (lo llama accesos): el codigo de cada espacio.
@@ -54,3 +60,17 @@ def _confirmar_y_avisar(db: Session, zona: Zona, background_tasks: BackgroundTas
     db.refresh(zona)
     background_tasks.add_task(realtime_service.broadcast_actualizacion_zona, zona.id, zona.cupos_disponibles)
     return zona
+
+
+# Deja en la consola que puesto cambio y cuantos cupos quedan en la zona.
+def _anotar(db: Session, accion: str, zona: Zona, espacio_id: uuid.UUID | None) -> None:
+    espacio = db.get(Espacio, espacio_id) if espacio_id is not None else None
+    puesto = espacio.codigo if espacio is not None else "sin puesto"
+    logger.info(
+        "Parqueadero: puesto %s %s en %s; quedan %s de %s cupos",
+        puesto,
+        accion,
+        zona.nombre,
+        zona.cupos_disponibles,
+        zona.capacidad_total,
+    )

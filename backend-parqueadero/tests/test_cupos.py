@@ -1,6 +1,7 @@
 """Zonas, espacios y cupos (RN-01 y RN-02). Requiere DATABASE_URL / SECRET_KEY en el entorno;
 la base de pruebas la prepara conftest."""
 
+import logging
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -79,6 +80,20 @@ def test_ocupar_descuenta_hasta_agotar_y_liberar_devuelve(client, admin, zona):
     assert client.post("/interno/cupos/liberar", json=solicitud).json()["cupos_disponibles"] == 1
     assert client.post("/interno/cupos/liberar", json=solicitud).json()["cupos_disponibles"] == 2
     assert client.post("/interno/cupos/liberar", json=solicitud).status_code == 409  # ya en capacidad total
+
+
+def test_arranque_y_movimientos_de_puesto_quedan_en_la_consola(client, admin, zona, caplog):
+    caplog.set_level(logging.INFO)
+    with TestClient(app):
+        pass
+    assert "Parqueadero: base de datos" in caplog.text and "conectada" in caplog.text
+
+    espacio = _espacio(client, admin, zona["id"], codigo="L1")
+    solicitud = {"zona_id": zona["id"], "espacio_id": espacio["id"]}
+    assert client.post("/interno/cupos/ocupar", json=solicitud).status_code == 200
+    assert f"puesto L1 ocupado en {zona['nombre']}; quedan 1 de 2 cupos" in caplog.text
+    assert client.post("/interno/cupos/liberar", json=solicitud).status_code == 200
+    assert f"puesto L1 liberado en {zona['nombre']}; quedan 2 de 2 cupos" in caplog.text
 
 
 def test_espacio_ocupado_no_descuenta_el_cupo(client, admin, zona):
