@@ -563,7 +563,7 @@ function PanelBaja({
   onCancelar: () => void;
 }) {
   const sugeridos = MOTIVOS_BAJA[usuario.rol] ?? [];
-  const [opcion, setOpcion] = useState(sugeridos[0] ?? OTRO_MOTIVO);
+  const [opcion, setOpcion] = useState("");
   const [otro, setOtro] = useState("");
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState<string | null>(null);
