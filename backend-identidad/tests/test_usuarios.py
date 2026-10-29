@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from jose import jwt  # noqa: E402
 
 from app.core.config import settings  # noqa: E402
-from app.core.security import hashear_password  # noqa: E402
+from app.core.security import crear_access_token, hashear_password  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.enums import RolUsuario  # noqa: E402
@@ -148,6 +148,13 @@ def test_login_rechaza_y_emite_token_con_sub_rol_y_exp(client, sufijo):
 def test_me_devuelve_el_perfil_propio_y_exige_sesion(client, sufijo):
     assert client.get(f"{API}/usuarios/me").status_code == 401
     assert client.get(f"{API}/usuarios/me", headers={"Authorization": "Bearer no-es-un-token"}).status_code == 401
+
+    sub_invalido = {"Authorization": f"Bearer {crear_access_token('no-es-un-uuid', 'estudiante')}"}
+    r = client.get(f"{API}/usuarios/me", headers=sub_invalido)
+    assert r.status_code == 401
+    assert r.json()["detail"] == "Token invalido"
+    sub_inexistente = {"Authorization": f"Bearer {crear_access_token(str(uuid.uuid4()), 'estudiante')}"}
+    assert client.get(f"{API}/usuarios/me", headers=sub_inexistente).status_code == 401
 
     assert _registrar(client, sufijo).status_code == 201
     estudiante = _login(client, f"est-{sufijo}@ufps.edu.co", "clave-segura-1")

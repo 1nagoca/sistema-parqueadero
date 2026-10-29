@@ -29,7 +29,12 @@ def get_current_user(
     if usuario_id is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido")
 
-    usuario = db.get(Usuario, uuid.UUID(usuario_id))
+    try:
+        usuario_uuid = uuid.UUID(usuario_id)
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido") from exc
+
+    usuario = db.get(Usuario, usuario_uuid)
     if usuario is None or not usuario.activo:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario inactivo o inexistente")
     return usuario
