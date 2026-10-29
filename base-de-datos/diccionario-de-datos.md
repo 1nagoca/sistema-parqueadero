@@ -10,7 +10,7 @@ Hay **una base de datos por microservicio**:
 | `parqueadero` | `backend-accesos` | `accesos`, `auditoria_accesos` | `backend-accesos/alembic/versions` (0001 a 0005) |
 | `parqueadero_zonas` | `backend-parqueadero` | `zonas`, `espacios` | `backend-parqueadero/alembic/versions` (0001) |
 
-Entre bases no hay llaves foráneas. `accesos` y `auditoria_accesos` guardan identificadores de vehículos y usuarios (base de identidad) y de zonas y espacios (base de parqueadero); la consistencia la cuida el código (ver `docs/arquitectura.md`).
+Entre bases no hay llaves foráneas. `accesos` y `auditoria_accesos` guardan identificadores de vehículos y usuarios (base de identidad) y de zonas y espacios (base de parqueadero); la consistencia la cuida el código.
 
 ## Resumen de tablas
 

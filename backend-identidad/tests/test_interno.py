@@ -1,4 +1,4 @@
-"""API interna que usa el servicio de accesos (contrato en docs/arquitectura.md). Requiere
+"""API interna que usa el servicio de accesos. Requiere
 DATABASE_URL / SECRET_KEY en el entorno; la base de pruebas la prepara conftest."""
 
 import os

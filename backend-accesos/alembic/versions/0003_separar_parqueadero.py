@@ -3,7 +3,7 @@ propia base de datos. Aqui se eliminan las tablas y las llaves foraneas que apun
 accesos conserva zona_id y espacio_id como identificadores sin restriccion.
 
 Antes de aplicar esta migracion en una base con datos hay que copiar zonas y espacios a la
-base del servicio de parqueadero (ver docs/arquitectura.md). Para no perderlos por descuido,
+base del servicio de parqueadero. Para no perderlos por descuido,
 la migracion se niega a correr si aun hay zonas, salvo que se confirme con la variable de
 entorno PARQUEADERO_DATOS_MIGRADOS=1.
 
@@ -33,7 +33,7 @@ def upgrade() -> None:
     if hay_zonas and os.environ.get("PARQUEADERO_DATOS_MIGRADOS") != "1":
         raise RuntimeError(
             "La tabla zonas tiene datos. Copialos primero a la base del servicio de parqueadero "
-            "y vuelve a correr con PARQUEADERO_DATOS_MIGRADOS=1 (ver docs/arquitectura.md)."
+            "y vuelve a correr con PARQUEADERO_DATOS_MIGRADOS=1."
         )
 
     # Quita las llaves foraneas de accesos y borra zonas, espacios y su tipo.

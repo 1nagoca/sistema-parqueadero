@@ -20,7 +20,7 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 # Nombre del rol de aplicacion sobre el que se endurecen los permisos de auditoria (RN-04).
-# Ajustar segun el rol real que use backend-core para conectarse en cada entorno
+# Ajustar segun el rol real que use backend-accesos para conectarse en cada entorno
 # (en Supabase/Neon normalmente no es el rol "postgres"/superusuario).
 APP_ROLE = "parqueadero_app"
 

@@ -78,7 +78,7 @@ services:
       - ./backend-parqueadero:/code
 
   # Base de datos propia del servicio de identidad: si se cae, parqueadero sigue arriba y
-  # accesos solo rechaza las entradas (ver docs/arquitectura.md).
+  # accesos solo rechaza las entradas.
   db-identidad:
     image: postgres:16-alpine
     restart: unless-stopped

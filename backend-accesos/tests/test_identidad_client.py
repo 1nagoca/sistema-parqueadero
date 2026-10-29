@@ -1,5 +1,5 @@
-"""Cliente del servicio de identidad: como traduce cada respuesta de su API interna (contrato
-en docs/arquitectura.md). No llama al servicio real: las respuestas se simulan."""
+"""Cliente del servicio de identidad: como traduce cada respuesta de su API interna.
+No llama al servicio real: las respuestas se simulan."""
 
 import os
 import uuid

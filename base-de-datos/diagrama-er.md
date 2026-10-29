@@ -1,6 +1,6 @@
 # Diagrama entidad-relación
 
-Hay una base de datos por microservicio, así que hay un diagrama por base. Entre bases no hay llaves foráneas: lo que una guarda de otra es solo un identificador, y la consistencia la cuida el código (ver [`docs/arquitectura.md`](../docs/arquitectura.md)).
+Hay una base de datos por microservicio, así que hay un diagrama por base. Entre bases no hay llaves foráneas: lo que una guarda de otra es solo un identificador, y la consistencia la cuida el código.
 
 Se visualiza directamente en GitHub (Mermaid). Para exportarlo a PostgreSQL, MySQL u otro motor, usa [`diagrama-er.dbml`](diagrama-er.dbml) en <https://dbdiagram.io/d>.
 

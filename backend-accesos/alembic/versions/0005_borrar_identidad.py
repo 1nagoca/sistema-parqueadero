@@ -2,7 +2,7 @@
 identidad (backend-identidad), con su propia base de datos. Aqui se eliminan junto con los
 enums que solo ellas usaban; accesos y auditoria_accesos ya no dependen de ellas (0004).
 
-No se copian datos: la base de identidad se siembra aparte (ver docs/arquitectura.md). Para no
+No se copian datos: la base de identidad se siembra aparte. Para no
 perder datos por descuido, la migracion se niega a correr si alguna de esas tablas tiene
 filas, salvo que se confirme con la variable de entorno IDENTIDAD_DATOS_MIGRADOS=1.
 
@@ -38,7 +38,7 @@ def upgrade() -> None:
         raise RuntimeError(
             "Las tablas usuarios, vehiculos o documentos tienen datos. Si ya no hacen falta "
             "(identidad vive en su propio servicio), vuelve a correr con "
-            "IDENTIDAD_DATOS_MIGRADOS=1 (ver docs/arquitectura.md)."
+            "IDENTIDAD_DATOS_MIGRADOS=1."
         )
 
     # Borra usuarios, vehiculos y documentos.

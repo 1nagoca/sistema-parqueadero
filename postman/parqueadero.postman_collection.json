@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "e156daca-b185-52b4-8df7-00845caba5dc",
-    "name": "Parqueadero - backend-core",
-    "description": "API REST del parqueadero universitario (backend-core).\n\n1. Levantar el proyecto: `docker compose up --build -d`\n2. Importar esta colección en Postman.\n3. Correr la colección completa con el Collection Runner (en orden): el login guarda los tokens y cada paso guarda los ids que usa el siguiente.\n\nPor defecto las peticiones usan el token de admin; las carpetas de vehículos y accesos usan el de vigilante.",
+    "name": "Parqueadero UFPS - API (gateway)",
+    "description": "API REST del parqueadero universitario (todos los servicios a través del gateway).\n\n1. Levantar el proyecto: `docker compose up --build -d`\n2. Importar esta colección en Postman.\n3. Correr la colección completa con el Collection Runner (en orden): el login guarda los tokens y cada paso guarda los ids que usa el siguiente.\n\nPor defecto las peticiones usan el token de admin; las carpetas de vehículos y accesos usan el de vigilante.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -43,7 +43,7 @@
           ]
         }
       ],
-      "description": "Verifica que backend-core esté arriba (docker compose up)."
+      "description": "Verifica que backend-accesos esté arriba (docker compose up)."
     },
     {
       "name": "01 - Auth",
