@@ -233,7 +233,7 @@ const MOTIVOS_BAJA: Partial<Record<RolUsuario, string[]>> = {
   vigilante: ["Despedido", "Renunció"],
 };
 const OTRO_MOTIVO = "Otro";
-const USUARIOS_POR_PAGINA = 20;
+const USUARIOS_POR_PAGINA = 50;
 
 // Lista paginada de usuarios con buscador, filtros, baja y reactivacion, y formulario para crear personal.
 function SeccionUsuarios() {

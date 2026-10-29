@@ -114,7 +114,7 @@ def crear_usuario(
 @router.get("", response_model=UsuariosPagina)
 def listar_usuarios(
     pagina: int = Query(1, ge=1),
-    por_pagina: int = Query(20, ge=1, le=100),
+    por_pagina: int = Query(50, ge=1, le=100),
     buscar: str | None = Query(None, max_length=100),
     rol: RolUsuario | None = None,
     activo: bool | None = None,

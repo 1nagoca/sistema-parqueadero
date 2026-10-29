@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import or_, select
+from sqlalchemy import case, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.documento import Documento
@@ -54,8 +54,15 @@ def listar_usuarios(
         consulta = consulta.filter(Usuario.activo.is_(activo))
 
     total = consulta.count()
+    # Primero admin, luego vigilante y estudiante; dentro de cada rol por nombre.
+    orden_rol = case(
+        (Usuario.rol == RolUsuario.ADMIN, 0),
+        (Usuario.rol == RolUsuario.VIGILANTE, 1),
+        (Usuario.rol == RolUsuario.ESTUDIANTE, 2),
+        else_=3,
+    )
     items = (
-        consulta.order_by(Usuario.nombre_completo, Usuario.id)
+        consulta.order_by(orden_rol, Usuario.nombre_completo, Usuario.id)
         .offset((pagina - 1) * por_pagina)
         .limit(por_pagina)
         .all()

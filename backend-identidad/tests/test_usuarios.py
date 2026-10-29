@@ -203,13 +203,14 @@ def test_listar_y_obtener_usuarios_segun_rol(client, admin, sufijo):
 
 
 def test_listar_usuarios_pagina_busca_y_filtra_en_el_servidor(client, admin, sufijo):
-    # Cinco usuarios con el sufijo en el nombre; el prefijo fija el orden por nombre.
+    # Seis usuarios con el sufijo en el nombre; salen por rol (admin, vigilante, estudiante) y luego por nombre.
     datos = [
         ("A", RolUsuario.ESTUDIANTE, True),
         ("B", RolUsuario.VIGILANTE, True),
         ("C", RolUsuario.ESTUDIANTE, False),
         ("D", RolUsuario.ESTUDIANTE, True),
         ("E", RolUsuario.VIGILANTE, True),
+        ("F", RolUsuario.ADMIN, True),
     ]
     ids = {}
     with SessionLocal() as db:
@@ -238,12 +239,12 @@ def test_listar_usuarios_pagina_busca_y_filtra_en_el_servidor(client, admin, suf
         return [u["nombre_completo"][0] for u in pagina["items"]]
 
     pagina = listar(buscar=clave, por_pagina=2)
-    assert (pagina["total"], pagina["pagina"], pagina["por_pagina"]) == (5, 1, 2)
-    assert letras(pagina) == ["A", "B"]
-    assert letras(listar(buscar=clave, por_pagina=2, pagina=2)) == ["C", "D"]
-    assert letras(listar(buscar=clave, por_pagina=2, pagina=3)) == ["E"]
+    assert (pagina["total"], pagina["pagina"], pagina["por_pagina"]) == (6, 1, 2)
+    assert letras(pagina) == ["F", "B"]
+    assert letras(listar(buscar=clave, por_pagina=2, pagina=2)) == ["E", "A"]
+    assert letras(listar(buscar=clave, por_pagina=2, pagina=3)) == ["C", "D"]
     vacia = listar(buscar=clave, por_pagina=2, pagina=4)
-    assert vacia["items"] == [] and vacia["total"] == 5
+    assert vacia["items"] == [] and vacia["total"] == 6
 
     # filtros de rol y estado, solos y juntos
     assert letras(listar(buscar=clave, rol="vigilante")) == ["B", "E"]
@@ -258,7 +259,7 @@ def test_listar_usuarios_pagina_busca_y_filtra_en_el_servidor(client, admin, suf
 
     # valores por defecto
     defecto = listar()
-    assert (defecto["pagina"], defecto["por_pagina"]) == (1, 20) and len(defecto["items"]) <= 20
+    assert (defecto["pagina"], defecto["por_pagina"]) == (1, 50) and len(defecto["items"]) <= 50
 
     # limites de los parametros
     for params in ({"por_pagina": 101}, {"por_pagina": 0}, {"pagina": 0}, {"rol": "docentes"}):
