@@ -526,25 +526,27 @@ function SeccionUsuarios() {
           <p className="p-4 text-center text-gray-400">Sin usuarios con esos filtros.</p>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 p-4 text-sm">
-          <span className="text-gray-500">{cargando ? "Cargando..." : `Mostrando ${desde}–${hasta} de ${total}`}</span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setNumeroPagina(numeroPagina - 1)}
-              disabled={cargando || numeroPagina <= 1}
-              className="rounded-lg bg-gray-100 px-3 py-1 text-gray-700 disabled:opacity-40"
-            >
-              ← Anterior
-            </button>
-            <button
-              onClick={() => setNumeroPagina(numeroPagina + 1)}
-              disabled={cargando || hasta >= total}
-              className="rounded-lg bg-gray-100 px-3 py-1 text-gray-700 disabled:opacity-40"
-            >
-              Siguiente →
-            </button>
+        {(cargando || total > 0) && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 p-4 text-sm">
+            <span className="text-gray-500">{cargando ? "Cargando..." : `Mostrando ${desde}–${hasta} de ${total}`}</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setNumeroPagina(numeroPagina - 1)}
+                disabled={cargando || numeroPagina <= 1}
+                className="rounded-lg bg-gray-100 px-3 py-1 text-gray-700 disabled:opacity-40"
+              >
+                ← Anterior
+              </button>
+              <button
+                onClick={() => setNumeroPagina(numeroPagina + 1)}
+                disabled={cargando || hasta >= total}
+                className="rounded-lg bg-gray-100 px-3 py-1 text-gray-700 disabled:opacity-40"
+              >
+                Siguiente →
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -1093,7 +1095,7 @@ function SeccionAuditoria() {
         )}
       </div>
 
-      {pagina && (
+      {pagina && total > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-white p-4 text-sm shadow-sm">
           <span className="text-gray-500">{cargando ? "Cargando..." : `Mostrando ${inicio}–${fin} de ${total}`}</span>
           <div className="flex gap-2">
