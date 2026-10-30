@@ -12,7 +12,7 @@ from app.models.usuario import Usuario
 from app.models.vehiculo import Vehiculo
 from app.schemas.documento import VehiculoConDocumentos
 from app.schemas.vehiculo import PropietarioVigilante, VehiculoCreate, VehiculoRead
-from app.services import documento_service, vehiculo_service, verificacion_service
+from app.services import documento_service, usuario_service, vehiculo_service, verificacion_service
 
 router = APIRouter(prefix="/vehiculos", tags=["vehiculos"])
 
@@ -30,7 +30,10 @@ def crear_vehiculo(
     existe = vehiculo_service.obtener_por_placa(db, datos.placa)
     if existe is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La placa ya esta registrada")
-    return vehiculo_service.crear_vehiculo(db, datos)
+    try:
+        return vehiculo_service.crear_vehiculo(db, datos)
+    except usuario_service.UsuarioNoEncontradoError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 # GET /vehiculos/placa/{placa}/propietario (admin, vigilante): nombre del dueno y si hay carnet para mostrar (RN-09).

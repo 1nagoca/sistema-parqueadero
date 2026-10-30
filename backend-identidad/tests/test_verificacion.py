@@ -2,6 +2,8 @@
 DATABASE_URL / SECRET_KEY en el entorno; la base de pruebas la prepara conftest."""
 
 import os
+import random
+import string
 import uuid
 from pathlib import Path
 
@@ -308,6 +310,39 @@ def test_visitante_solo_moto(client, admin):
     r = client.post(f"{API}/vehiculos", headers=admin, json=datos)
     assert r.status_code == 201, r.text
     assert r.json()["tipo_vehiculo"] == "moto"
+
+
+def _placa():
+    # Placa de moto con letras y numeros al azar: con un prefijo fijo chocaban dentro de una corrida.
+    letras = string.ascii_uppercase
+    return "".join(random.choices(letras, k=3)) + f"{random.randrange(100):02d}" + random.choice(letras)
+
+
+def test_crear_vehiculo_con_usuario_id_inexistente_da_404_y_no_guarda_nada(client, admin):
+    placa = _placa()
+    r = client.post(f"{API}/vehiculos", headers=admin, json={"placa": placa, "usuario_id": str(uuid.uuid4())})
+    assert r.status_code == 404
+    assert r.json()["detail"] == "El dueno (usuario_id) no existe"
+    with SessionLocal() as db:
+        assert db.query(Vehiculo).filter(Vehiculo.placa == placa).count() == 0
+
+
+def test_vigilante_crear_vehiculo_con_usuario_id_inexistente_da_404(client, sufijo):
+    _, vigilante = _personal(client, RolUsuario.VIGILANTE, sufijo)
+    datos = {"placa": _placa(), "usuario_id": str(uuid.uuid4())}
+    assert client.post(f"{API}/vehiculos", headers=vigilante, json=datos).status_code == 404
+
+
+def test_visitante_con_usuario_id_inexistente_da_404(client, admin):
+    datos = {"placa": _placa(), "usuario_id": str(uuid.uuid4()), "es_visitante": True}
+    assert client.post(f"{API}/vehiculos", headers=admin, json=datos).status_code == 404
+
+
+def test_crear_vehiculo_con_usuario_id_existente_da_201(client, admin, sufijo):
+    dueno_id, _ = _personal(client, RolUsuario.VIGILANTE, sufijo)
+    r = client.post(f"{API}/vehiculos", headers=admin, json={"placa": _placa(), "usuario_id": dueno_id})
+    assert r.status_code == 201, r.text
+    assert r.json()["usuario_id"] == dueno_id
 
 
 def _archivos_en_disco():

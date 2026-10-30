@@ -9,7 +9,7 @@ from app.models.enums import EstadoVerificacion, TipoDocumento
 from app.models.usuario import Usuario
 from app.models.vehiculo import Vehiculo
 from app.schemas.vehiculo import VehiculoCreate
-from app.services import documento_service
+from app.services import documento_service, usuario_service
 
 
 class PropietarioNoVisibleError(Exception):
@@ -24,6 +24,8 @@ class CarnetVisible(NamedTuple):
 
 # Crea un vehiculo y lo guarda en la base.
 def crear_vehiculo(db: Session, datos: VehiculoCreate) -> Vehiculo:
+    if datos.usuario_id is not None and db.get(Usuario, datos.usuario_id) is None:
+        raise usuario_service.UsuarioNoEncontradoError("El dueno (usuario_id) no existe")
     vehiculo = Vehiculo(**datos.model_dump())
     db.add(vehiculo)
     db.commit()
