@@ -211,6 +211,36 @@ def test_me_devuelve_el_perfil_propio_y_exige_sesion(client, sufijo):
     assert "password" not in cuerpo and "hashed_password" not in cuerpo
 
 
+def _cabeceras_de(rol, sufijo, activo=True):
+    usuario_id, _ = _crear_usuario(rol, sufijo, "clave-de-prueba", activo=activo)
+    return {"Authorization": f"Bearer {crear_access_token(usuario_id, rol.value)}"}
+
+
+@pytest.mark.parametrize("rol", [RolUsuario.VIGILANTE, RolUsuario.ADMIN])
+def test_lectura_placas_deja_pasar_a_vigilante_y_admin(client, sufijo, rol):
+    r = client.get(f"{API}/usuarios/me/lectura-placas", headers=_cabeceras_de(rol, sufijo))
+    assert r.status_code == 204, r.text
+    assert r.content == b""
+
+
+def test_lectura_placas_rechaza_al_estudiante_que_sigue_viendo_su_perfil(client, sufijo):
+    estudiante = _cabeceras_de(RolUsuario.ESTUDIANTE, sufijo)
+
+    r = client.get(f"{API}/usuarios/me/lectura-placas", headers=estudiante)
+    assert r.status_code == 403
+    assert r.json()["detail"] == "Rol no autorizado"
+    assert client.get(f"{API}/usuarios/me", headers=estudiante).status_code == 200
+
+
+def test_lectura_placas_exige_sesion(client):
+    assert client.get(f"{API}/usuarios/me/lectura-placas").status_code == 401
+
+
+def test_lectura_placas_rechaza_al_vigilante_dado_de_baja(client, sufijo):
+    vigilante = _cabeceras_de(RolUsuario.VIGILANTE, sufijo, activo=False)
+    assert client.get(f"{API}/usuarios/me/lectura-placas", headers=vigilante).status_code == 401
+
+
 def test_listar_y_obtener_usuarios_segun_rol(client, admin, sufijo):
     r = client.post(
         f"{API}/usuarios",

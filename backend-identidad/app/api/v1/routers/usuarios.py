@@ -24,6 +24,14 @@ def obtener_usuario_actual(usuario_actual: Usuario = Depends(get_current_user)) 
     return usuario_actual
 
 
+# GET /usuarios/me/lectura-placas (vigilante, admin): la usa el gateway antes de dejar pasar una imagen a vision.
+@router.get("/me/lectura-placas", status_code=status.HTTP_204_NO_CONTENT)
+def autorizar_lectura_placas(
+    _: Usuario = Depends(require_role(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
+):
+    """Sin cuerpo: 204 deja pasar la imagen; 401 o 403 los reenvia el gateway."""
+
+
 # GET /usuarios/me/documentos (estudiante): el carnet que ya subio.
 @router.get("/me/documentos", response_model=list[DocumentoRead])
 def listar_mis_documentos(
