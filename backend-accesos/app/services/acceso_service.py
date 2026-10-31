@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.identidad_client import client as identidad_client
 from app.models.acceso import Acceso
-from app.models.enums import AccionAuditoria, EstadoVerificacion, TipoAcceso
+from app.models.enums import AccionAuditoria, EstadoVerificacion, RolUsuario, TipoAcceso
 from app.parqueadero_client import client as parqueadero_client
 from app.schemas.acceso import AccesoEntradaCreate
 from app.services import auditoria_service
@@ -30,6 +30,10 @@ class UsuarioNoEncontradoError(Exception):
     """El conductor o quien autoriza el ingreso no existe en el servicio de identidad."""
 
 
+class AutorizadorNoValidoError(Exception):
+    """Quien autoriza el ingreso no es un vigilante o administrador activo (RN-03)."""
+
+
 class VehiculoYaAdentroError(Exception):
     """El vehiculo ya tiene un acceso abierto: no puede entrar otra vez sin haber salido."""
 
@@ -40,6 +44,9 @@ class ParqueaderoCerradoError(Exception):
 
 # Nombre del indice que impide dos accesos abiertos del mismo vehiculo.
 INDICE_ACCESO_ACTIVO = "uq_accesos_vehiculo_activo"
+
+# Roles que pueden autorizar una entrada (RN-03).
+ROLES_QUE_AUTORIZAN = (RolUsuario.VIGILANTE.value, RolUsuario.ADMIN.value)
 
 
 # Hora actual en Colombia; unico punto que los tests fijan con monkeypatch.
@@ -155,17 +162,20 @@ def _exigir_vehiculo_verificado(vehiculo: identidad_client.VehiculoIdentidad, ti
         )
 
 
-# Comprueba en identidad que el conductor y quien autoriza existan.
+# Comprueba en identidad que el conductor exista y que quien autoriza pueda hacerlo.
 def _exigir_usuarios_existentes(datos: AccesoEntradaCreate) -> None:
-    """El conductor y quien autoriza deben existir en identidad (no importa si estan activos)."""
-    pedidos = [i for i in (datos.usuario_id, datos.autorizado_por_id) if i is not None]
-    if not pedidos:
+    """El conductor solo debe existir en identidad (no importa si esta activo); quien autoriza
+    debe existir, tener rol de vigilante o administrador y estar activo (RN-03)."""
+    if datos.usuario_id is not None:
+        if datos.usuario_id not in identidad_client.usuarios_existentes([datos.usuario_id]):
+            raise UsuarioNoEncontradoError("El conductor (usuario_id) no existe")
+    if datos.autorizado_por_id is None:
         return
-    existentes = identidad_client.usuarios_existentes(pedidos)
-    if datos.usuario_id is not None and datos.usuario_id not in existentes:
-        raise UsuarioNoEncontradoError("El conductor (usuario_id) no existe")
-    if datos.autorizado_por_id is not None and datos.autorizado_por_id not in existentes:
+    autorizador = identidad_client.obtener_usuario(datos.autorizado_por_id)
+    if autorizador is None:
         raise UsuarioNoEncontradoError("Quien autoriza (autorizado_por_id) no existe")
+    if autorizador.rol not in ROLES_QUE_AUTORIZAN or not autorizador.activo:
+        raise AutorizadorNoValidoError("Quien autoriza debe ser un vigilante o administrador activo")
 
 
 # Dice si el vehiculo ya esta adentro (tiene un acceso sin salida).

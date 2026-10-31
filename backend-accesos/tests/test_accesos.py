@@ -61,8 +61,9 @@ def parqueadero(monkeypatch):
 @pytest.fixture(autouse=True)
 def identidad(monkeypatch):
     """Sustituye al microservicio de identidad en todos los tests: conoce los vehiculos que el
-    test le registra, da por existentes a todos los usuarios salvo ``usuarios_inexistentes`` y,
-    si ``caida`` es True, falla como lo haria el servicio sin responder."""
+    test le registra, da por existentes a todos los usuarios salvo ``usuarios_inexistentes``, los
+    trata como vigilantes activos salvo los registrados con ``usuario`` y, si ``caida`` es True,
+    falla como lo haria el servicio sin responder."""
 
     class Doble:
         caida = False
@@ -70,6 +71,7 @@ def identidad(monkeypatch):
         def __init__(self):
             self.vehiculos = {}
             self.usuarios_inexistentes = set()
+            self.usuarios = {}
 
         def vehiculo(self, prefijo="VIS", estado="aprobado", propietario_estado=None):
             """Registra un vehiculo; con ``propietario_estado`` tiene dueno, sin el es de visitante."""
@@ -85,6 +87,12 @@ def identidad(monkeypatch):
             self.vehiculos[vehiculo.id] = vehiculo
             return {"id": str(vehiculo.id), "placa": vehiculo.placa}
 
+        def usuario(self, rol="vigilante", activo=True):
+            """Registra un usuario con ese rol y estado; devuelve su id."""
+            usuario = identidad_client.UsuarioIdentidad(id=uuid.uuid4(), rol=rol, activo=activo)
+            self.usuarios[usuario.id] = usuario
+            return str(usuario.id)
+
         def cambiar(self, vehiculo_id, **campos):
             actual = self.vehiculos[uuid.UUID(vehiculo_id)]
             self.vehiculos[actual.id] = identidad_client.VehiculoIdentidad(**{**actual.__dict__, **campos})
@@ -99,6 +107,14 @@ def identidad(monkeypatch):
             self._responder()
             return set(usuario_ids) - self.usuarios_inexistentes
 
+        def obtener_usuario(self, usuario_id):
+            self._responder()
+            if usuario_id in self.usuarios_inexistentes:
+                return None
+            return self.usuarios.get(
+                usuario_id, identidad_client.UsuarioIdentidad(id=usuario_id, rol="vigilante", activo=True)
+            )
+
         def _responder(self):
             if self.caida:
                 raise identidad_client.IdentidadNoDisponibleError("El servicio de identidad no esta disponible")
@@ -106,6 +122,7 @@ def identidad(monkeypatch):
     doble = Doble()
     monkeypatch.setattr(identidad_client, "obtener_vehiculo", doble.obtener_vehiculo)
     monkeypatch.setattr(identidad_client, "usuarios_existentes", doble.usuarios_existentes)
+    monkeypatch.setattr(identidad_client, "obtener_usuario", doble.obtener_usuario)
     return doble
 
 
@@ -325,6 +342,82 @@ def test_entrada_con_conductor_o_autorizador_inexistente_responde_404(client, ad
     # con usuarios que existen, la misma entrada pasa
     r = client.post(f"{API}/accesos/entrada", headers=admin, json={**visitante, "usuario_id": str(uuid.uuid4())})
     assert r.status_code == 201, r.text
+
+
+def _visitante_autorizado_por(vehiculo_id, autorizado_por_id):
+    return {
+        "vehiculo_id": vehiculo_id,
+        "zona_id": str(uuid.uuid4()), "espacio_id": str(uuid.uuid4()),
+        "tipo_acceso": "visitante",
+        "autorizado_por_id": autorizado_por_id,
+        "justificacion": "Visita a decanatura",
+    }
+
+
+@pytest.mark.parametrize(
+    "rol, activo", [("estudiante", True), ("vigilante", False), ("admin", False)]
+)
+def test_entrada_con_autorizador_no_valido_responde_409(client, admin, parqueadero, identidad, rol, activo):
+    vehiculo = identidad.vehiculo()
+    entrada = _visitante_autorizado_por(vehiculo["id"], identidad.usuario(rol=rol, activo=activo))
+
+    r = client.post(f"{API}/accesos/entrada", headers=admin, json=entrada)
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"] == "Quien autoriza debe ser un vigilante o administrador activo"
+    assert parqueadero.movimientos == []
+    assert _accesos_abiertos(vehiculo["id"]) == 0
+
+
+def test_entrada_con_autorizador_inexistente_responde_404_sin_tocar_el_cupo(client, admin, parqueadero, identidad):
+    vehiculo = identidad.vehiculo()
+    fantasma = uuid.uuid4()
+    identidad.usuarios_inexistentes.add(fantasma)
+
+    r = client.post(f"{API}/accesos/entrada", headers=admin, json=_visitante_autorizado_por(vehiculo["id"], str(fantasma)))
+    assert r.status_code == 404, r.text
+    assert r.json()["detail"] == "Quien autoriza (autorizado_por_id) no existe"
+    assert parqueadero.movimientos == []
+    assert _accesos_abiertos(vehiculo["id"]) == 0
+
+
+def test_entrada_normal_con_autorizador_de_rol_no_valido_responde_409(client, admin, parqueadero, identidad):
+    vehiculo = identidad.vehiculo("NOR", propietario_estado="aprobado")
+    entrada = {
+        "vehiculo_id": vehiculo["id"],
+        "zona_id": str(uuid.uuid4()), "espacio_id": str(uuid.uuid4()),
+        "tipo_acceso": "normal",
+        "autorizado_por_id": identidad.usuario(rol="estudiante"),
+    }
+
+    r = client.post(f"{API}/accesos/entrada", headers=admin, json=entrada)
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"] == "Quien autoriza debe ser un vigilante o administrador activo"
+    assert parqueadero.movimientos == []
+    assert _accesos_abiertos(vehiculo["id"]) == 0
+
+
+@pytest.mark.parametrize("rol", ["vigilante", "admin"])
+def test_entrada_con_autorizador_activo_de_rol_valido_responde_201(client, admin, parqueadero, identidad, rol):
+    vehiculo = identidad.vehiculo()
+    entrada = _visitante_autorizado_por(vehiculo["id"], identidad.usuario(rol=rol))
+
+    r = client.post(f"{API}/accesos/entrada", headers=admin, json=entrada)
+    assert r.status_code == 201, r.text
+    assert parqueadero.movimientos == ["ocupar"]
+
+
+def test_identidad_caida_al_consultar_quien_autoriza_responde_503(client, admin, parqueadero, identidad, monkeypatch):
+    def caida(usuario_id):
+        raise identidad_client.IdentidadNoDisponibleError("El servicio de identidad no esta disponible")
+
+    vehiculo = identidad.vehiculo()
+    monkeypatch.setattr(identidad_client, "obtener_usuario", caida)
+
+    r = _entrada_visitante(client, admin, vehiculo["id"])
+    assert r.status_code == 503, r.text
+    assert r.json()["detail"] == "El servicio de identidad no esta disponible"
+    assert parqueadero.movimientos == []
+    assert _accesos_abiertos(vehiculo["id"]) == 0
 
 
 def test_identidad_caida_rechaza_toda_entrada_con_503(client, admin, parqueadero, identidad):

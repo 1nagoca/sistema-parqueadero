@@ -78,7 +78,8 @@ class UsuarioIdentidad:
 
 # Pide a identidad un usuario por su id; None si no existe.
 def obtener_usuario(usuario_id: uuid.UUID) -> UsuarioIdentidad | None:
-    """Lo usa el cierre de semestre para comprobar que quien lo corre es un administrador activo."""
+    """Lo usan el cierre de semestre, para comprobar que quien lo corre es un administrador activo,
+    y la entrada, para validar a quien la autoriza."""
     respuesta = _pedir("/interno/usuarios", params={"id": [str(usuario_id)]})
     try:
         for usuario in _json(respuesta):

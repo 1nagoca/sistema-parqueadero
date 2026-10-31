@@ -82,6 +82,7 @@ def registrar_entrada(
     except (VehiculoNoEncontradoError, acceso_service.UsuarioNoEncontradoError) as exc:
         raise _entrada_rechazada(status.HTTP_404_NOT_FOUND, exc) from exc
     except (
+        acceso_service.AutorizadorNoValidoError,
         acceso_service.ParqueaderoCerradoError,
         acceso_service.VehiculoNoVerificadoError,
         acceso_service.VehiculoYaAdentroError,
