@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_role
@@ -92,9 +93,18 @@ def crear_usuario(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Solo se crean vigilantes o administradores"
         )
-    existe = db.query(Usuario).filter(Usuario.correo_institucional == datos.correo_institucional).first()
-    if existe is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El correo ya esta registrado")
+    duplicado = (
+        db.query(Usuario)
+        .filter(
+            (Usuario.correo_institucional == datos.correo_institucional)
+            | (Usuario.documento_identidad == datos.documento_identidad)
+        )
+        .first()
+    )
+    if duplicado is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="El correo o el documento ya estan registrados"
+        )
 
     usuario = Usuario(
         nombre_completo=datos.nombre_completo,
@@ -105,7 +115,13 @@ def crear_usuario(
         hashed_password=hashear_password(datos.password),
     )
     db.add(usuario)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="El correo o el documento ya estan registrados"
+        ) from exc
     db.refresh(usuario)
     return usuario
 

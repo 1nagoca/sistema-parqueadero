@@ -12,6 +12,7 @@ if not os.environ.get("DATABASE_URL"):
 
 from fastapi.testclient import TestClient  # noqa: E402
 from jose import jwt  # noqa: E402
+from sqlalchemy.orm import Query  # noqa: E402
 
 from app.core.config import settings  # noqa: E402
 from app.core.security import crear_access_token, hashear_password  # noqa: E402
@@ -119,6 +120,49 @@ def test_admin_no_crea_docentes_ni_administrativos(client, admin, sufijo):
             },
         )
         assert r.status_code == esperado, r.text  # RN-07
+
+
+def _crear_vigilante(client, headers, correo, documento):
+    return client.post(
+        f"{API}/usuarios",
+        headers=headers,
+        json={
+            "nombre_completo": "Vigilante Nuevo",
+            "correo_institucional": correo,
+            "documento_identidad": documento,
+            "rol": "vigilante",
+            "password": "una-clave-larga",
+        },
+    )
+
+
+def test_crear_personal_con_cedula_repetida_da_409_y_no_guarda_nada(client, admin, sufijo):
+    assert _crear_vigilante(client, admin, f"v-{sufijo}@ufps.edu.co", f"V{sufijo}").status_code == 201
+
+    correo_nuevo = f"otro-{sufijo}@ufps.edu.co"
+    r = _crear_vigilante(client, admin, correo_nuevo, f"V{sufijo}")
+    assert r.status_code == 409
+    assert r.json()["detail"] == "El correo o el documento ya estan registrados"
+    with SessionLocal() as db:
+        assert db.query(Usuario).filter(Usuario.correo_institucional == correo_nuevo).count() == 0
+
+
+def test_crear_personal_con_correo_repetido_da_409(client, admin, sufijo):
+    assert _crear_vigilante(client, admin, f"v-{sufijo}@ufps.edu.co", f"V{sufijo}").status_code == 201
+
+    r = _crear_vigilante(client, admin, f"v-{sufijo}@ufps.edu.co", f"W{sufijo}")
+    assert r.status_code == 409
+    assert r.json()["detail"] == "El correo o el documento ya estan registrados"
+
+
+def test_crear_personal_a_la_vez_con_datos_repetidos_da_409(client, admin, sufijo, monkeypatch):
+    assert _crear_vigilante(client, admin, f"v-{sufijo}@ufps.edu.co", f"V{sufijo}").status_code == 201
+
+    # la comprobacion previa no ve el duplicado: el que responde es el commit
+    monkeypatch.setattr(Query, "first", lambda self: None)
+    r = _crear_vigilante(client, admin, f"v-{sufijo}@ufps.edu.co", f"V{sufijo}")
+    assert r.status_code == 409
+    assert r.json()["detail"] == "El correo o el documento ya estan registrados"
 
 
 def test_login_rechaza_y_emite_token_con_sub_rol_y_exp(client, sufijo):

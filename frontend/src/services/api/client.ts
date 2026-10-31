@@ -38,6 +38,11 @@ export function mensajeDeDetalle(detalle: unknown): string | undefined {
   return undefined;
 }
 
+// Mensaje para cuando el error no trae texto del backend.
+function mensajeGenerico(status: number): string {
+  return `Error ${status} del servidor`;
+}
+
 // Si el token guardado ya no sirve (vencio o es invalido), lo borra y manda al login con aviso.
 function cerrarSesionVencida(respuesta: Response): void {
   if (respuesta.status === 401 && obtenerToken()) {
@@ -50,14 +55,14 @@ function cerrarSesionVencida(respuesta: Response): void {
 async function manejarRespuesta<T>(respuesta: Response): Promise<T> {
   if (!respuesta.ok) {
     cerrarSesionVencida(respuesta);
-    let detalle = respuesta.statusText;
+    let detalle: string | undefined;
     try {
       const cuerpo = await respuesta.json();
-      detalle = mensajeDeDetalle(cuerpo.detail) ?? detalle;
+      detalle = mensajeDeDetalle(cuerpo.detail);
     } catch {
-      // el cuerpo de error no era JSON; se usa el statusText
+      // el cuerpo de error no era JSON; se usa el mensaje generico
     }
-    throw new ApiError(respuesta.status, detalle);
+    throw new ApiError(respuesta.status, detalle || mensajeGenerico(respuesta.status));
   }
   if (respuesta.status === 204) {
     return undefined as T;
@@ -98,7 +103,7 @@ export async function apiGetBlob(ruta: string): Promise<Blob> {
   const respuesta = await fetch(`${BASE_URL}${ruta}`, { headers: encabezadosAuth() });
   if (!respuesta.ok) {
     cerrarSesionVencida(respuesta);
-    throw new ApiError(respuesta.status, respuesta.statusText);
+    throw new ApiError(respuesta.status, mensajeGenerico(respuesta.status));
   }
   return respuesta.blob();
 }
