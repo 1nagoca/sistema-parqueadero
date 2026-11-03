@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "e156daca-b185-52b4-8df7-00845caba5dc",
     "name": "Parqueadero UFPS - API (gateway)",
-    "description": "API REST del parqueadero universitario (todos los servicios a través del gateway).\n\n1. Levantar el proyecto: `docker compose up --build -d`\n2. Importar esta colección en Postman.\n3. Correr la colección completa con el Collection Runner (en orden): el login guarda los tokens y cada paso guarda los ids que usa el siguiente.\n\nPor defecto las peticiones usan el token de admin; las carpetas de vehículos y accesos usan el de vigilante.",
+    "description": "API REST del parqueadero universitario (todos los servicios a través del gateway).\n\n1. Levantar el proyecto: `docker compose up --build -d`\n2. Importar esta colección en Postman.\n3. Llenar las variables de la colección `correo_admin`, `password_admin`, `correo_vigilante` y `password_vigilante` con las cuentas de la siembra. Se llenan solo en Value (en versiones recientes de Postman puede llamarse Local value), nunca en Initial value. Las demás variables se llenan solas.\n4. Correr la colección completa con el Collection Runner (en orden) entre las 05:45 y las 22:00 (RN-11): el login guarda los tokens y cada paso guarda los ids que usa el siguiente.\n\nNunca exportes ni subas la colección con esos valores.\n\nPor defecto las peticiones usan el token de admin; las carpetas de vehículos y accesos usan el de vigilante, salvo «Crear puestos del plano en lote», que usa el de admin.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -59,12 +59,12 @@
               "urlencoded": [
                 {
                   "key": "username",
-                  "value": "admin@uni.edu.co",
+                  "value": "{{correo_admin}}",
                   "type": "text"
                 },
                 {
                   "key": "password",
-                  "value": "admin123",
+                  "value": "{{password_admin}}",
                   "type": "text"
                 }
               ]
@@ -100,12 +100,12 @@
               "urlencoded": [
                 {
                   "key": "username",
-                  "value": "vigilante@uni.edu.co",
+                  "value": "{{correo_vigilante}}",
                   "type": "text"
                 },
                 {
                   "key": "password",
-                  "value": "vigilante123",
+                  "value": "{{password_vigilante}}",
                   "type": "text"
                 }
               ]
@@ -131,6 +131,56 @@
           ]
         },
         {
+          "name": "Registrar estudiante",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/registro",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre_completo\": \"Estudiante Postman\",\n  \"correo_institucional\": \"{{correo_estudiante}}\",\n  \"documento_identidad\": \"{{documento_estudiante}}\",\n  \"password\": \"{{password_prueba}}\",\n  \"acepta_tratamiento_datos\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Correo y documento son UNIQUE: se generan distintos en cada ejecución.",
+                  "const n = Date.now();",
+                  "pm.collectionVariables.set(\"correo_estudiante\", `postman-est${n}@ufps.edu.co`);",
+                  "pm.collectionVariables.set(\"documento_estudiante\", `E${n}`);",
+                  "// Clave aleatoria de 36 caracteres; POST /auth/registro admite de 8 a 72.",
+                  "pm.collectionVariables.set(\"password_prueba\", pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Login estudiante",
           "request": {
             "method": "POST",
@@ -141,12 +191,12 @@
               "urlencoded": [
                 {
                   "key": "username",
-                  "value": "estudiante@uni.edu.co",
+                  "value": "{{correo_estudiante}}",
                   "type": "text"
                 },
                 {
                   "key": "password",
-                  "value": "estudiante123",
+                  "value": "{{password_prueba}}",
                   "type": "text"
                 }
               ]
@@ -182,12 +232,12 @@
               "urlencoded": [
                 {
                   "key": "username",
-                  "value": "admin@uni.edu.co",
+                  "value": "{{correo_admin}}",
                   "type": "text"
                 },
                 {
                   "key": "password",
-                  "value": "clave-incorrecta",
+                  "value": "{{$randomPassword}}",
                   "type": "text"
                 }
               ]
@@ -274,7 +324,7 @@
             "url": "{{baseUrl}}/api/v1/usuarios",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre_completo\": \"Usuario Postman\",\n  \"correo_institucional\": \"{{nuevo_correo}}\",\n  \"documento_identidad\": \"{{nuevo_documento}}\",\n  \"telefono\": \"3001234567\",\n  \"rol\": \"estudiante\",\n  \"password\": \"postman123\"\n}",
+              "raw": "{\n  \"nombre_completo\": \"Usuario Postman\",\n  \"correo_institucional\": \"{{nuevo_correo}}\",\n  \"documento_identidad\": \"{{nuevo_documento}}\",\n  \"telefono\": \"3001234567\",\n  \"rol\": \"vigilante\",\n  \"password\": \"{{password_prueba}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -290,8 +340,12 @@
                 "exec": [
                   "// Correo y documento son UNIQUE: se generan distintos en cada ejecución.",
                   "const n = Date.now();",
-                  "pm.collectionVariables.set(\"nuevo_correo\", `postman${n}@uni.edu.co`);",
-                  "pm.collectionVariables.set(\"nuevo_documento\", `${n}`);"
+                  "pm.collectionVariables.set(\"nuevo_correo\", `postman${n}@ufps.edu.co`);",
+                  "pm.collectionVariables.set(\"nuevo_documento\", `${n}`);",
+                  "// Si se corre sola, Registrar estudiante no ha generado la clave.",
+                  "if (!pm.collectionVariables.get(\"password_prueba\")) {",
+                  "    pm.collectionVariables.set(\"password_prueba\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "}"
                 ]
               }
             },
@@ -431,7 +485,7 @@
             "url": "{{baseUrl}}/api/v1/usuarios",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre_completo\": \"Duplicado\",\n  \"correo_institucional\": \"{{nuevo_correo}}\",\n  \"documento_identidad\": \"dup-{{nuevo_documento}}\",\n  \"rol\": \"estudiante\",\n  \"password\": \"x\"\n}",
+              "raw": "{\n  \"nombre_completo\": \"Duplicado\",\n  \"correo_institucional\": \"{{nuevo_correo}}\",\n  \"documento_identidad\": \"dup-{{nuevo_documento}}\",\n  \"rol\": \"vigilante\",\n  \"password\": \"{{password_prueba}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -642,42 +696,6 @@
                   "const json = pm.response.json();",
                   "pm.test(\"Nace libre\", () => pm.expect(json.estado).to.eql(\"libre\"));",
                   "pm.collectionVariables.set(\"espacio_id\", json.id);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Crear puestos del plano en lote",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{baseUrl}}/api/v1/espacios/lote",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"zona_id\": \"{{zona_id}}\",\n  \"codigos\": [\"P-01\", \"P-02\"]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
-                  "",
-                  "// P-01 ya existia: solo se crea P-02.",
-                  "pm.test(\"No duplica los existentes\", () => pm.expect(pm.response.json()).to.eql({ creados: 1, existentes: 1 }));"
                 ]
               }
             }
@@ -1232,6 +1250,52 @@
               }
             }
           ]
+        },
+        {
+          "name": "Crear puestos del plano en lote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/espacios/lote",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"zona_id\": \"{{zona_id}}\",\n  \"codigos\": [\"P-01\", \"P-02\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "// P-01 ya existia: solo se crea P-02.",
+                  "pm.test(\"No duplica los existentes\", () => pm.expect(pm.response.json()).to.eql({ creados: 1, existentes: 1 }));"
+                ]
+              }
+            }
+          ]
         }
       ],
       "description": "Flujo completo en orden: correr con el Collection Runner para que las variables se encadenen.",
@@ -1525,6 +1589,41 @@
     },
     {
       "key": "acceso_visitante_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "correo_admin",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "password_admin",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "correo_vigilante",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "password_vigilante",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "correo_estudiante",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "documento_estudiante",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "password_prueba",
       "value": "",
       "type": "string"
     }
