@@ -126,6 +126,13 @@ export interface AccesoActivo extends Acceso {
   espacio_codigo: string | null;
 }
 
+// Lo que ve el estudiante de su moto adentro.
+export interface MiAcceso {
+  placa: string;
+  espacio_codigo: string | null;
+  fecha_hora_entrada: string;
+}
+
 // Lo que envia el vigilante al registrar una entrada.
 export interface AccesoEntradaPayload {
   vehiculo_id: string;

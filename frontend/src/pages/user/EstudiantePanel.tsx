@@ -5,6 +5,7 @@ import Button from "@/components/common/Button";
 import DocumentoVisor from "@/components/verificacion/DocumentoVisor";
 import EstadoBadge from "@/components/verificacion/EstadoBadge";
 import { useAuth } from "@/context/AuthContext";
+import { listarMisAccesos } from "@/services/api/accesos";
 import { ApiError } from "@/services/api/client";
 import { listarMisDocumentos, obtenerUsuarioActual, subirCarnet } from "@/services/api/usuarios";
 import {
@@ -12,7 +13,8 @@ import {
   registrarMiVehiculo,
   reenviarDocumentosVehiculo,
 } from "@/services/api/vehiculos";
-import type { Documento, Usuario, VehiculoConDocumentos } from "@/types/api";
+import { useActualizacionesZona } from "@/services/realtime/useActualizacionesZona";
+import type { Documento, MiAcceso, Usuario, VehiculoConDocumentos } from "@/types/api";
 
 // Estilo comun de los campos y tipos de archivo que se aceptan.
 const campo = "min-h-12 w-full rounded-lg border border-gray-300 px-3 focus:border-emerald-500 focus:outline-none";
@@ -85,6 +87,8 @@ export default function EstudiantePanel() {
             : "Para ingresar al parqueadero necesitas que tu identidad y al menos un vehiculo sean aprobados por el administrador."}
         </p>
 
+        <TarjetaMiMoto hayVehiculoAprobado={vehiculos.some((v) => v.estado_verificacion === "aprobado")} />
+
         {perfil && <TarjetaIdentidad perfil={perfil} carnet={carnet} onCambio={cargar} />}
         <TarjetaVehiculos vehiculos={vehiculos} onCambio={cargar} />
 
@@ -93,6 +97,73 @@ export default function EstudiantePanel() {
         </Link>
       </div>
     </div>
+  );
+}
+
+// Hora de entrada en Colombia; si no fue hoy, con la fecha corta delante.
+function desdeCuando(fechaHora: string): string {
+  const zona = { timeZone: "America/Bogota" } as const;
+  const entrada = new Date(fechaHora);
+  const hora = entrada.toLocaleTimeString("es-CO", { ...zona, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const dia = (fecha: Date) => fecha.toLocaleDateString("en-CA", zona);
+  if (dia(entrada) === dia(new Date())) return `desde las ${hora}`;
+  const fecha = entrada.toLocaleDateString("es-CO", { ...zona, day: "numeric", month: "short" });
+  return `desde el ${fecha}, ${hora}`;
+}
+
+// Donde estan sus motos adentro; se refresca con cada entrada o salida que avisa /ws/zonas.
+function TarjetaMiMoto({ hayVehiculoAprobado }: { hayVehiculoAprobado: boolean }) {
+  const [accesos, setAccesos] = useState<MiAcceso[] | null>(null);
+  const [fallo, setFallo] = useState(false);
+
+  // Pide sus motos adentro; si falla, solo esta tarjeta lo avisa.
+  const cargar = useCallback(async () => {
+    try {
+      setAccesos(await listarMisAccesos());
+      setFallo(false);
+    } catch {
+      setFallo(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  useActualizacionesZona(cargar);
+
+  if (fallo) {
+    return (
+      <section className="rounded-2xl bg-white p-4 shadow-sm">
+        <p className="rounded-lg bg-amber-50 p-2 text-sm text-amber-800">
+          No pudimos consultar donde esta tu moto; intenta de nuevo mas tarde.
+        </p>
+      </section>
+    );
+  }
+  // Mientras carga, o sin motos adentro ni ninguna aprobada, no se muestra nada.
+  if (accesos === null || (accesos.length === 0 && !hayVehiculoAprobado)) return null;
+
+  return (
+    <section className="space-y-2 rounded-2xl bg-white p-4 shadow-sm">
+      {accesos.length === 0 ? (
+        <p className="text-sm text-gray-500">Ninguna de tus motos esta en el parqueadero ahora.</p>
+      ) : (
+        accesos.map((acceso) => (
+          <p key={acceso.placa} className="break-words text-gray-900">
+            Tu moto <span className="font-semibold">{acceso.placa}</span> esta{" "}
+            {acceso.espacio_codigo ? (
+              <>
+                en el puesto <span className="whitespace-nowrap font-semibold">{acceso.espacio_codigo}</span>
+              </>
+            ) : (
+              "en el parqueadero"
+            )}{" "}
+            {desdeCuando(acceso.fecha_hora_entrada)}
+          </p>
+        ))
+      )}
+    </section>
   );
 }
 

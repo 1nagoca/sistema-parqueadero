@@ -1,5 +1,5 @@
 // Llamadas al servicio de accesos (entradas y salidas).
-import type { Acceso, AccesoActivo, AccesoEntradaPayload } from "@/types/api";
+import type { Acceso, AccesoActivo, AccesoEntradaPayload, MiAcceso } from "@/types/api";
 import { apiGet, apiPost, ApiError } from "./client";
 
 // Vehiculos que estan adentro en una zona.
@@ -17,6 +17,11 @@ export async function buscarAccesoActivoPorPlaca(placa: string): Promise<Acceso 
     }
     throw error;
   }
+}
+
+// Sus motos adentro (solo estudiante); lista vacia si ninguna esta en el parqueadero.
+export function listarMisAccesos(): Promise<MiAcceso[]> {
+  return apiGet<MiAcceso[]>("/accesos/mio");
 }
 
 // Registra una entrada.
