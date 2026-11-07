@@ -216,8 +216,8 @@ def _estudiante_con_carnet_y_vehiculo(client, sufijo):
     uid = client.get(f"{API}/usuarios/me", headers=est).json()["id"]
     r = client.post(f"{API}/usuarios/me/carnet", headers=est, files={"archivo": ("c.png", PNG, "image/png")})
     assert r.status_code == 200, r.text
-    # Placa al azar (ABC12D) para que no choque con otra de la misma corrida.
-    r = _vehiculo(client, est, "AUD" + str(uuid.uuid4().int)[:2] + chr(ord("A") + uuid.uuid4().int % 26))
+    # Placa del todo al azar (ABC12D) con _placa() para que no choque con otra de la misma corrida.
+    r = _vehiculo(client, est, _placa())
     assert r.status_code == 201, r.text
     return est, uid, r.json()["id"]
 
@@ -464,7 +464,7 @@ def test_reactivar_estudiante_lo_deja_pendiente_y_sus_vehiculos_rechazados(clien
 def test_reactivar_estudiante_con_dos_motos_deja_una_traza_por_vehiculo(client, sufijo):
     admin_id, admin = _personal(client, RolUsuario.ADMIN, sufijo)
     est, uid, primera = _estudiante_con_carnet_y_vehiculo(client, sufijo)
-    r = _vehiculo(client, est, "DOS" + str(uuid.uuid4().int)[:2] + chr(ord("A") + uuid.uuid4().int % 26))
+    r = _vehiculo(client, est, _placa())
     assert r.status_code == 201, r.text
     segunda = r.json()["id"]
     client.post(f"{API}/verificaciones/vehiculos/{primera}/resolver", headers=admin, json={"aprobar": True})

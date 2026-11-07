@@ -3,6 +3,8 @@ DATABASE_URL / SECRET_KEY en el entorno; la base de pruebas la prepara conftest.
 
 import logging
 import os
+import random
+import string
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -78,7 +80,8 @@ def identidad(monkeypatch):
             al azar), sin el es de visitante."""
             vehiculo = identidad_client.VehiculoIdentidad(
                 id=uuid.uuid4(),
-                placa=prefijo + str(uuid.uuid4().int)[:3],
+                # Sufijo al azar (3 letras y 3 digitos): con pocos valores chocaban dentro de una corrida.
+                placa=prefijo + "".join(random.choices(string.ascii_uppercase, k=3)) + f"{random.randrange(1000):03d}",
                 es_visitante=propietario_estado is None,
                 estado_verificacion=estado,
                 propietario_id=(
