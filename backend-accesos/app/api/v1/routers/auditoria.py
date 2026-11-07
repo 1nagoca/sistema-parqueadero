@@ -32,7 +32,10 @@ def listar_auditoria(
         db, desde=desde, hasta=hasta, tabla_afectada=tabla_afectada, pagina=pagina, por_pagina=por_pagina
     )
     return AuditoriaAccesoPagina(
-        items=[AuditoriaAccesoRead.model_validate(t) for t in items],
+        items=[
+            AuditoriaAccesoRead.model_validate(traza).model_copy(update={"detalle": detalle})
+            for traza, detalle in items
+        ],
         total=total,
         pagina=pagina,
         por_pagina=por_pagina,

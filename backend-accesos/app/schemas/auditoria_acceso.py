@@ -5,7 +5,16 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models.enums import AccionAuditoria
+from app.models.enums import AccionAuditoria, TipoAcceso
+
+
+# Datos del acceso de una traza para escribirla en frases; el nombre de la zona y de quien la registro los pone el panel.
+class DetalleAcceso(BaseModel):
+    placa: str
+    tipo_acceso: TipoAcceso
+    zona_id: uuid.UUID
+    espacio_codigo: str | None
+    duracion_minutos: int | None
 
 
 # Una traza de la bitacora de entradas y salidas.
@@ -22,6 +31,8 @@ class AuditoriaAccesoRead(BaseModel):
     motivo: str | None
     fecha_hora: datetime
     ip_origen: str | None
+    # Null si la traza no es de un acceso o el acceso ya no existe.
+    detalle: DetalleAcceso | None = None
 
 
 # Una pagina de la bitacora con el rango de fechas que se consulto.

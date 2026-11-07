@@ -3,10 +3,14 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from app.models.acceso import Acceso
 from app.models.auditoria_acceso import AuditoriaAcceso
 from app.models.enums import AccionAuditoria
+from app.parqueadero_client import client as parqueadero_client
+from app.schemas.auditoria_acceso import DetalleAcceso
 
 
 # Guarda una traza en la bitacora (sin commit: lo hace quien la llama).
@@ -88,7 +92,7 @@ def resolver_rango(desde: date | None, hasta: date | None) -> tuple[date, date]:
     return desde, hasta
 
 
-# Una pagina de trazas entre dos fechas inclusivas en hora de Colombia, de la mas nueva a la mas vieja.
+# Una pagina de trazas entre dos fechas inclusivas en hora de Colombia, de la mas nueva a la mas vieja, con su detalle.
 def listar_auditoria(
     db: Session,
     *,
@@ -97,7 +101,7 @@ def listar_auditoria(
     tabla_afectada: str | None,
     pagina: int,
     por_pagina: int,
-) -> tuple[list[AuditoriaAcceso], int]:
+) -> tuple[list[tuple[AuditoriaAcceso, DetalleAcceso | None]], int]:
     inicio = datetime.combine(desde, time.min, tzinfo=COLOMBIA)
     fin = datetime.combine(hasta + timedelta(days=1), time.min, tzinfo=COLOMBIA)
     consulta = db.query(AuditoriaAcceso).filter(
@@ -107,10 +111,43 @@ def listar_auditoria(
         consulta = consulta.filter(AuditoriaAcceso.tabla_afectada == tabla_afectada)
 
     total = consulta.count()
-    items = (
-        consulta.order_by(AuditoriaAcceso.fecha_hora.desc(), AuditoriaAcceso.id.desc())
+    # LEFT JOIN por la llave del acceso: solo trazas de la tabla accesos, sin una consulta por fila.
+    filas = (
+        consulta.outerjoin(
+            Acceso,
+            and_(AuditoriaAcceso.tabla_afectada == "accesos", Acceso.id == AuditoriaAcceso.registro_id),
+        )
+        .add_columns(Acceso.placa, Acceso.tipo_acceso, Acceso.zona_id, Acceso.espacio_id, Acceso.duracion_minutos)
+        .order_by(AuditoriaAcceso.fecha_hora.desc(), AuditoriaAcceso.id.desc())
         .offset((pagina - 1) * por_pagina)
         .limit(por_pagina)
         .all()
     )
-    return items, total
+    codigos = _codigos_de_la_pagina([fila.espacio_id for fila in filas if fila.espacio_id is not None])
+    return [(fila[0], _detalle(fila, codigos)) for fila in filas], total
+
+
+# Codigos de los puestos de la pagina en una sola llamada; sin parqueadero, sin codigos (es de cortesia).
+def _codigos_de_la_pagina(espacio_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+    distintos = list(dict.fromkeys(espacio_ids))
+    if not distintos:
+        return {}
+    try:
+        return parqueadero_client.codigos_de_espacios(distintos)
+    except parqueadero_client.ParqueaderoNoDisponibleError:
+        return {}
+
+
+# Detalle de una traza de acceso; None si no es de un acceso o el acceso ya no existe.
+def _detalle(fila, codigos: dict[uuid.UUID, str]) -> DetalleAcceso | None:
+    traza = fila[0]
+    if fila.placa is None:
+        return None
+    return DetalleAcceso(
+        placa=fila.placa,
+        tipo_acceso=fila.tipo_acceso,
+        zona_id=fila.zona_id,
+        espacio_codigo=codigos.get(fila.espacio_id),
+        # La duracion es de la salida: la traza de la entrada no la lleva aunque el acceso ya este cerrado.
+        duracion_minutos=fila.duracion_minutos if traza.accion == AccionAuditoria.ACTUALIZACION else None,
+    )
