@@ -230,4 +230,24 @@ export interface AuditoriaAcceso {
   motivo: string | null;
   fecha_hora: string;
   ip_origen: string | null;
+  // Datos para escribir la traza en frases; null si no es de un acceso, usuario o vehiculo.
+  detalle?: DetalleAcceso | DetalleVerificacion | null;
+  // Solo en la bitacora de verificaciones.
+  realizado_por_nombre?: string | null;
+}
+
+// Datos del acceso de una traza (bitacora de accesos).
+export interface DetalleAcceso {
+  placa: string;
+  tipo_acceso: TipoAcceso;
+  zona_id: string;
+  espacio_codigo: string | null;
+  duracion_minutos: number | null;
+}
+
+// A quien se refiere una traza de verificaciones: el usuario, o la placa y su dueno.
+export interface DetalleVerificacion {
+  nombre: string | null;
+  rol: RolUsuario | null;
+  placa: string | null;
 }

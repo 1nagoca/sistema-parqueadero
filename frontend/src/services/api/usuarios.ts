@@ -7,6 +7,11 @@ export function obtenerUsuarioActual(): Promise<Usuario> {
   return apiGet<Usuario>("/usuarios/me");
 }
 
+// Un usuario por su id (admin y vigilante); el panel solo usa su nombre.
+export function obtenerUsuario(id: string): Promise<Usuario> {
+  return apiGet<Usuario>(`/usuarios/${encodeURIComponent(id)}`);
+}
+
 // Una pagina de usuarios con buscador y filtros (admin).
 export function listarUsuarios(filtros: FiltrosUsuarios = {}): Promise<UsuariosPagina> {
   const params = new URLSearchParams();

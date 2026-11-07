@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import MapaParqueadero from "@/components/map/MapaParqueadero";
 import { CODIGOS_PLANO } from "@/components/map/planoParqueadero";
@@ -10,7 +10,13 @@ import { listarAccesosActivos } from "@/services/api/accesos";
 import { listarAuditoria, listarAuditoriaVerificaciones } from "@/services/api/auditoria";
 import { ApiError } from "@/services/api/client";
 import { crearEspaciosLote, listarEspacios } from "@/services/api/espacios";
-import { crearUsuario, darDeBajaUsuario, listarUsuarios, reactivarUsuario } from "@/services/api/usuarios";
+import {
+  crearUsuario,
+  darDeBajaUsuario,
+  listarUsuarios,
+  obtenerUsuario,
+  reactivarUsuario,
+} from "@/services/api/usuarios";
 import { listarPendientes, resolverUsuario, resolverVehiculo } from "@/services/api/verificaciones";
 import { crearZona, listarZonas } from "@/services/api/zonas";
 import { useActualizacionesZona } from "@/services/realtime/useActualizacionesZona";
@@ -25,6 +31,8 @@ import type {
   UsuariosPagina,
   Zona,
 } from "@/types/api";
+
+import { fraseDeTraza } from "./frasesAuditoria";
 
 // Pestanas del panel y su titulo.
 type Pestana = "verificaciones" | "usuarios" | "zonas" | "espacios" | "auditoria";
@@ -913,6 +921,33 @@ function SeccionAuditoria() {
   const [pagina, setPagina] = useState<AuditoriaPagina | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [zonas, setZonas] = useState<Record<string, string>>({});
+  const [nombres, setNombres] = useState<Record<string, string | null>>({});
+  // Ids ya pedidos a identidad (con o sin exito), para no repetirlos al cambiar de pagina.
+  const pedidos = useRef(new Set<string>());
+
+  // Nombres de las zonas, una sola vez; si falla, la frase va sin zona.
+  useEffect(() => {
+    listarZonas()
+      .then((lista) => setZonas(Object.fromEntries(lista.map((zona) => [zona.id, zona.nombre]))))
+      .catch(() => undefined);
+  }, []);
+
+  // Nombres de quien registro las trazas de accesos de esta pagina que aun no se conocen.
+  useEffect(() => {
+    const faltan = new Set(
+      (pagina?.items ?? [])
+        .filter((t) => t.tabla_afectada === "accesos" || t.tabla_afectada === "cierre_semestre")
+        .map((t) => t.realizado_por_id)
+        .filter((id) => !pedidos.current.has(id)),
+    );
+    faltan.forEach((id) => {
+      pedidos.current.add(id);
+      obtenerUsuario(id)
+        .then((usuario) => setNombres((previos) => ({ ...previos, [id]: usuario.nombre_completo })))
+        .catch(() => setNombres((previos) => ({ ...previos, [id]: null })));
+    });
+  }, [pagina]);
 
   const hoy = hoyEnColombia();
   const semestreActual = semestreDe(hoy);
@@ -1073,22 +1108,29 @@ function SeccionAuditoria() {
       )}
 
       <div className="space-y-2">
-        {items.map((registro) => (
-          <div key={registro.id} className="rounded-xl bg-white p-3 text-sm shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-medium text-gray-900">
-                {registro.tabla_afectada} · {registro.accion}
-              </p>
-              <p className="text-xs text-gray-500">{new Date(registro.fecha_hora).toLocaleString("es-CO")}</p>
+        {items.map((registro) => {
+          const frase = fraseDeTraza(registro, { usuarios: nombres, zonas });
+          return (
+            <div key={registro.id} className="rounded-xl bg-white p-3 text-sm shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-medium text-gray-900">
+                  {registro.tabla_afectada} · {registro.accion}
+                </p>
+                <p className="text-xs text-gray-500">{new Date(registro.fecha_hora).toLocaleString("es-CO")}</p>
+              </div>
+              {registro.motivo && <p className="mt-1 text-xs text-gray-700">Motivo: {registro.motivo}</p>}
+              {frase ? (
+                <p className="mt-1 break-words text-gray-800">{frase}</p>
+              ) : (
+                registro.valores_nuevos && (
+                  <pre className="mt-1 overflow-x-auto text-xs text-gray-600">
+                    {JSON.stringify(registro.valores_nuevos)}
+                  </pre>
+                )
+              )}
             </div>
-            {registro.motivo && <p className="mt-1 text-xs text-gray-700">Motivo: {registro.motivo}</p>}
-            {registro.valores_nuevos && (
-              <pre className="mt-1 overflow-x-auto text-xs text-gray-600">
-                {JSON.stringify(registro.valores_nuevos)}
-              </pre>
-            )}
-          </div>
-        ))}
+          );
+        })}
         {cargando && items.length === 0 && <p className="text-center text-gray-400">Cargando...</p>}
         {!cargando && pagina && items.length === 0 && (
           <p className="text-center text-gray-400">Sin registros en ese periodo.</p>
