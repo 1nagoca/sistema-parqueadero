@@ -295,6 +295,8 @@ def test_auditoria_de_verificaciones_solo_la_lee_el_administrador(client, sufijo
         "motivo",
         "fecha_hora",
         "ip_origen",
+        "detalle",
+        "realizado_por_nombre",
     }
 
     r = client.get(f"{API}/verificaciones/auditoria", headers=admin, params={"tabla_afectada": "vehiculos"})

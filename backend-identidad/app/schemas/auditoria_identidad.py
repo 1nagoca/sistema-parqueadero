@@ -5,7 +5,14 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models.enums import AccionAuditoria
+from app.models.enums import AccionAuditoria, RolUsuario
+
+
+# A quien se refiere una traza: en usuarios, el usuario; en vehiculos, la placa y su dueno (null si es de visitante).
+class DetalleVerificacion(BaseModel):
+    nombre: str | None
+    rol: RolUsuario | None
+    placa: str | None
 
 
 # Una traza de la bitacora de verificaciones.
@@ -22,6 +29,9 @@ class AuditoriaIdentidadRead(BaseModel):
     motivo: str | None
     fecha_hora: datetime
     ip_origen: str | None
+    # Null si la traza no es de usuarios o vehiculos o el registro no existe.
+    detalle: DetalleVerificacion | None = None
+    realizado_por_nombre: str | None = None
 
 
 # Una pagina de la bitacora con el rango de fechas que se consulto.

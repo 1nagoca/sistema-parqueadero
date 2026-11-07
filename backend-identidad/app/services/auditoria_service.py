@@ -3,10 +3,14 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 
-from sqlalchemy.orm import Session
+from sqlalchemy import and_
+from sqlalchemy.orm import Session, aliased
 
 from app.models.auditoria_identidad import AuditoriaIdentidad
 from app.models.enums import AccionAuditoria
+from app.models.usuario import Usuario
+from app.models.vehiculo import Vehiculo
+from app.schemas.auditoria_identidad import DetalleVerificacion
 
 
 # Guarda una traza en la bitacora (sin commit: lo hace quien la llama).
@@ -88,7 +92,7 @@ def resolver_rango(desde: date | None, hasta: date | None) -> tuple[date, date]:
     return desde, hasta
 
 
-# Una pagina de trazas entre dos fechas inclusivas en hora de Colombia, de la mas nueva a la mas vieja.
+# Una pagina de trazas entre dos fechas inclusivas en hora de Colombia, de la mas nueva a la mas vieja, con su detalle y autor.
 def listar_auditoria(
     db: Session,
     *,
@@ -97,7 +101,7 @@ def listar_auditoria(
     tabla_afectada: str | None,
     pagina: int,
     por_pagina: int,
-) -> tuple[list[AuditoriaIdentidad], int]:
+) -> tuple[list[tuple[AuditoriaIdentidad, DetalleVerificacion | None, str | None]], int]:
     inicio = datetime.combine(desde, time.min, tzinfo=COLOMBIA)
     fin = datetime.combine(hasta + timedelta(days=1), time.min, tzinfo=COLOMBIA)
     consulta = db.query(AuditoriaIdentidad).filter(
@@ -107,10 +111,40 @@ def listar_auditoria(
         consulta = consulta.filter(AuditoriaIdentidad.tabla_afectada == tabla_afectada)
 
     total = consulta.count()
-    items = (
-        consulta.order_by(AuditoriaIdentidad.fecha_hora.desc(), AuditoriaIdentidad.id.desc())
+
+    # LEFT JOIN por llave: el usuario o el vehiculo afectado, el dueno del vehiculo y quien hizo la traza.
+    afectado, dueno, autor = aliased(Usuario), aliased(Usuario), aliased(Usuario)
+    filas = (
+        consulta.outerjoin(
+            afectado,
+            and_(AuditoriaIdentidad.tabla_afectada == "usuarios", afectado.id == AuditoriaIdentidad.registro_id),
+        )
+        .outerjoin(
+            Vehiculo,
+            and_(AuditoriaIdentidad.tabla_afectada == "vehiculos", Vehiculo.id == AuditoriaIdentidad.registro_id),
+        )
+        .outerjoin(dueno, dueno.id == Vehiculo.usuario_id)
+        .outerjoin(autor, autor.id == AuditoriaIdentidad.realizado_por_id)
+        .add_columns(
+            afectado.nombre_completo.label("afectado_nombre"),
+            afectado.rol.label("afectado_rol"),
+            Vehiculo.placa.label("placa"),
+            dueno.nombre_completo.label("dueno_nombre"),
+            dueno.rol.label("dueno_rol"),
+            autor.nombre_completo.label("autor_nombre"),
+        )
+        .order_by(AuditoriaIdentidad.fecha_hora.desc(), AuditoriaIdentidad.id.desc())
         .offset((pagina - 1) * por_pagina)
         .limit(por_pagina)
         .all()
     )
-    return items, total
+    return [(fila[0], _detalle(fila), fila.autor_nombre) for fila in filas], total
+
+
+# Detalle de una traza segun su tabla; None si no es de usuarios o vehiculos o el registro no existe.
+def _detalle(fila) -> DetalleVerificacion | None:
+    if fila.afectado_nombre is not None:
+        return DetalleVerificacion(nombre=fila.afectado_nombre, rol=fila.afectado_rol, placa=None)
+    if fila.placa is not None:
+        return DetalleVerificacion(nombre=fila.dueno_nombre, rol=fila.dueno_rol, placa=fila.placa)
+    return None
