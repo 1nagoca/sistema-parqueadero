@@ -58,3 +58,10 @@ class AccesoActivoRead(AccesoRead):
 
     placa: str
     espacio_codigo: str | None = None
+
+
+# Lo que ve el estudiante de su moto adentro: solo placa, puesto y hora de entrada (Ley 1581).
+class MiAccesoRead(BaseModel):
+    placa: str
+    espacio_codigo: str | None
+    fecha_hora_entrada: datetime

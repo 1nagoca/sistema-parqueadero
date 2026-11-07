@@ -188,6 +188,18 @@ def _tiene_acceso_activo(db: Session, vehiculo_id: uuid.UUID) -> bool:
     )
 
 
+# Accesos abiertos de esos vehiculos, por hora de entrada; sin ids no consulta (son pocos: .in_ vale).
+def accesos_abiertos_de_vehiculos(db: Session, vehiculo_ids: list[uuid.UUID]) -> list[Acceso]:
+    if not vehiculo_ids:
+        return []
+    return (
+        db.query(Acceso)
+        .filter(Acceso.vehiculo_id.in_(vehiculo_ids), Acceso.fecha_hora_salida.is_(None))
+        .order_by(Acceso.fecha_hora_entrada)
+        .all()
+    )
+
+
 # Registra la salida: cierra el acceso, calcula la duracion y libera el cupo.
 def registrar_salida(db: Session, acceso_id: uuid.UUID, realizado_por_id: uuid.UUID) -> Acceso:
     """RN-02: cierra el acceso (fecha/duracion) y libera el cupo en el servicio de parqueadero.

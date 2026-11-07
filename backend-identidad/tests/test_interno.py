@@ -111,3 +111,28 @@ def test_usuarios_devuelve_solo_los_que_existen_sin_datos_personales(client, suf
     assert client.get("/interno/usuarios", params={"id": [inexistente]}).json() == []
     assert client.get("/interno/usuarios").json() == []
     assert client.get("/interno/usuarios", params={"id": "no-es-un-uuid"}).status_code == 422
+
+
+def test_vehiculos_de_usuario_devuelve_solo_los_ids_de_sus_vehiculos_en_orden(client, sufijo):
+    estudiante_id = _usuario(sufijo, RolUsuario.ESTUDIANTE)
+    otro_id = _usuario(uuid.uuid4().hex[:8], RolUsuario.ESTUDIANTE)
+    primera, placa_primera = _vehiculo("MV1", usuario_id=uuid.UUID(estudiante_id))
+    _vehiculo("MVO", usuario_id=uuid.UUID(otro_id))
+    _vehiculo("MVV", es_visitante=True)
+    segunda, _ = _vehiculo("MV2", usuario_id=uuid.UUID(estudiante_id))
+
+    r = client.get(f"/interno/usuarios/{estudiante_id}/vehiculos")  # sin sesion: es una llamada entre servicios
+    assert r.status_code == 200, r.text
+    assert r.json() == [primera, segunda]
+    # solo ids: sin placas ni datos del dueno
+    assert placa_primera not in r.text and "Nombre Privado" not in r.text and "@ufps.edu.co" not in r.text
+
+
+def test_vehiculos_de_usuario_sin_motos_o_inexistente_da_lista_vacia(client, sufijo):
+    sin_motos_id = _usuario(sufijo, RolUsuario.ESTUDIANTE)
+
+    for usuario_id in (sin_motos_id, str(uuid.uuid4())):
+        r = client.get(f"/interno/usuarios/{usuario_id}/vehiculos")
+        assert r.status_code == 200, r.text
+        assert r.json() == []
+    assert client.get("/interno/usuarios/no-es-un-uuid/vehiculos").status_code == 422

@@ -73,14 +73,19 @@ def identidad(monkeypatch):
             self.usuarios_inexistentes = set()
             self.usuarios = {}
 
-        def vehiculo(self, prefijo="VIS", estado="aprobado", propietario_estado=None):
-            """Registra un vehiculo; con ``propietario_estado`` tiene dueno, sin el es de visitante."""
+        def vehiculo(self, prefijo="VIS", estado="aprobado", propietario_estado=None, propietario_id=None):
+            """Registra un vehiculo; con ``propietario_estado`` tiene dueno (``propietario_id`` o uno
+            al azar), sin el es de visitante."""
             vehiculo = identidad_client.VehiculoIdentidad(
                 id=uuid.uuid4(),
                 placa=prefijo + str(uuid.uuid4().int)[:3],
                 es_visitante=propietario_estado is None,
                 estado_verificacion=estado,
-                propietario_id=uuid.uuid4() if propietario_estado is not None else None,
+                propietario_id=(
+                    (uuid.UUID(str(propietario_id)) if propietario_id else uuid.uuid4())
+                    if propietario_estado is not None
+                    else None
+                ),
                 propietario_estado_verificacion=propietario_estado,
                 propietario_activo=True if propietario_estado is not None else None,
             )
@@ -115,6 +120,10 @@ def identidad(monkeypatch):
                 usuario_id, identidad_client.UsuarioIdentidad(id=usuario_id, rol="vigilante", activo=True)
             )
 
+        def vehiculos_de_usuario(self, usuario_id):
+            self._responder()
+            return [v.id for v in self.vehiculos.values() if v.propietario_id == usuario_id]
+
         def _responder(self):
             if self.caida:
                 raise identidad_client.IdentidadNoDisponibleError("El servicio de identidad no esta disponible")
@@ -123,6 +132,7 @@ def identidad(monkeypatch):
     monkeypatch.setattr(identidad_client, "obtener_vehiculo", doble.obtener_vehiculo)
     monkeypatch.setattr(identidad_client, "usuarios_existentes", doble.usuarios_existentes)
     monkeypatch.setattr(identidad_client, "obtener_usuario", doble.obtener_usuario)
+    monkeypatch.setattr(identidad_client, "vehiculos_de_usuario", doble.vehiculos_de_usuario)
     return doble
 
 

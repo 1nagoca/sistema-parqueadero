@@ -5,10 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import UsuarioToken, get_db, require_role_token
+from app.identidad_client import client as identidad_client
 from app.identidad_client.client import IdentidadNoDisponibleError, VehiculoNoEncontradoError
 from app.models.acceso import Acceso
 from app.models.enums import RolUsuario
-from app.schemas.acceso import AccesoActivoRead, AccesoEntradaCreate, AccesoRead
+from app.schemas.acceso import AccesoActivoRead, AccesoEntradaCreate, AccesoRead, MiAccesoRead
 from app.parqueadero_client import client as parqueadero_client
 from app.parqueadero_client.client import CupoNoDisponibleError, ParqueaderoNoDisponibleError
 from app.services import acceso_service
@@ -68,6 +69,37 @@ def buscar_acceso_activo(
     if acceso is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No hay un acceso activo para esa placa")
     return acceso
+
+
+# GET /accesos/mio (estudiante): donde estan sus motos adentro, segun sus vehiculos en identidad.
+@router.get("/mio", response_model=list[MiAccesoRead])
+def mis_accesos_activos(
+    db: Session = Depends(get_db),
+    estudiante: UsuarioToken = Depends(require_role_token(RolUsuario.ESTUDIANTE)),
+):
+    """Sin identidad no se sabe cuales motos son suyas (503); sin parqueadero sale sin codigo."""
+    try:
+        vehiculo_ids = identidad_client.vehiculos_de_usuario(estudiante.id)
+    except IdentidadNoDisponibleError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    accesos = acceso_service.accesos_abiertos_de_vehiculos(db, vehiculo_ids)
+
+    # Igual que en la lista del vigilante: el codigo del puesto es de cortesia.
+    try:
+        codigos = parqueadero_client.codigos_de_espacios(
+            [acceso.espacio_id for acceso in accesos if acceso.espacio_id is not None]
+        )
+    except ParqueaderoNoDisponibleError:
+        codigos = {}
+
+    return [
+        MiAccesoRead(
+            placa=acceso.placa,
+            espacio_codigo=codigos.get(acceso.espacio_id),
+            fecha_hora_entrada=acceso.fecha_hora_entrada,
+        )
+        for acceso in accesos
+    ]
 
 
 # POST /accesos/entrada (vigilante, admin): registra una entrada; traduce los errores del service a 404/409/503.

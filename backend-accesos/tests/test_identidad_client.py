@@ -140,3 +140,35 @@ def test_usuarios_existentes_devuelve_los_que_identidad_conoce(identidad_respond
     identidad_responde(lambda peticion: httpx.Response(404, json={"detail": "Not Found"}))
     with pytest.raises(identidad_client.IdentidadNoDisponibleError):
         identidad_client.usuarios_existentes([activo])
+
+
+def test_vehiculos_de_usuario_lee_la_lista_de_ids(identidad_responde):
+    usuario_id, primera, segunda = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    peticiones = identidad_responde(lambda peticion: httpx.Response(200, json=[str(primera), str(segunda)]))
+
+    assert identidad_client.vehiculos_de_usuario(usuario_id) == [primera, segunda]
+    assert str(peticiones[0].url) == f"{settings.IDENTIDAD_URL}/interno/usuarios/{usuario_id}/vehiculos"
+
+    identidad_responde(lambda peticion: httpx.Response(200, json=[]))
+    assert identidad_client.vehiculos_de_usuario(usuario_id) == []
+
+
+@pytest.mark.parametrize(
+    "manejador",
+    [
+        _sin_conexion,
+        _tarda_demasiado,
+        lambda peticion: httpx.Response(500, json={"detail": "error"}),
+        # la ruta nunca responde 404: si lo hace, identidad no tiene la ruta
+        lambda peticion: httpx.Response(404, json={"detail": "Not Found"}),
+        lambda peticion: httpx.Response(200, text="<html>no es json</html>"),
+        lambda peticion: httpx.Response(200, json={"ids": []}),
+        lambda peticion: httpx.Response(200, json=["no-es-un-uuid"]),
+        lambda peticion: httpx.Response(200, json=[{"id": str(VEHICULO_ID)}]),
+    ],
+    ids=["sin-conexion", "timeout", "500", "404", "no-json", "objeto", "id-invalido", "lista-de-objetos"],
+)
+def test_vehiculos_de_usuario_mal_formado_o_caido_es_identidad_no_disponible(identidad_responde, manejador):
+    identidad_responde(manejador)
+    with pytest.raises(identidad_client.IdentidadNoDisponibleError):
+        identidad_client.vehiculos_de_usuario(uuid.uuid4())

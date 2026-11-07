@@ -92,6 +92,20 @@ def obtener_usuario(usuario_id: uuid.UUID) -> UsuarioIdentidad | None:
     return None
 
 
+# Pregunta a identidad los ids de los vehiculos de un usuario ([] si no tiene).
+def vehiculos_de_usuario(usuario_id: uuid.UUID) -> list[uuid.UUID]:
+    """Lo usa GET /accesos/mio: Acceso.usuario_id es el conductor y casi siempre va vacio,
+    asi que la moto del estudiante se reconoce por sus vehiculos en identidad."""
+    respuesta = _pedir(f"/interno/usuarios/{usuario_id}/vehiculos")
+    cuerpo = _json(respuesta)
+    if not isinstance(cuerpo, list):
+        raise IdentidadNoDisponibleError("El servicio de identidad no esta disponible")
+    try:
+        return [uuid.UUID(vehiculo_id) for vehiculo_id in cuerpo]
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise IdentidadNoDisponibleError("El servicio de identidad no esta disponible") from exc
+
+
 # Hace el GET con 5 s de espera; si identidad no responde, IdentidadNoDisponibleError.
 def _pedir(ruta: str, **kwargs) -> httpx.Response:
     try:

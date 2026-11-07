@@ -38,6 +38,17 @@ def obtener_por_placa(db: Session, placa: str) -> Vehiculo | None:
     return db.query(Vehiculo).filter(Vehiculo.placa == placa.strip().upper()).first()
 
 
+# Ids de los vehiculos de ese usuario, del mas antiguo al mas nuevo; [] si no tiene o no existe.
+def ids_de_vehiculos_de_usuario(db: Session, usuario_id: uuid.UUID) -> list[uuid.UUID]:
+    filas = (
+        db.query(Vehiculo.id)
+        .filter(Vehiculo.usuario_id == usuario_id)
+        .order_by(Vehiculo.creado_en, Vehiculo.id)
+        .all()
+    )
+    return [fila.id for fila in filas]
+
+
 # Dueno de la moto y su carnet si el vigilante puede verlos (RN-09); si no, PropietarioNoVisibleError.
 def propietario_para_vigilante(db: Session, placa: str) -> tuple[Usuario, CarnetVisible | None]:
     """Solo motos registradas y aprobadas cuyo dueno esta aprobado y activo; todo lo demas

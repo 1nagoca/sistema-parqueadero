@@ -7,6 +7,7 @@ from app.api.deps import get_db
 from app.models.usuario import Usuario
 from app.models.vehiculo import Vehiculo
 from app.schemas.interno import UsuarioInterno, VehiculoInterno
+from app.services import vehiculo_service
 
 # API interna entre microservicios: la usa el servicio de accesos al registrar una entrada.
 # El gateway no publica /interno, asi que no es alcanzable desde el navegador.
@@ -36,3 +37,10 @@ def usuarios_existentes(id: list[uuid.UUID] = Query(default=[]), db: Session = D
     if not id:
         return []
     return db.query(Usuario).filter(Usuario.id.in_(id)).all()
+
+
+# GET /interno/usuarios/{id}/vehiculos (lo llama accesos): solo los ids de sus vehiculos.
+@router.get("/usuarios/{usuario_id}/vehiculos", response_model=list[uuid.UUID])
+def vehiculos_de_usuario(usuario_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Sin placas ni datos del dueno; un usuario sin vehiculos o inexistente da []."""
+    return vehiculo_service.ids_de_vehiculos_de_usuario(db, usuario_id)
