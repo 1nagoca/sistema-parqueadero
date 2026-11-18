@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import DibujoPlano, { colorPorEstado, COLOR_SIN_CREAR, COLOR_VISITANTE } from "@/components/map/DibujoPlano";
+import { colorPorEstado, COLOR_SIN_CREAR, COLOR_VISITANTE } from "@/components/map/coloresPlano";
+import DibujoPlano from "@/components/map/DibujoPlano";
 import { ANCHO, BLOQUES, FILAS, PLANO, PUESTOS } from "@/components/map/planoParqueadero";
 import type { Espacio, EstadoEspacio } from "@/types/api";
 

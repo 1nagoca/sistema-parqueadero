@@ -1,5 +1,6 @@
 import { useId, type CSSProperties } from "react";
 
+import { colorPorEstado, COLOR_SIN_CREAR, COLOR_VISITANTE } from "@/components/map/coloresPlano";
 import {
   BLOQUES,
   CAJAS,
@@ -11,17 +12,7 @@ import {
   PUESTOS,
   type Rectangulo,
 } from "@/components/map/planoParqueadero";
-import type { Espacio, EstadoEspacio } from "@/types/api";
-
-// Color de cada estado; gris si el puesto del plano aun no existe en la base.
-export const colorPorEstado: Record<EstadoEspacio, string> = {
-  libre: "#22c55e",
-  ocupado: "#ef4444",
-  reservado: "#eab308",
-  mantenimiento: "#eab308",
-};
-export const COLOR_SIN_CREAR = "#d1d5db";
-export const COLOR_VISITANTE = "#8b5cf6";
+import type { Espacio } from "@/types/api";
 
 // Lo necesario para que cada puesto se pueda tocar.
 interface Interaccion {

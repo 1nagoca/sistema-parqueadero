@@ -1,20 +1,11 @@
 // Sesion del usuario compartida por toda la app (quien esta conectado y su rol).
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
+import { AuthContext } from "@/context/contextoAuth";
 import { login as loginApi } from "@/services/api/auth";
 import { borrarToken, guardarToken, obtenerToken } from "@/services/api/client";
 import { obtenerUsuarioActual } from "@/services/api/usuarios";
 import type { Usuario } from "@/types/api";
-
-// Lo que ofrece el contexto a las paginas.
-interface AuthContextValue {
-  usuario: Usuario | null;
-  cargando: boolean;
-  iniciarSesion: (correo: string, password: string) => Promise<Usuario>;
-  cerrarSesion: () => void;
-}
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 // Envuelve la app y guarda el usuario de la sesion.
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -53,13 +44,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-// Hook para leer la sesion desde cualquier pagina.
-export function useAuth(): AuthContextValue {
-  const contexto = useContext(AuthContext);
-  if (!contexto) {
-    throw new Error("useAuth debe usarse dentro de un AuthProvider");
-  }
-  return contexto;
 }

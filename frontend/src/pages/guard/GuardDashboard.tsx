@@ -6,7 +6,7 @@ import PlateReader from "@/components/scanner/PlateReader";
 import PlateSearchBar from "@/components/scanner/PlateSearchBar";
 import QRScanner from "@/components/scanner/QRScanner";
 import CarnetPropietario from "@/components/verificacion/CarnetPropietario";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import { ApiError } from "@/services/api/client";
 import {
   buscarAccesoActivoPorPlaca,

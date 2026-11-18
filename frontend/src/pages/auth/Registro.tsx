@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import Button from "@/components/common/Button";
 import PasswordInput from "@/components/common/PasswordInput";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import { registrarEstudiante } from "@/services/api/auth";
 import { ApiError } from "@/services/api/client";
 import { rutaInicioPara } from "@/utils/rutas";

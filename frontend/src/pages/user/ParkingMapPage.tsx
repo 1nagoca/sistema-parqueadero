@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import ZoneCard from "@/components/map/ZoneCard";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import { listarEspacios } from "@/services/api/espacios";
 import { listarZonas } from "@/services/api/zonas";
 import { useActualizacionesZona } from "@/services/realtime/useActualizacionesZona";

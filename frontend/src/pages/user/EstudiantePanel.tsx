@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import Button from "@/components/common/Button";
 import DocumentoVisor from "@/components/verificacion/DocumentoVisor";
 import EstadoBadge from "@/components/verificacion/EstadoBadge";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import { listarMisAccesos } from "@/services/api/accesos";
 import { ApiError } from "@/services/api/client";
 import { listarMisDocumentos, obtenerUsuarioActual, subirCarnet } from "@/services/api/usuarios";

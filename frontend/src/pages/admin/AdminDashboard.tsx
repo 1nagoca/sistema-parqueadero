@@ -5,7 +5,7 @@ import { CODIGOS_PLANO } from "@/components/map/planoParqueadero";
 import Button from "@/components/common/Button";
 import DocumentoVisor from "@/components/verificacion/DocumentoVisor";
 import EstadoBadge from "@/components/verificacion/EstadoBadge";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import { listarAccesosActivos } from "@/services/api/accesos";
 import { listarAuditoria, listarAuditoriaVerificaciones } from "@/services/api/auditoria";
 import { ApiError } from "@/services/api/client";

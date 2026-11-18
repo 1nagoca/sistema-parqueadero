@@ -4,7 +4,7 @@ import { descargarDocumento } from "@/services/api/verificaciones";
 import type { Documento, TipoDocumento } from "@/types/api";
 
 // Nombre visible de cada tipo de documento.
-export const ETIQUETA_DOCUMENTO: Record<TipoDocumento, string> = {
+const ETIQUETA_DOCUMENTO: Record<TipoDocumento, string> = {
   carnet: "Carnet / Divisist",
   foto_placa: "Foto de la placa",
   tarjeta_propiedad: "Tarjeta de propiedad",
