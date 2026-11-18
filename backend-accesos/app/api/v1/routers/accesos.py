@@ -4,7 +4,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import UsuarioToken, get_db, require_role_token
+from app.api.deps import UsuarioToken, get_db, require_rol_activo, require_role_token
 from app.identidad_client import client as identidad_client
 from app.identidad_client.client import IdentidadNoDisponibleError, VehiculoNoEncontradoError
 from app.models.acceso import Acceso
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 def listar_accesos_activos(
     zona_id: uuid.UUID | None = None,
     db: Session = Depends(get_db),
-    _: UsuarioToken = Depends(require_role_token(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
+    _: UsuarioToken = Depends(require_rol_activo(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
 ):
     """Vehiculos actualmente adentro (sin fecha_hora_salida), para que el vigilante pueda
     registrar la salida sin tener que recordar/escribir la placa de nuevo."""
@@ -56,7 +56,7 @@ def listar_accesos_activos(
 def buscar_acceso_activo(
     placa: str,
     db: Session = Depends(get_db),
-    _: UsuarioToken = Depends(require_role_token(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
+    _: UsuarioToken = Depends(require_rol_activo(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
 ):
     """Usado por el panel de vigilancia para saber si una placa tiene un acceso abierto
     (y por lo tanto corresponde ofrecer 'registrar salida' en vez de una nueva entrada).
@@ -107,7 +107,7 @@ def mis_accesos_activos(
 def registrar_entrada(
     datos: AccesoEntradaCreate,
     db: Session = Depends(get_db),
-    vigilante: UsuarioToken = Depends(require_role_token(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
+    vigilante: UsuarioToken = Depends(require_rol_activo(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
 ):
     try:
         return acceso_service.registrar_entrada(db, datos, realizado_por_id=vigilante.id)
@@ -139,7 +139,7 @@ def _entrada_rechazada(codigo: int, exc: Exception) -> HTTPException:
 def registrar_salida(
     acceso_id: uuid.UUID,
     db: Session = Depends(get_db),
-    vigilante: UsuarioToken = Depends(require_role_token(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
+    vigilante: UsuarioToken = Depends(require_rol_activo(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
 ):
     try:
         return acceso_service.registrar_salida(db, acceso_id, realizado_por_id=vigilante.id)
