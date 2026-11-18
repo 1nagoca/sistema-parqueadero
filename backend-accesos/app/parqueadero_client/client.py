@@ -47,7 +47,10 @@ def _mover_cupo(accion: str, zona_id: uuid.UUID, espacio_id: uuid.UUID | None) -
 # Hace la peticion con 5 s de espera; 409 es sin cupo y cualquier otro error, parqueadero no disponible.
 def _pedir(metodo: str, ruta: str, **kwargs) -> httpx.Response:
     try:
-        with httpx.Client(base_url=settings.PARQUEADERO_URL, timeout=5.0) as client:
+        # la clave interna va en cada llamada; identidad y parqueadero responden 401 sin ella
+        with httpx.Client(
+            base_url=settings.PARQUEADERO_URL, timeout=5.0, headers={"X-Clave-Interna": settings.CLAVE_INTERNA}
+        ) as client:
             respuesta = client.request(metodo, ruta, **kwargs)
     except httpx.HTTPError as exc:
         raise ParqueaderoNoDisponibleError("El servicio de parqueadero no esta disponible") from exc

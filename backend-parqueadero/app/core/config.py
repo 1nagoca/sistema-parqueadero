@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     # La misma clave con la que el servicio de identidad firma los tokens: aqui solo se
     # verifican, nunca se emiten.
     SECRET_KEY: str
+    # Clave que accesos manda en X-Clave-Interna al llamar /interno; la misma en los tres servicios.
+    CLAVE_INTERNA: str = "cambiar-esta-clave-interna"
 
     # Paginas que pueden llamar a esta API desde el navegador.
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]

@@ -172,3 +172,18 @@ def test_vehiculos_de_usuario_mal_formado_o_caido_es_identidad_no_disponible(ide
     identidad_responde(manejador)
     with pytest.raises(identidad_client.IdentidadNoDisponibleError):
         identidad_client.vehiculos_de_usuario(uuid.uuid4())
+
+
+def test_cada_peticion_lleva_la_clave_interna(identidad_responde, monkeypatch):
+    monkeypatch.setattr(settings, "CLAVE_INTERNA", "clave-de-prueba")
+    peticiones = identidad_responde(lambda peticion: httpx.Response(200, json=_vehiculo(None)))
+
+    identidad_client.obtener_vehiculo(VEHICULO_ID)
+    assert peticiones[0].headers["X-Clave-Interna"] == "clave-de-prueba"
+
+
+def test_clave_interna_rechazada_es_identidad_no_disponible(identidad_responde):
+    identidad_responde(lambda peticion: httpx.Response(401, json={"detail": "Clave interna invalida"}))
+
+    with pytest.raises(identidad_client.IdentidadNoDisponibleError):
+        identidad_client.obtener_vehiculo(VEHICULO_ID)

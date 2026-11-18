@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_db, verificar_clave_interna
 from app.models.usuario import Usuario
 from app.models.vehiculo import Vehiculo
 from app.schemas.interno import UsuarioInterno, VehiculoInterno
@@ -11,7 +11,7 @@ from app.services import vehiculo_service
 
 # API interna entre microservicios: la usa el servicio de accesos al registrar una entrada.
 # El gateway no publica /interno, asi que no es alcanzable desde el navegador.
-router = APIRouter(prefix="/interno", tags=["interno"])
+router = APIRouter(prefix="/interno", tags=["interno"], dependencies=[Depends(verificar_clave_interna)])
 
 
 # GET /interno/vehiculos/{id} (lo llama accesos): placa y estado del vehiculo y de su dueno.

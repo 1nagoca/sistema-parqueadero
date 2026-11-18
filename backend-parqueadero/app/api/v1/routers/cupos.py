@@ -4,7 +4,7 @@ import uuid
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_db, verificar_clave_interna
 from app.models.espacio import Espacio
 from app.models.zona import Zona
 from app.schemas.cupo import CupoSolicitud, EspacioCodigo
@@ -13,7 +13,7 @@ from app.services import realtime_service, zona_service
 
 # API interna entre microservicios: la usa el servicio de accesos al registrar entradas y
 # salidas. El gateway no publica /interno, asi que no es alcanzable desde el navegador.
-router = APIRouter(prefix="/interno", tags=["interno"])
+router = APIRouter(prefix="/interno", tags=["interno"], dependencies=[Depends(verificar_clave_interna)])
 logger = logging.getLogger(__name__)
 
 

@@ -73,6 +73,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-parqueadero}:${POSTGRES_PASSWORD:-parqueadero}@db-parqueadero:5432/parqueadero_zonas
       SECRET_KEY: ${SECRET_KEY:-cambiar-esta-clave-en-produccion}
+      CLAVE_INTERNA: ${CLAVE_INTERNA:-cambiar-esta-clave-interna}
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:5173"]}
     volumes:
       - ./backend-parqueadero:/code
@@ -108,6 +109,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-parqueadero}:${POSTGRES_PASSWORD:-parqueadero}@db-identidad:5432/parqueadero_identidad
       SECRET_KEY: ${SECRET_KEY:-cambiar-esta-clave-en-produccion}
+      CLAVE_INTERNA: ${CLAVE_INTERNA:-cambiar-esta-clave-interna}
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:5173"]}
       UPLOAD_DIR: /code/uploads
       # Solo las usa el script de siembra (python -m app.db.seed). Sin valor por defecto: las
@@ -141,6 +143,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-parqueadero}:${POSTGRES_PASSWORD:-parqueadero}@db:5432/${POSTGRES_DB:-parqueadero}
       SECRET_KEY: ${SECRET_KEY:-cambiar-esta-clave-en-produccion}
+      CLAVE_INTERNA: ${CLAVE_INTERNA:-cambiar-esta-clave-interna}
       PARQUEADERO_URL: http://backend-parqueadero:8002
       IDENTIDAD_URL: http://backend-identidad:8003
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:5173"]}

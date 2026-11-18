@@ -42,7 +42,7 @@ def _esperar_registro(n: int, limite: float = 2.0) -> None:
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return TestClient(app, headers={"X-Clave-Interna": settings.CLAVE_INTERNA})
 
 
 @pytest.fixture

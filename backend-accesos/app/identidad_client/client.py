@@ -109,7 +109,10 @@ def vehiculos_de_usuario(usuario_id: uuid.UUID) -> list[uuid.UUID]:
 # Hace el GET con 5 s de espera; si identidad no responde, IdentidadNoDisponibleError.
 def _pedir(ruta: str, **kwargs) -> httpx.Response:
     try:
-        with httpx.Client(base_url=settings.IDENTIDAD_URL, timeout=5.0) as client:
+        # la clave interna va en cada llamada; identidad y parqueadero responden 401 sin ella
+        with httpx.Client(
+            base_url=settings.IDENTIDAD_URL, timeout=5.0, headers={"X-Clave-Interna": settings.CLAVE_INTERNA}
+        ) as client:
             respuesta = client.get(ruta, **kwargs)
     except httpx.HTTPError as exc:
         raise IdentidadNoDisponibleError("El servicio de identidad no esta disponible") from exc

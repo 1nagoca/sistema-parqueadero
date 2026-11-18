@@ -28,9 +28,13 @@ def _token(rol: str | None) -> dict:
     return {"Authorization": f"Bearer {jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')}"}
 
 
+# La clave interna, como la manda accesos en cada llamada.
+CLAVE = {"X-Clave-Interna": settings.CLAVE_INTERNA}
+
+
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return TestClient(app, headers=CLAVE)
 
 
 @pytest.fixture
@@ -138,3 +142,16 @@ def test_espacio_de_otra_zona_no_se_ocupa(client, admin, zona):
     assert _cupos(client, admin, zona["id"]) == 2
     estados = {e["id"]: e["estado"] for e in client.get(f"{API}/espacios", headers=admin).json()}
     assert estados[espacio["id"]] == "libre"
+
+
+def test_interno_exige_la_clave_interna(client, admin, zona):
+    sin_clave = TestClient(app)
+
+    r = sin_clave.get("/interno/espacios")
+    assert r.status_code == 401
+    assert r.json()["detail"] == "Clave interna invalida"
+    assert sin_clave.get("/interno/espacios", headers={"X-Clave-Interna": "otra-clave"}).status_code == 401
+    assert sin_clave.get("/interno/espacios", headers=CLAVE).status_code == 200
+    # sin clave no se toca el cupo
+    assert sin_clave.post("/interno/cupos/ocupar", json={"zona_id": zona["id"]}).status_code == 401
+    assert _cupos(client, admin, zona["id"]) == 2

@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     # La misma clave con la que el servicio de identidad firma los tokens: aqui solo se
     # verifican, nunca se emiten.
     SECRET_KEY: str
+    # Clave que se manda en X-Clave-Interna a /interno de identidad y parqueadero; la misma en los tres servicios.
+    CLAVE_INTERNA: str = "cambiar-esta-clave-interna"
 
     # Direcciones internas de los otros servicios (red de Docker).
     PARQUEADERO_URL: str = "http://backend-parqueadero:8002"

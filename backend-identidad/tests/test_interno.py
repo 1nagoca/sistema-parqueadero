@@ -11,6 +11,7 @@ if not os.environ.get("DATABASE_URL"):
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app.core.config import settings  # noqa: E402
 from app.core.security import hashear_password  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.main import app  # noqa: E402
@@ -19,9 +20,13 @@ from app.models.usuario import Usuario  # noqa: E402
 from app.models.vehiculo import Vehiculo  # noqa: E402
 
 
+# La clave interna, como la manda accesos en cada llamada.
+CLAVE = {"X-Clave-Interna": settings.CLAVE_INTERNA}
+
+
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return TestClient(app, headers=CLAVE)
 
 
 @pytest.fixture
@@ -136,3 +141,16 @@ def test_vehiculos_de_usuario_sin_motos_o_inexistente_da_lista_vacia(client, suf
         assert r.status_code == 200, r.text
         assert r.json() == []
     assert client.get("/interno/usuarios/no-es-un-uuid/vehiculos").status_code == 422
+
+
+def test_interno_exige_la_clave_interna():
+    sin_clave = TestClient(app)
+    params = {"id": [str(uuid.uuid4())]}
+
+    r = sin_clave.get("/interno/usuarios", params=params)
+    assert r.status_code == 401
+    assert r.json()["detail"] == "Clave interna invalida"
+    assert sin_clave.get("/interno/usuarios", params=params, headers={"X-Clave-Interna": "otra-clave"}).status_code == 401
+    assert sin_clave.get("/interno/usuarios", params=params, headers=CLAVE).status_code == 200
+    # sin clave no se llega a validar la peticion: 401 y no 422
+    assert sin_clave.get("/interno/vehiculos/no-es-un-uuid").status_code == 401

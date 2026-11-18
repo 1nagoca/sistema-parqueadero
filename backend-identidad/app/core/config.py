@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     # La clave compartida con la que se firman los tokens: este servicio es el unico que los
     # emite; los demas solo los verifican.
     SECRET_KEY: str
+    # Clave que accesos manda en X-Clave-Interna al llamar /interno; la misma en los tres servicios.
+    CLAVE_INTERNA: str = "cambiar-esta-clave-interna"
     # El token dura 8 horas.
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8
 
