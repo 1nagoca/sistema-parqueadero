@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import ENUM, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -29,6 +29,7 @@ class Vehiculo(Base):
             "usuario_id IS NOT NULL OR es_visitante = true",
             name="ck_vehiculos_propietario_o_visitante",
         ),
+        Index("idx_vehiculos_usuario_id", "usuario_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

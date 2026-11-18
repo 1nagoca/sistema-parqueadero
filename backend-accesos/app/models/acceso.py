@@ -47,6 +47,8 @@ class Acceso(Base):
             unique=True,
             postgresql_where=text("fecha_hora_salida IS NULL"),
         ),
+        Index("idx_accesos_zona_id", "zona_id"),
+        Index("idx_accesos_usuario_id", "usuario_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

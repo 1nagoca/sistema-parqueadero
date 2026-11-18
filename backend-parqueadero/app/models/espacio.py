@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import DateTime, ForeignKey, Index, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import ENUM, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -25,8 +25,11 @@ class Espacio(Base):
     llevan conteo agregado (sin mapa granular) simplemente no tienen filas aqui."""
 
     __tablename__ = "espacios"
-    # El codigo no se repite dentro de la misma zona.
-    __table_args__ = (UniqueConstraint("zona_id", "codigo", name="uq_espacios_zona_codigo"),)
+    # El codigo no se repite dentro de la misma zona; el indice de zona_id lo crea la migracion 0001.
+    __table_args__ = (
+        UniqueConstraint("zona_id", "codigo", name="uq_espacios_zona_codigo"),
+        Index("idx_espacios_zona_id", "zona_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()

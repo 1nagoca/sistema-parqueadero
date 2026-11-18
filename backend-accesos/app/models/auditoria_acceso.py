@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy import DateTime, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -21,6 +21,11 @@ class AuditoriaAcceso(Base):
     inicial: REVOKE UPDATE, DELETE ON auditoria_accesos), no solo por convencion de la app."""
 
     __tablename__ = "auditoria_accesos"
+    # Indices que crea la migracion 0001.
+    __table_args__ = (
+        Index("idx_auditoria_accesos_registro", "tabla_afectada", "registro_id"),
+        Index("idx_auditoria_accesos_fecha_hora", "fecha_hora"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()

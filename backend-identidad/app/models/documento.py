@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, func
 from sqlalchemy.dialects.postgresql import ENUM, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -26,6 +26,11 @@ class Documento(Base):
     privado (``settings.UPLOAD_DIR``), nunca en una ruta publica."""
 
     __tablename__ = "documentos"
+    # Indices que crea la migracion 0001.
+    __table_args__ = (
+        Index("idx_documentos_usuario_id", "usuario_id"),
+        Index("idx_documentos_vehiculo_id", "vehiculo_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()

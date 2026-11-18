@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -25,6 +25,11 @@ class AuditoriaIdentidad(Base):
     la app."""
 
     __tablename__ = "auditoria_identidad"
+    # Indices que crea la migracion 0001.
+    __table_args__ = (
+        Index("idx_auditoria_identidad_registro", "tabla_afectada", "registro_id"),
+        Index("idx_auditoria_identidad_fecha_hora", "fecha_hora"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
