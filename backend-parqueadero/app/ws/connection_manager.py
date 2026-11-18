@@ -28,10 +28,13 @@ class ConnectionManager:
         if websocket in self._conexiones:
             self._conexiones.remove(websocket)
 
-    # Envia el mismo mensaje a todas las conexiones.
+    # Envia el mismo mensaje a todas las conexiones; la que falla sale del registro y se sigue con las demas.
     async def broadcast(self, mensaje: dict[str, Any]) -> None:
         for conexion in list(self._conexiones):
-            await conexion.send_json(mensaje)
+            try:
+                await conexion.send_json(mensaje)
+            except Exception:
+                self.desconectar(conexion)
 
 
 # Unica instancia, la comparten el router y el service.

@@ -1,6 +1,7 @@
 """WebSocket /ws/zonas: solo avisa a conexiones que mandan un token valido en el primer mensaje.
 Requiere DATABASE_URL / SECRET_KEY en el entorno; la base de pruebas la prepara conftest."""
 
+import asyncio
 import os
 import time
 import uuid
@@ -18,7 +19,7 @@ from starlette.websockets import WebSocketDisconnect  # noqa: E402
 from app.api.v1.routers import realtime  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.main import app  # noqa: E402
-from app.ws.connection_manager import connection_manager  # noqa: E402
+from app.ws.connection_manager import ConnectionManager, connection_manager  # noqa: E402
 
 API = settings.API_V1_PREFIX
 
@@ -126,3 +127,38 @@ def test_al_vencer_el_token_cierra_con_4401_y_sale_del_registro(client):
     assert cierre.value.code == 4401
     assert time.monotonic() - inicio < 3
     assert len(connection_manager._conexiones) == base
+
+
+# Conexion de mentira: guarda lo que recibe o falla al enviar.
+class _ConexionFalsa:
+    def __init__(self, falla: bool = False) -> None:
+        self.falla = falla
+        self.recibidos: list[dict] = []
+
+    async def send_json(self, mensaje: dict) -> None:
+        if self.falla:
+            raise RuntimeError("socket cerrado")
+        self.recibidos.append(mensaje)
+
+
+def test_broadcast_sigue_con_las_demas_si_una_falla_y_la_saca_del_registro():
+    manager = ConnectionManager()
+    primera, del_medio, tercera = _ConexionFalsa(), _ConexionFalsa(falla=True), _ConexionFalsa()
+    for conexion in (primera, del_medio, tercera):
+        manager.registrar(conexion)
+
+    asyncio.run(manager.broadcast({"evento": "zona_actualizada"}))
+
+    assert primera.recibidos == [{"evento": "zona_actualizada"}]
+    assert tercera.recibidos == [{"evento": "zona_actualizada"}]
+    assert manager._conexiones == [primera, tercera]
+
+
+def test_broadcast_con_todas_fallando_no_lanza_y_vacia_el_registro():
+    manager = ConnectionManager()
+    for _ in range(3):
+        manager.registrar(_ConexionFalsa(falla=True))
+
+    asyncio.run(manager.broadcast({"evento": "zona_actualizada"}))
+
+    assert manager._conexiones == []
