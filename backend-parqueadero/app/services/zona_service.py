@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.models.enums import EstadoEspacio
@@ -59,6 +59,10 @@ def liberar_cupo(db: Session, zona_id: uuid.UUID, espacio_id: uuid.UUID | None) 
     efecto: si el puesto ya no esta ocupado (o no es de esta zona) devuelve la zona sin tocar el
     contador; asi accesos puede reintentar la compensacion sin contar el cupo dos veces."""
     if espacio_id is not None:
+        # bloquea la zona antes que el puesto, en el mismo orden que ocupar_cupo, para no trabarse con una entrada
+        zona = db.execute(select(Zona).where(Zona.id == zona_id).with_for_update()).scalar_one_or_none()
+        if zona is None:
+            raise ZonaEnCapacidadTotalError(f"La zona {zona_id} ya esta en su capacidad total")
         liberado = db.execute(
             update(Espacio)
             .where(Espacio.id == espacio_id, Espacio.zona_id == zona_id, Espacio.estado == EstadoEspacio.OCUPADO)
@@ -66,9 +70,6 @@ def liberar_cupo(db: Session, zona_id: uuid.UUID, espacio_id: uuid.UUID | None) 
             .returning(Espacio.id)
         ).scalar_one_or_none()
         if liberado is None:
-            zona = db.get(Zona, zona_id)
-            if zona is None:
-                raise ZonaEnCapacidadTotalError(f"La zona {zona_id} ya esta en su capacidad total")
             return zona
 
     resultado = db.execute(
