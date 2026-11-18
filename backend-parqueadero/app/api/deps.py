@@ -11,7 +11,7 @@ from app.models.enums import RolUsuario
 # Lee el token del encabezado Authorization: Bearer <token>.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
-__all__ = ["get_db", "get_current_user", "require_role", "UsuarioToken"]
+__all__ = ["get_db", "get_current_user", "require_role", "usuario_de_token", "UsuarioToken"]
 
 
 # El usuario que hace la peticion, segun su token.
@@ -24,12 +24,20 @@ class UsuarioToken:
     rol: RolUsuario
 
 
-# Valida el token y saca de el el id y el rol (si no sirve, 401).
-def get_current_user(token: str = Depends(oauth2_scheme)) -> UsuarioToken:
+# Valida el token y saca de el el id y el rol; si no sirve, ValueError (lo usan HTTP y el WebSocket).
+def usuario_de_token(token: str) -> UsuarioToken:
     try:
         payload = decodificar_token(token)
         return UsuarioToken(id=uuid.UUID(payload["sub"]), rol=RolUsuario(payload["rol"]))
-    except (ValueError, KeyError) as exc:
+    except KeyError as exc:
+        raise ValueError("Token invalido") from exc
+
+
+# Valida el token del encabezado (si no sirve, 401).
+def get_current_user(token: str = Depends(oauth2_scheme)) -> UsuarioToken:
+    try:
+        return usuario_de_token(token)
+    except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido") from exc
 
 

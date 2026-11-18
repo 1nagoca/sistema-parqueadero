@@ -1,7 +1,12 @@
 import { useEffect, useRef } from "react";
 
+import { obtenerToken } from "@/services/api/client";
+
 // Direccion del WebSocket en el gateway; en el servidor se cambia con VITE_WS_URL.
 const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000/ws/zonas";
+
+// Cierre del servidor por sesion ausente, invalida o vencida: no se reintenta.
+const CIERRE_SIN_SESION = 4401;
 
 // Mensaje que envia el servidor cuando cambian los cupos.
 interface EventoZona {
@@ -11,8 +16,8 @@ interface EventoZona {
 }
 
 /** Se suscribe a /ws/zonas (poblado por backend-parqueadero via BackgroundTasks despues de cada
- * entrada/salida) y llama a `onActualizacion` con cada evento. Reintenta la conexion con
- * backoff simple si el socket se cae. */
+ * entrada/salida) y llama a `onActualizacion` con cada evento. Manda el token al abrir y reintenta
+ * con backoff simple si el socket se cae, salvo que el servidor cierre por sesion (4401). */
 export function useActualizacionesZona(onActualizacion: () => void): void {
   const callbackRef = useRef(onActualizacion);
   callbackRef.current = onActualizacion;
@@ -25,7 +30,14 @@ export function useActualizacionesZona(onActualizacion: () => void): void {
 
     // Abre el WebSocket y, si se cae, reintenta cada vez mas lento (hasta 10 s).
     function conectar() {
-      socket = new WebSocket(WS_URL);
+      const token = obtenerToken();
+      // sin sesion no se abre el WebSocket
+      if (!token) return;
+      const nuevo = new WebSocket(WS_URL);
+      socket = nuevo;
+
+      // el token va en el primer mensaje, nunca en la URL
+      nuevo.onopen = () => nuevo.send(JSON.stringify({ token }));
 
       socket.onmessage = (evento) => {
         try {
@@ -38,8 +50,8 @@ export function useActualizacionesZona(onActualizacion: () => void): void {
         }
       };
 
-      socket.onclose = () => {
-        if (cerradoPorLimpieza) return;
+      socket.onclose = (evento) => {
+        if (cerradoPorLimpieza || evento.code === CIERRE_SIN_SESION) return;
         intentoReconexion += 1;
         const espera = Math.min(1000 * intentoReconexion, 10000);
         temporizador = setTimeout(conectar, espera);

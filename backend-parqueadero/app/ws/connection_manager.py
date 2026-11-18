@@ -15,9 +15,12 @@ class ConnectionManager:
     def __init__(self) -> None:
         self._conexiones: list[WebSocket] = []
 
-    # Acepta una conexion nueva y la guarda.
-    async def conectar(self, websocket: WebSocket) -> None:
+    # Acepta la conexion sin guardarla: todavia no se sabe si trae sesion.
+    async def aceptar(self, websocket: WebSocket) -> None:
         await websocket.accept()
+
+    # Guarda una conexion ya autenticada para que reciba los avisos.
+    def registrar(self, websocket: WebSocket) -> None:
         self._conexiones.append(websocket)
 
     # Quita una conexion cerrada.
