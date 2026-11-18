@@ -34,6 +34,8 @@ def crear_vehiculo(
         return vehiculo_service.crear_vehiculo(db, datos)
     except usuario_service.UsuarioNoEncontradoError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except vehiculo_service.PlacaRepetidaError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La placa ya esta registrada") from exc
 
 
 # GET /vehiculos/placa/{placa}/propietario (admin, vigilante): nombre del dueno y si hay carnet para mostrar (RN-09).

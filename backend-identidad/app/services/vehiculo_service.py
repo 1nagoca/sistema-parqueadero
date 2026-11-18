@@ -2,6 +2,7 @@ import uuid
 from pathlib import Path
 from typing import NamedTuple
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.documento import Documento
@@ -16,6 +17,10 @@ class PropietarioNoVisibleError(Exception):
     """El vigilante no puede ver al dueno de esa placa (no se dice por que)."""
 
 
+class PlacaRepetidaError(Exception):
+    """Otra peticion guardo la misma placa entre la busqueda previa y el commit."""
+
+
 # El carnet que se le puede mostrar al vigilante: ruta real y tipo del archivo.
 class CarnetVisible(NamedTuple):
     ruta: Path
@@ -28,7 +33,12 @@ def crear_vehiculo(db: Session, datos: VehiculoCreate) -> Vehiculo:
         raise usuario_service.UsuarioNoEncontradoError("El dueno (usuario_id) no existe")
     vehiculo = Vehiculo(**datos.model_dump())
     db.add(vehiculo)
-    db.commit()
+    # si dos peticiones llegan a la vez, el unique de la placa frena a la segunda
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise PlacaRepetidaError("La placa ya esta registrada") from exc
     db.refresh(vehiculo)
     return vehiculo
 

@@ -14,6 +14,7 @@ if not os.environ.get("DATABASE_URL"):
 
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
+from sqlalchemy.orm import Query  # noqa: E402
 
 from app.core.config import settings  # noqa: E402
 from app.core.security import hashear_password  # noqa: E402
@@ -345,6 +346,29 @@ def test_crear_vehiculo_con_usuario_id_existente_da_201(client, admin, sufijo):
     r = client.post(f"{API}/vehiculos", headers=admin, json={"placa": _placa(), "usuario_id": dueno_id})
     assert r.status_code == 201, r.text
     assert r.json()["usuario_id"] == dueno_id
+
+
+def test_crear_vehiculo_con_placa_repetida_da_409(client, admin):
+    datos = {"placa": _placa(), "es_visitante": True}
+    assert client.post(f"{API}/vehiculos", headers=admin, json=datos).status_code == 201
+
+    r = client.post(f"{API}/vehiculos", headers=admin, json=datos)
+    assert r.status_code == 409
+    assert r.json()["detail"] == "La placa ya esta registrada"
+
+
+def test_crear_vehiculo_a_la_vez_con_placa_repetida_da_409_y_guarda_uno(client, admin, monkeypatch):
+    placa = _placa()
+    datos = {"placa": placa, "es_visitante": True}
+    assert client.post(f"{API}/vehiculos", headers=admin, json=datos).status_code == 201
+
+    # la busqueda previa no ve la placa: el que responde es el commit
+    monkeypatch.setattr(Query, "first", lambda self: None)
+    r = client.post(f"{API}/vehiculos", headers=admin, json=datos)
+    assert r.status_code == 409
+    assert r.json()["detail"] == "La placa ya esta registrada"
+    with SessionLocal() as db:
+        assert db.query(Vehiculo).filter(Vehiculo.placa == placa).count() == 1
 
 
 def _archivos_en_disco():
