@@ -155,3 +155,50 @@ def test_interno_exige_la_clave_interna(client, admin, zona):
     # sin clave no se toca el cupo
     assert sin_clave.post("/interno/cupos/ocupar", json={"zona_id": zona["id"]}).status_code == 401
     assert _cupos(client, admin, zona["id"]) == 2
+
+
+# Estado de un puesto segun GET /espacios.
+def _estado(client, admin, espacio):
+    lista = client.get(f"{API}/espacios", headers=admin, params={"zona_id": espacio["zona_id"]}).json()
+    return next(e["estado"] for e in lista if e["id"] == espacio["id"])
+
+
+def test_liberar_dos_veces_el_mismo_puesto_suma_un_solo_cupo(client, admin, zona):
+    espacio = _espacio(client, admin, zona["id"])
+    solicitud = {"zona_id": zona["id"], "espacio_id": espacio["id"]}
+    assert client.post("/interno/cupos/ocupar", json=solicitud).json()["cupos_disponibles"] == 1
+
+    assert client.post("/interno/cupos/liberar", json=solicitud).json()["cupos_disponibles"] == 2
+    # el reintento de una compensacion no cuenta doble
+    r = client.post("/interno/cupos/liberar", json=solicitud)
+    assert r.status_code == 200 and r.json()["cupos_disponibles"] == 2
+    assert _cupos(client, admin, zona["id"]) == 2
+    assert _estado(client, admin, espacio) == "libre"
+
+
+def test_liberar_un_puesto_libre_o_de_otra_zona_no_cambia_el_contador(client, admin, zona):
+    libre = _espacio(client, admin, zona["id"])
+    otra = client.post(f"{API}/zonas", headers=admin, json={"nombre": f"Zona {uuid.uuid4().hex[:8]}", "capacidad_total": 2})
+    ajeno = _espacio(client, admin, otra.json()["id"], codigo="B1")
+    assert client.post("/interno/cupos/ocupar", json={"zona_id": otra.json()["id"], "espacio_id": ajeno["id"]}).status_code == 200
+    assert client.post("/interno/cupos/ocupar", json={"zona_id": zona["id"]}).json()["cupos_disponibles"] == 1
+
+    r = client.post("/interno/cupos/liberar", json={"zona_id": zona["id"], "espacio_id": libre["id"]})
+    assert r.status_code == 200 and r.json()["cupos_disponibles"] == 1
+    r = client.post("/interno/cupos/liberar", json={"zona_id": zona["id"], "espacio_id": ajeno["id"]})
+    assert r.status_code == 200 and r.json()["cupos_disponibles"] == 1
+    assert _cupos(client, admin, zona["id"]) == 1
+    # el puesto de la otra zona sigue ocupado
+    assert _estado(client, admin, ajeno) == "ocupado"
+
+
+def test_liberar_un_puesto_con_la_zona_en_capacidad_total_da_409_y_no_lo_libera(client, admin, zona):
+    espacio = _espacio(client, admin, zona["id"])
+    assert client.post("/interno/cupos/ocupar", json={"zona_id": zona["id"], "espacio_id": espacio["id"]}).status_code == 200
+    # la zona se llena por otro lado y el puesto sigue ocupado
+    assert client.post("/interno/cupos/liberar", json={"zona_id": zona["id"]}).json()["cupos_disponibles"] == 2
+
+    r = client.post("/interno/cupos/liberar", json={"zona_id": zona["id"], "espacio_id": espacio["id"]})
+    assert r.status_code == 409
+    assert _cupos(client, admin, zona["id"]) == 2
+    assert _estado(client, admin, espacio) == "ocupado"

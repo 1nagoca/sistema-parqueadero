@@ -1,4 +1,5 @@
 import logging
+import time
 import uuid
 from datetime import datetime
 
@@ -16,6 +17,10 @@ from app.services import auditoria_service
 from app.services.auditoria_service import COLOMBIA
 
 logger = logging.getLogger(__name__)
+
+# Intentos de la compensacion del cupo y espera antes de cada reintento (segundos).
+INTENTOS_COMPENSACION = 3
+ESPERAS_COMPENSACION = (0.5, 1.0)
 
 
 class AccesoNoEncontradoOYaCerradoError(Exception):
@@ -258,15 +263,38 @@ def registrar_salida(db: Session, acceso_id: uuid.UUID, realizado_por_id: uuid.U
     return acceso
 
 
-# Deshace el cambio de cupo cuando algo fallo despues.
+# Deshace el cambio de cupo cuando algo fallo despues; reintenta solo si parqueadero no responde.
 def _compensar(accion, zona_id: uuid.UUID, espacio_id: uuid.UUID | None) -> None:
-    """Deshace el movimiento de cupo ya hecho en el servicio de parqueadero. Si la compensacion
-    tambien falla no hay mas que hacer aqui: se deja registro para corregir el contador a mano."""
-    try:
-        accion(zona_id, espacio_id)
-    except Exception:
-        logger.exception(
-            "No se pudo compensar el cupo de la zona %s (espacio %s): el contador quedo desfasado",
-            zona_id,
-            espacio_id,
-        )
+    """Deshace el movimiento de cupo ya hecho en el servicio de parqueadero. Repetirlo no cuenta
+    doble: ocupar un puesto ya ocupado da 409 y liberar uno ya libre no suma cupo. Si parqueadero no
+    responde, reintenta hasta INTENTOS_COMPENSACION veces; si aun asi falla, se deja registro para
+    corregir el contador a mano."""
+    for intento in range(1, INTENTOS_COMPENSACION + 1):
+        try:
+            accion(zona_id, espacio_id)
+            return
+        except parqueadero_client.ParqueaderoNoDisponibleError:
+            if intento == INTENTOS_COMPENSACION:
+                logger.exception(
+                    "No se pudo compensar el cupo de la zona %s (espacio %s) tras %s intentos: el contador quedo desfasado",
+                    zona_id,
+                    espacio_id,
+                    intento,
+                )
+                return
+            time.sleep(ESPERAS_COMPENSACION[intento - 1])
+        except parqueadero_client.CupoNoDisponibleError:
+            # 409: el puesto ya estaba tomado o un intento anterior si se aplico; repetir no ayuda
+            logger.warning(
+                "Parqueadero rechazo la compensacion del cupo de la zona %s (espacio %s) con 409: revisar el contador",
+                zona_id,
+                espacio_id,
+            )
+            return
+        except Exception:
+            logger.exception(
+                "No se pudo compensar el cupo de la zona %s (espacio %s): el contador quedo desfasado",
+                zona_id,
+                espacio_id,
+            )
+            return

@@ -53,9 +53,24 @@ def ocupar_cupo(db: Session, zona_id: uuid.UUID, espacio_id: uuid.UUID | None) -
     return zona
 
 
-# Suma un cupo a la zona (y libera el espacio si se indico).
+# Suma un cupo a la zona; con espacio, solo si el puesto pasa de ocupado a libre (liberar dos veces no suma doble).
 def liberar_cupo(db: Session, zona_id: uuid.UUID, espacio_id: uuid.UUID | None) -> Zona:
-    """RN-02: incremento atomico del contador de cupos de la zona."""
+    """RN-02: incremento atomico del contador de cupos de la zona. Con espacio se puede repetir sin
+    efecto: si el puesto ya no esta ocupado (o no es de esta zona) devuelve la zona sin tocar el
+    contador; asi accesos puede reintentar la compensacion sin contar el cupo dos veces."""
+    if espacio_id is not None:
+        liberado = db.execute(
+            update(Espacio)
+            .where(Espacio.id == espacio_id, Espacio.zona_id == zona_id, Espacio.estado == EstadoEspacio.OCUPADO)
+            .values(estado=EstadoEspacio.LIBRE)
+            .returning(Espacio.id)
+        ).scalar_one_or_none()
+        if liberado is None:
+            zona = db.get(Zona, zona_id)
+            if zona is None:
+                raise ZonaEnCapacidadTotalError(f"La zona {zona_id} ya esta en su capacidad total")
+            return zona
+
     resultado = db.execute(
         update(Zona)
         .where(Zona.id == zona_id, Zona.cupos_disponibles < Zona.capacidad_total)
@@ -65,8 +80,4 @@ def liberar_cupo(db: Session, zona_id: uuid.UUID, espacio_id: uuid.UUID | None) 
     zona = resultado.scalar_one_or_none()
     if zona is None:
         raise ZonaEnCapacidadTotalError(f"La zona {zona_id} ya esta en su capacidad total")
-
-    if espacio_id is not None:
-        db.execute(update(Espacio).where(Espacio.id == espacio_id).values(estado=EstadoEspacio.LIBRE))
-
     return zona
