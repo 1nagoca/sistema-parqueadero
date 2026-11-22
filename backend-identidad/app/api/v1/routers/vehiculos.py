@@ -2,6 +2,7 @@ import re
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -127,6 +128,11 @@ async def registrar_mi_vehiculo(
     _validar_placa_moto(placa)
     if vehiculo_service.obtener_por_placa(db, placa) is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La placa ya esta registrada")
+    # el bloqueo puede esperar a otro registro: va en un hilo para no frenar el servidor
+    try:
+        await run_in_threadpool(vehiculo_service.comprobar_maximo_de_motos, db, estudiante.id)
+    except vehiculo_service.MaximoDeMotosError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     archivos = await _guardar_documentos_vehiculo(foto_placa, tarjeta_propiedad)
     vehiculo = Vehiculo(

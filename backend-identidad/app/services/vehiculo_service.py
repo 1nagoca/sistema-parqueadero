@@ -2,6 +2,7 @@ import uuid
 from pathlib import Path
 from typing import NamedTuple
 
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -57,6 +58,23 @@ def ids_de_vehiculos_de_usuario(db: Session, usuario_id: uuid.UUID) -> list[uuid
         .all()
     )
     return [fila.id for fila in filas]
+
+
+# Maximo de motos a nombre de un estudiante (punto 3); cuentan en cualquier estado.
+MAX_MOTOS_POR_ESTUDIANTE = 4
+
+
+# El estudiante ya tiene el maximo de motos registradas.
+class MaximoDeMotosError(Exception):
+    pass
+
+
+# Bloquea la fila del usuario hasta el commit y falla si ya tiene el maximo de motos.
+def comprobar_maximo_de_motos(db: Session, usuario_id: uuid.UUID) -> None:
+    db.query(Usuario.id).filter(Usuario.id == usuario_id).with_for_update().one()
+    total = db.query(func.count(Vehiculo.id)).filter(Vehiculo.usuario_id == usuario_id).scalar()
+    if total >= MAX_MOTOS_POR_ESTUDIANTE:
+        raise MaximoDeMotosError(f"Ya tienes {MAX_MOTOS_POR_ESTUDIANTE} motos registradas, que es el maximo")
 
 
 # Dueno de la moto y su carnet si el vigilante puede verlos (RN-09); si no, PropietarioNoVisibleError.

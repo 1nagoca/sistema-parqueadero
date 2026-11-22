@@ -14,6 +14,7 @@ if not os.environ.get("DATABASE_URL"):
 
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
+from sqlalchemy.exc import OperationalError  # noqa: E402
 from sqlalchemy.orm import Query  # noqa: E402
 
 from app.core.config import settings  # noqa: E402
@@ -25,6 +26,7 @@ from app.models.documento import Documento  # noqa: E402
 from app.models.enums import RolUsuario  # noqa: E402
 from app.models.usuario import Usuario  # noqa: E402
 from app.models.vehiculo import Vehiculo  # noqa: E402
+from app.services import vehiculo_service  # noqa: E402
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
@@ -570,3 +572,90 @@ def test_reactivar_estudiante_con_dos_motos_deja_una_traza_por_vehiculo(client, 
             .count()
         )
     assert de_la_reactivacion == 2
+
+
+def _estudiante_con_4_motos(client, sufijo):
+    # Estudiante con 4 motos pendientes (2 colombianas y 2 venezolanas); devuelve (cabeceras, id, ids de motos).
+    assert _registrar(client, sufijo).status_code == 201
+    est = _login(client, f"est-{sufijo}@ufps.edu.co", "clave-segura-1")
+    uid = client.get(f"{API}/usuarios/me", headers=est).json()["id"]
+    motos = []
+    for placa in (_placa(), _placa(), _placa_venezolana(), _placa_venezolana()):
+        r = _vehiculo(client, est, placa)
+        assert r.status_code == 201, r.text
+        motos.append(r.json()["id"])
+    return est, uid, motos
+
+
+def _motos_de(usuario_id):
+    with SessionLocal() as db:
+        return db.query(Vehiculo).filter(Vehiculo.usuario_id == uuid.UUID(usuario_id)).count()
+
+
+def test_quinta_moto_da_409_sin_guardar_fila_ni_archivos(client, sufijo):
+    est, uid, _ = _estudiante_con_4_motos(client, sufijo)
+    placa = _placa_venezolana()
+    antes = _archivos_en_disco()
+
+    r = _vehiculo(client, est, placa)
+    assert r.status_code == 409
+    assert r.json()["detail"] == "Ya tienes 4 motos registradas, que es el maximo"
+    assert _motos_de(uid) == 4
+    with SessionLocal() as db:
+        assert vehiculo_service.obtener_por_placa(db, placa) is None
+    assert _archivos_en_disco() == antes
+
+
+def test_moto_rechazada_cuenta_para_el_maximo(client, admin, sufijo):
+    est, uid, motos = _estudiante_con_4_motos(client, sufijo)
+    r = client.post(
+        f"{API}/verificaciones/vehiculos/{motos[0]}/resolver",
+        headers=admin,
+        json={"aprobar": False, "motivo": "Placa no visible"},
+    )
+    assert r.json()["estado_verificacion"] == "rechazado"
+
+    r = _vehiculo(client, est, _placa())
+    assert r.status_code == 409
+    assert r.json()["detail"] == "Ya tienes 4 motos registradas, que es el maximo"
+    assert _motos_de(uid) == 4
+
+
+def test_reenvio_de_rechazada_con_4_motos_sigue_funcionando(client, admin, sufijo):
+    est, uid, motos = _estudiante_con_4_motos(client, sufijo)
+    client.post(
+        f"{API}/verificaciones/vehiculos/{motos[0]}/resolver",
+        headers=admin,
+        json={"aprobar": False, "motivo": "Placa no visible"},
+    )
+
+    r = client.post(f"{API}/vehiculos/mis-vehiculos/{motos[0]}/reenviar", headers=est, files=_archivos())
+    assert r.status_code == 200, r.text
+    assert r.json()["estado_verificacion"] == "pendiente"
+    assert _motos_de(uid) == 4
+
+
+def test_maximo_de_motos_es_por_estudiante(client, sufijo):
+    _estudiante_con_4_motos(client, sufijo)
+    otro = uuid.uuid4().hex[:8]
+    assert _registrar(client, otro).status_code == 201
+    est_otro = _login(client, f"est-{otro}@ufps.edu.co", "clave-segura-1")
+
+    r = _vehiculo(client, est_otro, _placa())
+    assert r.status_code == 201, r.text
+
+
+def test_comprobar_maximo_bloquea_la_fila_del_usuario(client, sufijo):
+    # Sin hilos: mientras una sesion tiene el bloqueo, otra no puede tomarlo (NOWAIT falla al instante).
+    assert _registrar(client, sufijo).status_code == 201
+    est = _login(client, f"est-{sufijo}@ufps.edu.co", "clave-segura-1")
+    uid = uuid.UUID(client.get(f"{API}/usuarios/me", headers=est).json()["id"])
+    with SessionLocal() as primera, SessionLocal() as segunda:
+        vehiculo_service.comprobar_maximo_de_motos(primera, uid)
+        with pytest.raises(OperationalError):
+            segunda.execute(text("SELECT id FROM usuarios WHERE id = :id FOR UPDATE NOWAIT"), {"id": uid})
+        primera.rollback()
+        segunda.rollback()
+        # al soltarlo con el rollback, la otra sesion ya puede tomarlo
+        segunda.execute(text("SELECT id FROM usuarios WHERE id = :id FOR UPDATE NOWAIT"), {"id": uid})
+        segunda.rollback()
