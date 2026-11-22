@@ -755,11 +755,13 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "// La placa es UNIQUE (máx. 10 caracteres): se generan dos placas nuevas por ejecución.",
+                  "// La placa es UNIQUE y con formato de moto (RN-05): dos placas al azar por ejecución.",
+                  "// placa_1 colombiana (ABC12D) y placa_2 venezolana (AB1C23D), la del visitante.",
                   "// Un vehículo debe tener dueño (usuario_id) o ser visitante: este es del usuario creado en 02.",
-                  "const s = String(Date.now()).slice(-6);",
-                  "pm.collectionVariables.set(\"placa_1\", `PA${s}`);",
-                  "pm.collectionVariables.set(\"placa_2\", `PB${s}`);"
+                  "const letra = () => String.fromCharCode(65 + Math.floor(Math.random() * 26));",
+                  "const digito = () => String(Math.floor(Math.random() * 10));",
+                  "pm.collectionVariables.set(\"placa_1\", letra() + letra() + letra() + digito() + digito() + letra());",
+                  "pm.collectionVariables.set(\"placa_2\", letra() + letra() + digito() + letra() + digito() + digito() + letra());"
                 ]
               }
             },

@@ -401,6 +401,31 @@ def test_crear_vehiculo_a_la_vez_con_placa_repetida_da_409_y_guarda_uno(client, 
         assert db.query(Vehiculo).filter(Vehiculo.placa == placa).count() == 1
 
 
+@pytest.mark.parametrize("placa", ["AB12C3D", "PA123456"])
+def test_visitante_con_placa_invalida_da_422_y_no_guarda_nada(client, sufijo, placa):
+    _, vigilante = _personal(client, RolUsuario.VIGILANTE, sufijo)
+    r = client.post(f"{API}/vehiculos", headers=vigilante, json={"placa": placa, "es_visitante": True})
+    assert r.status_code == 422
+    assert r.json()["detail"] == f"La placa {placa} no tiene un formato valido de moto (ABC12, ABC12D o AB1C23D)"
+    with SessionLocal() as db:
+        assert db.query(Vehiculo).filter(Vehiculo.placa == placa).count() == 0
+
+
+def test_visitante_con_placa_venezolana_da_201_en_mayusculas(client, sufijo):
+    _, vigilante = _personal(client, RolUsuario.VIGILANTE, sufijo)
+    placa = _placa_venezolana()
+    r = client.post(f"{API}/vehiculos", headers=vigilante, json={"placa": placa.lower(), "es_visitante": True})
+    assert r.status_code == 201, r.text
+    assert r.json()["placa"] == placa
+    assert r.json()["es_visitante"] is True
+
+
+def test_crear_vehiculo_valida_la_placa_antes_que_el_dueno(client, admin):
+    r = client.post(f"{API}/vehiculos", headers=admin, json={"placa": "AB12C3D", "usuario_id": str(uuid.uuid4())})
+    assert r.status_code == 422
+    assert r.json()["detail"] == "La placa AB12C3D no tiene un formato valido de moto (ABC12, ABC12D o AB1C23D)"
+
+
 def _archivos_en_disco():
     carpeta = Path(settings.UPLOAD_DIR)
     return sorted(p.name for p in carpeta.iterdir()) if carpeta.exists() else []

@@ -20,6 +20,15 @@ router = APIRouter(prefix="/vehiculos", tags=["vehiculos"])
 _PLACA_MOTO = re.compile(r"^(?:[A-Z]{3}\d{2}[A-Z]?|[A-Z]{2}\d[A-Z]\d{2}[A-Z])$")
 
 
+# Responde 422 si la placa no tiene formato de moto (RN-05).
+def _validar_placa_moto(placa: str) -> None:
+    if not _PLACA_MOTO.match(placa):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"La placa {placa} no tiene un formato valido de moto (ABC12, ABC12D o AB1C23D)",
+        )
+
+
 # POST /vehiculos (admin, vigilante): registra un vehiculo, por ejemplo de un visitante.
 @router.post("", response_model=VehiculoRead, status_code=status.HTTP_201_CREATED)
 def crear_vehiculo(
@@ -27,6 +36,7 @@ def crear_vehiculo(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_role(RolUsuario.ADMIN, RolUsuario.VIGILANTE)),
 ):
+    _validar_placa_moto(datos.placa)
     existe = vehiculo_service.obtener_por_placa(db, datos.placa)
     if existe is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La placa ya esta registrada")
@@ -114,11 +124,7 @@ async def registrar_mi_vehiculo(
     placa = placa.strip().upper()
     if tipo_vehiculo != TipoVehiculo.MOTO:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Solo se registran motos")
-    if not _PLACA_MOTO.match(placa):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"La placa {placa} no tiene un formato valido de moto (ABC12, ABC12D o AB1C23D)",
-        )
+    _validar_placa_moto(placa)
     if vehiculo_service.obtener_por_placa(db, placa) is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La placa ya esta registrada")
 
