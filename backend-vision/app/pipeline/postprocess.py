@@ -1,9 +1,8 @@
 # Paso 3 del pipeline: quedarse con el texto que parece una placa.
 import re
 
-# Formato de placa colombiana de moto (3 letras + 2 digitos + letra opcional). Ajustar si el
-# parqueadero debe aceptar formatos de otros paises.
-PATRON_PLACA = re.compile(r"^[A-Z]{3}\d{2}[A-Z]?$")
+# Placa de moto colombiana (ABC12, ABC12D) o venezolana (AB1C23D).
+PATRON_PLACA = re.compile(r"^(?:[A-Z]{3}\d{2}[A-Z]?|[A-Z]{2}\d[A-Z]\d{2}[A-Z])$")
 
 
 # Deja solo letras y numeros en mayusculas ("abc-12d" -> "ABC12D").
@@ -11,7 +10,7 @@ def normalizar_placa(texto: str) -> str:
     return re.sub(r"[^A-Z0-9]", "", texto.upper())
 
 
-# Dice si el texto tiene forma de placa colombiana de moto.
+# Dice si el texto tiene forma de placa de moto colombiana o venezolana.
 def es_placa_valida(texto: str) -> bool:
     return bool(PATRON_PLACA.match(texto))
 

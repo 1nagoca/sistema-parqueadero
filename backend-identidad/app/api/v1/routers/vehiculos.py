@@ -16,8 +16,8 @@ from app.services import documento_service, usuario_service, vehiculo_service, v
 
 router = APIRouter(prefix="/vehiculos", tags=["vehiculos"])
 
-# Placa colombiana de moto: ABC12 o ABC12D.
-_PLACA_MOTO = re.compile(r"^[A-Z]{3}\d{2}[A-Z]?$")
+# Placa de moto: colombiana ABC12 o ABC12D, o venezolana AB1C23D.
+_PLACA_MOTO = re.compile(r"^(?:[A-Z]{3}\d{2}[A-Z]?|[A-Z]{2}\d[A-Z]\d{2}[A-Z])$")
 
 
 # POST /vehiculos (admin, vigilante): registra un vehiculo, por ejemplo de un visitante.
@@ -117,7 +117,7 @@ async def registrar_mi_vehiculo(
     if not _PLACA_MOTO.match(placa):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"La placa {placa} no tiene un formato valido de moto (ABC12 o ABC12D)",
+            detail=f"La placa {placa} no tiene un formato valido de moto (ABC12, ABC12D o AB1C23D)",
         )
     if vehiculo_service.obtener_por_placa(db, placa) is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La placa ya esta registrada")

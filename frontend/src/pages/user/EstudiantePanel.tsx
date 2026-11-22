@@ -382,9 +382,9 @@ function FormularioVehiculo({ onCreado }: { onCreado: () => void }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <input
           required
-          placeholder="Placa de la moto (ej. ABC12D)"
+          placeholder="Placa de la moto (ej. ABC12D o AB1C23D)"
           value={placa}
-          maxLength={6}
+          maxLength={7}
           onChange={(e) => setPlaca(e.target.value.toUpperCase())}
           className={`${campo} font-mono uppercase`}
         />

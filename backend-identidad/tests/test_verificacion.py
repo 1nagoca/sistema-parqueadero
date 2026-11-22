@@ -210,6 +210,36 @@ def test_vehiculo_rechazado_se_reenvia(client, admin, sufijo):
     assert len(r.json()["documentos"]) == 2
 
 
+def _placa_venezolana():
+    # Placa venezolana de moto al azar (AB1C23D) para que no choque dentro de una corrida.
+    letras = string.ascii_uppercase
+    return (
+        "".join(random.choices(letras, k=2))
+        + str(random.randrange(10))
+        + random.choice(letras)
+        + f"{random.randrange(100):02d}"
+        + random.choice(letras)
+    )
+
+
+def test_estudiante_registra_moto_con_placa_venezolana(client, sufijo):
+    _registrar(client, sufijo)
+    est = _login(client, f"est-{sufijo}@ufps.edu.co", "clave-segura-1")
+    placa = _placa_venezolana()
+    r = _vehiculo(client, est, placa.lower())
+    assert r.status_code == 201, r.text
+    assert r.json()["placa"] == placa
+    assert r.json()["estado_verificacion"] == "pendiente"
+
+
+def test_estudiante_con_placa_invalida_da_422_con_los_formatos(client, sufijo):
+    _registrar(client, sufijo)
+    est = _login(client, f"est-{sufijo}@ufps.edu.co", "clave-segura-1")
+    r = _vehiculo(client, est, "AB12C3D")
+    assert r.status_code == 422
+    assert r.json()["detail"] == "La placa AB12C3D no tiene un formato valido de moto (ABC12, ABC12D o AB1C23D)"
+
+
 def _estudiante_con_carnet_y_vehiculo(client, sufijo):
     """Devuelve (cabeceras, id del estudiante, id de su vehiculo), ambos pendientes."""
     assert _registrar(client, sufijo).status_code == 201
