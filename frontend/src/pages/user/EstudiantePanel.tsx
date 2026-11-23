@@ -21,6 +21,9 @@ const campo = "min-h-12 w-full rounded-lg border border-gray-300 px-3 focus:bord
 const ACEPTA_IMAGEN = "image/jpeg,image/png,image/webp";
 const ACEPTA_IMAGEN_O_PDF = `${ACEPTA_IMAGEN},application/pdf`;
 
+// Maximo de motos por estudiante (RN-12); debe coincidir con MAX_MOTOS_POR_ESTUDIANTE de identidad.
+const MAX_MOTOS = 4;
+
 // Mensaje de error del backend o uno por defecto.
 function mensajeDe(err: unknown, porDefecto: string): string {
   return err instanceof ApiError ? err.message : porDefecto;
@@ -249,7 +252,13 @@ function TarjetaVehiculos({ vehiculos, onCambio }: { vehiculos: VehiculoConDocum
       {vehiculos.map((vehiculo) => (
         <FilaVehiculo key={vehiculo.id} vehiculo={vehiculo} onCambio={onCambio} />
       ))}
-      <FormularioVehiculo onCreado={onCambio} />
+      {vehiculos.length >= MAX_MOTOS ? (
+        <p className="text-sm text-gray-400">
+          Ya tienes 4 motos registradas, que es el maximo. Si una fue rechazada, corrige sus documentos con Reenviar.
+        </p>
+      ) : (
+        <FormularioVehiculo onCreado={onCambio} />
+      )}
     </section>
   );
 }
