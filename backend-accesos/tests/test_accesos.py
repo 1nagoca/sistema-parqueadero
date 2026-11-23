@@ -177,12 +177,6 @@ def test_entrada_normal_exige_vehiculo_y_propietario_aprobados(client, admin, pa
         assert db.get(Acceso, uuid.UUID(r.json()["id"])).placa == vehiculo["placa"]  # la que dio identidad
 
 
-def test_entrada_normal_de_vehiculo_aprobado_sin_propietario(client, admin, parqueadero, identidad):
-    vehiculo = identidad.vehiculo()
-    entrada = {"vehiculo_id": vehiculo["id"], "zona_id": str(uuid.uuid4()), "espacio_id": str(uuid.uuid4())}
-    assert client.post(f"{API}/accesos/entrada", headers=admin, json=entrada).status_code == 201
-
-
 def test_entrada_normal_con_propietario_dado_de_baja_responde_409(client, admin, parqueadero, identidad):
     vehiculo = identidad.vehiculo("BAJ", propietario_estado="aprobado")
     identidad.cambiar(vehiculo["id"], propietario_activo=False)

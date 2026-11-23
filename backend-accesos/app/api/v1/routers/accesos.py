@@ -119,6 +119,7 @@ def registrar_entrada(
         acceso_service.VehiculoNoVerificadoError,
         acceso_service.VehiculoYaAdentroError,
         acceso_service.OtraMotoDelDuenoAdentroError,
+        acceso_service.VisitanteSinAutorizacionError,
     ) as exc:
         raise _entrada_rechazada(status.HTTP_409_CONFLICT, exc) from exc
     except IdentidadNoDisponibleError as exc:

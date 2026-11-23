@@ -1,7 +1,7 @@
 import logging
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import Integer, cast, func, text, update
 from sqlalchemy.exc import IntegrityError
@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 # Intentos de la compensacion del cupo y espera antes de cada reintento (segundos).
 INTENTOS_COMPENSACION = 3
 ESPERAS_COMPENSACION = (0.5, 1.0)
+
+# Tiempo tras su ultima salida en que una moto de visitante vuelve sin nueva autorizacion (RN-03).
+VENTANA_REINGRESO_VISITANTE = timedelta(hours=1)
 
 
 class AccesoNoEncontradoOYaCerradoError(Exception):
@@ -49,6 +52,10 @@ class ParqueaderoCerradoError(Exception):
 
 class OtraMotoDelDuenoAdentroError(Exception):
     """El dueno ya tiene otra moto adentro: solo una a la vez (RN-12)."""
+
+
+class VisitanteSinAutorizacionError(Exception):
+    """La moto de visitante vuelve sin autorizacion y su ultima salida no le da para reingresar (RN-03)."""
 
 
 # Nombre del indice que impide dos accesos abiertos del mismo vehiculo.
@@ -90,6 +97,9 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
 
     Una moto con dueno no entra si otra moto suya sigue adentro (RN-12); un bloqueo por dueno
     hasta el commit impide que dos motos suyas entren a la vez.
+
+    Una moto sin dueno que llega como entrada normal solo vuelve si salio como visitante dentro
+    de la ultima hora (RN-03): el acceso se guarda como visitante con la autorizacion anterior.
     """
     # 0. Fuera de horario no entra nadie, sea normal o visitante (RN-11).
     if not parqueadero_abierto(ahora_en_colombia()):
@@ -109,6 +119,18 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
         raise VehiculoYaAdentroError("El vehiculo ya tiene un acceso activo")
     if vehiculo.propietario_id is not None:
         _exigir_ninguna_otra_moto_adentro(db, vehiculo)
+    # Moto sin dueno con entrada normal: solo vuelve dentro de la ventana, con la autorizacion anterior (RN-03).
+    reingreso_de = None
+    if vehiculo.propietario_id is None and datos.tipo_acceso == TipoAcceso.NORMAL:
+        anterior = _visitante_que_vuelve(db, datos.vehiculo_id)
+        datos = datos.model_copy(
+            update={
+                "tipo_acceso": TipoAcceso.VISITANTE,
+                "autorizado_por_id": anterior.autorizado_por_id,
+                "justificacion": anterior.justificacion,
+            }
+        )
+        reingreso_de = anterior.id
 
     # 2. Pide al servicio de parqueadero que ocupe el cupo.
     parqueadero_client.ocupar_cupo(datos.zona_id, datos.espacio_id)
@@ -140,6 +162,7 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
                 "zona_id": str(datos.zona_id),
                 "vehiculo_id": str(datos.vehiculo_id),
                 "tipo_acceso": datos.tipo_acceso.value,
+                **({"reingreso_de": str(reingreso_de)} if reingreso_de else {}),
             },
         )
 
@@ -206,6 +229,22 @@ def _exigir_ninguna_otra_moto_adentro(db: Session, vehiculo: identidad_client.Ve
     abiertos = accesos_abiertos_de_vehiculos(db, otras)
     if abiertos:
         raise OtraMotoDelDuenoAdentroError(f"El dueno ya tiene otra moto adentro ({abiertos[0].placa})")
+
+
+# Ultimo acceso cerrado de la moto si fue de visitante y salio dentro de la ventana; si no, el 409 de RN-03.
+def _visitante_que_vuelve(db: Session, vehiculo_id: uuid.UUID) -> Acceso:
+    fila = (
+        db.query(Acceso, (Acceso.fecha_hora_salida >= func.now() - VENTANA_REINGRESO_VISITANTE).label("a_tiempo"))
+        .filter(Acceso.vehiculo_id == vehiculo_id, Acceso.fecha_hora_salida.is_not(None))
+        .order_by(Acceso.fecha_hora_salida.desc())
+        .first()
+    )
+    if fila is None or fila.Acceso.tipo_acceso != TipoAcceso.VISITANTE or not fila.a_tiempo:
+        raise VisitanteSinAutorizacionError(
+            "La moto de visitante necesita una nueva autorizacion: "
+            "salio hace mas de 1 hora o no tiene una autorizacion previa"
+        )
+    return fila.Acceso
 
 
 # Dice si el vehiculo ya esta adentro (tiene un acceso sin salida).
