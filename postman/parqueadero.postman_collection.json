@@ -741,7 +741,7 @@
             "url": "{{baseUrl}}/api/v1/vehiculos",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"placa\": \"{{placa_1}}\",\n  \"tipo_vehiculo\": \"moto\",\n  \"marca\": \"Yamaha\",\n  \"modelo\": \"FZ\",\n  \"color\": \"Rojo\",\n  \"usuario_id\": \"{{nuevo_usuario_id}}\"\n}",
+              "raw": "{\n  \"placa\": \"{{placa_1}}\",\n  \"tipo_vehiculo\": \"moto\",\n  \"marca\": \"Yamaha\",\n  \"modelo\": \"FZ\",\n  \"color\": \"Rojo\",\n  \"es_visitante\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -756,8 +756,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "// La placa es UNIQUE y con formato de moto (RN-05): dos placas al azar por ejecución.",
-                  "// placa_1 colombiana (ABC12D) y placa_2 venezolana (AB1C23D), la del visitante.",
-                  "// Un vehículo debe tener dueño (usuario_id) o ser visitante: este es del usuario creado en 02.",
+                  "// placa_1 colombiana (ABC12D) y placa_2 venezolana (AB1C23D).",
+                  "// Solo motos de visitantes (la de un estudiante entra por su panel): las dos son de visitantes.",
                   "const letra = () => String.fromCharCode(65 + Math.floor(Math.random() * 26));",
                   "const digito = () => String(Math.floor(Math.random() * 10));",
                   "pm.collectionVariables.set(\"placa_1\", letra() + letra() + letra() + digito() + digito() + letra());",
@@ -929,6 +929,40 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Moto con dueño (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/vehiculos",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"placa\": \"DUE12A\",\n  \"tipo_vehiculo\": \"moto\",\n  \"usuario_id\": \"{{nuevo_usuario_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// POST /vehiculos solo registra visitantes: la moto de un estudiante entra por su panel.",
                   "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
                 ]
               }

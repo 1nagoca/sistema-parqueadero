@@ -13,7 +13,7 @@ from app.models.usuario import Usuario
 from app.models.vehiculo import Vehiculo
 from app.schemas.documento import VehiculoConDocumentos
 from app.schemas.vehiculo import PropietarioVigilante, VehiculoCreate, VehiculoRead
-from app.services import documento_service, usuario_service, vehiculo_service, verificacion_service
+from app.services import documento_service, vehiculo_service, verificacion_service
 
 router = APIRouter(prefix="/vehiculos", tags=["vehiculos"])
 
@@ -43,8 +43,6 @@ def crear_vehiculo(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La placa ya esta registrada")
     try:
         return vehiculo_service.crear_vehiculo(db, datos)
-    except usuario_service.UsuarioNoEncontradoError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except vehiculo_service.PlacaRepetidaError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La placa ya esta registrada") from exc
 

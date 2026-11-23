@@ -353,31 +353,51 @@ def _placa():
     return "".join(random.choices(letras, k=3)) + f"{random.randrange(100):02d}" + random.choice(letras)
 
 
-def test_crear_vehiculo_con_usuario_id_inexistente_da_404_y_no_guarda_nada(client, admin):
+# El 422 de POST /vehiculos cuando no es una moto de visitante (lo arma pydantic: detail es una lista).
+SOLO_VISITANTES = "solo se registran motos de visitantes: la moto de un estudiante se registra desde su panel"
+
+
+def _es_solo_visitantes(r):
+    return r.status_code == 422 and r.json()["detail"][0]["msg"].endswith(SOLO_VISITANTES)
+
+
+def _placa_guardada(placa):
+    with SessionLocal() as db:
+        return db.query(Vehiculo).filter(Vehiculo.placa == placa).count()
+
+
+def test_moto_con_dueno_inexistente_da_422_y_no_guarda_nada(client, admin):
     placa = _placa()
     r = client.post(f"{API}/vehiculos", headers=admin, json={"placa": placa, "usuario_id": str(uuid.uuid4())})
-    assert r.status_code == 404
-    assert r.json()["detail"] == "El dueno (usuario_id) no existe"
-    with SessionLocal() as db:
-        assert db.query(Vehiculo).filter(Vehiculo.placa == placa).count() == 0
+    assert _es_solo_visitantes(r), r.text
+    assert _placa_guardada(placa) == 0
 
 
-def test_vigilante_crear_vehiculo_con_usuario_id_inexistente_da_404(client, sufijo):
+def test_vigilante_moto_con_dueno_da_422(client, sufijo):
     _, vigilante = _personal(client, RolUsuario.VIGILANTE, sufijo)
     datos = {"placa": _placa(), "usuario_id": str(uuid.uuid4())}
-    assert client.post(f"{API}/vehiculos", headers=vigilante, json=datos).status_code == 404
+    assert _es_solo_visitantes(client.post(f"{API}/vehiculos", headers=vigilante, json=datos))
 
 
-def test_visitante_con_usuario_id_inexistente_da_404(client, admin):
+def test_moto_con_dueno_y_es_visitante_da_422(client, admin):
     datos = {"placa": _placa(), "usuario_id": str(uuid.uuid4()), "es_visitante": True}
-    assert client.post(f"{API}/vehiculos", headers=admin, json=datos).status_code == 404
+    assert _es_solo_visitantes(client.post(f"{API}/vehiculos", headers=admin, json=datos))
 
 
-def test_crear_vehiculo_con_usuario_id_existente_da_201(client, admin, sufijo):
-    dueno_id, _ = _personal(client, RolUsuario.VIGILANTE, sufijo)
-    r = client.post(f"{API}/vehiculos", headers=admin, json={"placa": _placa(), "usuario_id": dueno_id})
-    assert r.status_code == 201, r.text
-    assert r.json()["usuario_id"] == dueno_id
+def test_moto_con_dueno_estudiante_aprobado_da_422_y_no_guarda_nada(client, admin, sufijo):
+    # el estudiante nace aprobado en _personal: aun asi su moto solo entra por su panel
+    dueno_id, _ = _personal(client, RolUsuario.ESTUDIANTE, sufijo)
+    placa = _placa()
+    r = client.post(f"{API}/vehiculos", headers=admin, json={"placa": placa, "usuario_id": dueno_id})
+    assert _es_solo_visitantes(r), r.text
+    assert _placa_guardada(placa) == 0
+
+
+def test_sin_dueno_ni_visitante_da_422_con_el_texto(client, admin):
+    placa = _placa()
+    r = client.post(f"{API}/vehiculos", headers=admin, json={"placa": placa})
+    assert _es_solo_visitantes(r), r.text
+    assert _placa_guardada(placa) == 0
 
 
 def test_crear_vehiculo_con_placa_repetida_da_409(client, admin):
@@ -422,10 +442,10 @@ def test_visitante_con_placa_venezolana_da_201_en_mayusculas(client, sufijo):
     assert r.json()["es_visitante"] is True
 
 
-def test_crear_vehiculo_valida_la_placa_antes_que_el_dueno(client, admin):
+def test_moto_con_dueno_da_422_del_dueno_antes_que_el_de_la_placa(client, admin):
+    # pydantic revisa el cuerpo antes que el router: el dueno se rechaza antes que el formato
     r = client.post(f"{API}/vehiculos", headers=admin, json={"placa": "AB12C3D", "usuario_id": str(uuid.uuid4())})
-    assert r.status_code == 422
-    assert r.json()["detail"] == "La placa AB12C3D no tiene un formato valido de moto (ABC12, ABC12D o AB1C23D)"
+    assert _es_solo_visitantes(r), r.text
 
 
 def _archivos_en_disco():

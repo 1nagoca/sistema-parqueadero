@@ -36,13 +36,13 @@ class VehiculoCreate(VehiculoBase):
             raise ValueError("solo se registran motos")
         return valor
 
-    # Debe tener dueno o ser de visitante.
+    # Solo motos de visitantes: la de un estudiante entra por su panel y la revisa el admin.
     @model_validator(mode="after")
     def validar_propietario_o_visitante(self) -> "VehiculoCreate":
-        """Espejo del CHECK de BD ck_vehiculos_propietario_o_visitante: sin esto la violacion
-        llega hasta Postgres y la API responde 500 en vez de 422."""
-        if self.usuario_id is None and not self.es_visitante:
-            raise ValueError("el vehiculo requiere usuario_id o es_visitante=true")
+        """POST /vehiculos solo registra visitantes; tambien cubre el CHECK de BD
+        ck_vehiculos_propietario_o_visitante, que sin esto llegaria a Postgres como 500."""
+        if self.usuario_id is not None or not self.es_visitante:
+            raise ValueError("solo se registran motos de visitantes: la moto de un estudiante se registra desde su panel")
         return self
 
 
