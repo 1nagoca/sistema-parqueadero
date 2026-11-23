@@ -21,12 +21,13 @@ import { listarZonas } from "@/services/api/zonas";
 import { useActualizacionesZona } from "@/services/realtime/useActualizacionesZona";
 import type { Acceso, AccesoActivo, Espacio, Vehiculo, Zona } from "@/types/api";
 
-// Lo que se muestra al buscar una placa: nada, cargando, ya esta adentro, registrado o no registrado.
+// Lo que se muestra al buscar una placa: nada, cargando, ya esta adentro, registrado, visitante que necesita autorizacion o no registrado.
 type Resultado =
   | { estado: "vacio" }
   | { estado: "cargando" }
   | { estado: "con_acceso_activo"; placa: string; acceso: Acceso }
   | { estado: "vehiculo_registrado"; vehiculo: Vehiculo }
+  | { estado: "visitante_sin_autorizacion"; vehiculo: Vehiculo }
   | { estado: "no_registrado"; placa: string };
 
 // Panel del vigilante: buscar placa (a mano, con foto o con QR) y registrar entradas y salidas.
@@ -140,9 +141,9 @@ export default function GuardDashboard() {
       : {};
   }
 
-  // Entrada de un vehiculo registrado.
+  // Entrada de un vehiculo registrado; si es de visitante y accesos responde 409 (RN-03), pide nueva autorizacion.
   async function confirmarEntradaNormal(vehiculoId: string) {
-    await conCargando(() =>
+    const fallo = await conCargando(() =>
       registrarEntrada({
         vehiculo_id: vehiculoId,
         zona_id: zonaId,
@@ -151,6 +152,14 @@ export default function GuardDashboard() {
         ...camposAlpr(),
       }),
     );
+    if (
+      fallo instanceof ApiError &&
+      fallo.status === 409 &&
+      resultado.estado === "vehiculo_registrado" &&
+      resultado.vehiculo.es_visitante
+    ) {
+      setResultado({ estado: "visitante_sin_autorizacion", vehiculo: resultado.vehiculo });
+    }
   }
 
   // Entrada de visitante: la autoriza el vigilante de la sesion con una justificacion.
@@ -180,11 +189,11 @@ export default function GuardDashboard() {
     resultadoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  // Ejecuta la accion mostrando que esta procesando; al terminar limpia y refresca.
-  async function conCargando(accion: () => Promise<unknown>) {
+  // Ejecuta la accion mostrando que esta procesando; al terminar limpia y refresca. Devuelve el error si fallo.
+  async function conCargando(accion: () => Promise<unknown>): Promise<unknown> {
     if (!zonaId && resultado.estado !== "con_acceso_activo") {
       setError("Selecciona una zona");
-      return;
+      return null;
     }
     setProcesando(true);
     setError(null);
@@ -195,8 +204,10 @@ export default function GuardDashboard() {
       setLecturaAlpr(null);
       setEspacioId("");
       recargarZonaYEspacios();
+      return null;
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo completar la operacion");
+      return err;
     } finally {
       setProcesando(false);
     }
@@ -328,6 +339,7 @@ export default function GuardDashboard() {
           puesto={puestoElegido?.codigo ?? null}
           onEntradaNormal={confirmarEntradaNormal}
           onSalida={confirmarSalida}
+          onAutorizarVisitante={confirmarEntradaVisitante}
           onRegistrarVehiculoVisitante={async (placa, justificacion) => {
             // Visitante no registrado: primero crea el vehiculo y luego registra la entrada.
             if (!usuario) return;
@@ -360,6 +372,7 @@ interface ResultadoPanelProps {
   puesto: string | null;
   onEntradaNormal: (vehiculoId: string) => void;
   onSalida: (accesoId: string) => void;
+  onAutorizarVisitante: (vehiculoId: string, justificacion: string) => void;
   onRegistrarVehiculoVisitante: (placa: string, justificacion: string) => void;
 }
 
@@ -371,6 +384,7 @@ function ResultadoPanel({
   puesto,
   onEntradaNormal,
   onSalida,
+  onAutorizarVisitante,
   onRegistrarVehiculoVisitante,
 }: ResultadoPanelProps) {
   if (resultado.estado === "vacio") {
@@ -418,13 +432,32 @@ function ResultadoPanel({
         >
           {puesto ? `Registrar entrada en ${puesto}` : "Elige un puesto en el mapa"}
         </Button>
+        {resultado.vehiculo.es_visitante && (
+          <p className="mt-2 text-sm text-gray-400">
+            Visitante: entra sin nueva autorizacion solo si salio hace menos de 1 hora
+          </p>
+        )}
       </div>
+    );
+  }
+
+  if (resultado.estado === "visitante_sin_autorizacion") {
+    return (
+      <FormularioVisitante
+        placa={resultado.vehiculo.placa}
+        aviso="Visitante: salio hace mas de 1 hora o no tiene una autorizacion previa — requiere nueva autorizacion (RN-03)."
+        procesando={procesando}
+        sinCupos={sinCupos}
+        puesto={puesto}
+        onConfirmar={(_placa, justificacion) => onAutorizarVisitante(resultado.vehiculo.id, justificacion)}
+      />
     );
   }
 
   return (
     <FormularioVisitante
       placa={resultado.placa}
+      aviso="Moto no registrada — requiere autorizacion de visitante (RN-03)."
       procesando={procesando}
       sinCupos={sinCupos}
       puesto={puesto}
@@ -436,12 +469,14 @@ function ResultadoPanel({
 // Formulario para dejar entrar como visitante un vehiculo no registrado.
 function FormularioVisitante({
   placa,
+  aviso,
   procesando,
   sinCupos,
   puesto,
   onConfirmar,
 }: {
   placa: string;
+  aviso: string;
   procesando: boolean;
   sinCupos: boolean;
   puesto: string | null;
@@ -452,7 +487,7 @@ function FormularioVisitante({
   return (
     <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
       <p className="text-lg font-semibold text-gray-900">{placa}</p>
-      <p className="text-sm text-amber-600">Moto no registrada — requiere autorizacion de visitante (RN-03).</p>
+      <p className="text-sm text-amber-600">{aviso}</p>
 
       <textarea
         value={justificacion}
