@@ -3,7 +3,7 @@ import time
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Integer, cast, func, update
+from sqlalchemy import Integer, cast, func, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -47,6 +47,10 @@ class ParqueaderoCerradoError(Exception):
     """Fuera del horario del parqueadero no se registran entradas (RN-11)."""
 
 
+class OtraMotoDelDuenoAdentroError(Exception):
+    """El dueno ya tiene otra moto adentro: solo una a la vez (RN-12)."""
+
+
 # Nombre del indice que impide dos accesos abiertos del mismo vehiculo.
 INDICE_ACCESO_ACTIVO = "uq_accesos_vehiculo_activo"
 
@@ -83,6 +87,9 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
 
     Fuera del horario del parqueadero (RN-11) se rechaza antes de todo: no se consulta a
     identidad ni se toca el cupo.
+
+    Una moto con dueno no entra si otra moto suya sigue adentro (RN-12); un bloqueo por dueno
+    hasta el commit impide que dos motos suyas entren a la vez.
     """
     # 0. Fuera de horario no entra nadie, sea normal o visitante (RN-11).
     if not parqueadero_abierto(ahora_en_colombia()):
@@ -95,8 +102,13 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
     vehiculo = identidad_client.obtener_vehiculo(datos.vehiculo_id)
     _exigir_vehiculo_verificado(vehiculo, datos.tipo_acceso)
     _exigir_usuarios_existentes(datos)
+    # Con dueno, sus entradas van de una en una hasta el commit o el rollback (RN-12).
+    if vehiculo.propietario_id is not None:
+        _bloquear_entradas_del_dueno(db, vehiculo.propietario_id)
     if _tiene_acceso_activo(db, datos.vehiculo_id):
         raise VehiculoYaAdentroError("El vehiculo ya tiene un acceso activo")
+    if vehiculo.propietario_id is not None:
+        _exigir_ninguna_otra_moto_adentro(db, vehiculo)
 
     # 2. Pide al servicio de parqueadero que ocupe el cupo.
     parqueadero_client.ocupar_cupo(datos.zona_id, datos.espacio_id)
@@ -181,6 +193,19 @@ def _exigir_usuarios_existentes(datos: AccesoEntradaCreate) -> None:
         raise UsuarioNoEncontradoError("Quien autoriza (autorizado_por_id) no existe")
     if autorizador.rol not in ROLES_QUE_AUTORIZAN or not autorizador.activo:
         raise AutorizadorNoValidoError("Quien autoriza debe ser un vigilante o administrador activo")
+
+
+# Bloqueo de la transaccion por dueno (clave sacada de su id); lo suelta el commit o el rollback.
+def _bloquear_entradas_del_dueno(db: Session, propietario_id: uuid.UUID) -> None:
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:clave, 0))"), {"clave": str(propietario_id)})
+
+
+# Rechaza la entrada si otra moto del mismo dueno sigue adentro (RN-12); identidad dice cuales son suyas.
+def _exigir_ninguna_otra_moto_adentro(db: Session, vehiculo: identidad_client.VehiculoIdentidad) -> None:
+    otras = [i for i in identidad_client.vehiculos_de_usuario(vehiculo.propietario_id) if i != vehiculo.id]
+    abiertos = accesos_abiertos_de_vehiculos(db, otras)
+    if abiertos:
+        raise OtraMotoDelDuenoAdentroError(f"El dueno ya tiene otra moto adentro ({abiertos[0].placa})")
 
 
 # Dice si el vehiculo ya esta adentro (tiene un acceso sin salida).

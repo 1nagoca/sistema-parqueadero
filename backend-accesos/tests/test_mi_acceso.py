@@ -11,6 +11,8 @@ if not os.environ.get("DATABASE_URL"):
     pytest.skip("requiere DATABASE_URL de una BD de pruebas", allow_module_level=True)
 
 from app.core.config import settings  # noqa: E402
+from app.db.session import SessionLocal  # noqa: E402
+from app.models.acceso import Acceso  # noqa: E402
 from app.parqueadero_client import client as parqueadero_client  # noqa: E402
 from test_accesos import (  # noqa: E402, F401
     _id_del_token,
@@ -89,9 +91,15 @@ def test_sin_moto_adentro_da_lista_vacia_y_tras_la_salida_ya_no_sale(client, adm
     assert r.status_code == 200 and r.json() == []
 
 
-def test_con_dos_motos_suyas_adentro_salen_las_dos(client, admin, identidad, codigos, estudiante):
+def test_con_dos_motos_suyas_adentro_de_antes_de_la_regla_salen_las_dos(client, admin, identidad, codigos, estudiante):
+    # RN-12 ya no deja entrar la segunda por la API: va directo a la base, como un dato de antes de la regla.
     primera = _moto_adentro(client, admin, identidad, codigos, estudiante, codigo="A-01")
-    segunda = _moto_adentro(client, admin, identidad, codigos, estudiante, codigo="C-07")
+    segunda = identidad.vehiculo("MIA", propietario_estado="aprobado", propietario_id=_id_del_token(estudiante))
+    espacio_id = uuid.uuid4()
+    codigos[espacio_id] = "C-07"
+    with SessionLocal() as db:
+        db.add(Acceso(vehiculo_id=uuid.UUID(segunda["id"]), placa=segunda["placa"], zona_id=uuid.uuid4(), espacio_id=espacio_id))
+        db.commit()
 
     r = client.get(f"{API}/accesos/mio", headers=estudiante)
     assert r.status_code == 200, r.text
