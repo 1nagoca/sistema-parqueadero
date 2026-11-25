@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -8,9 +9,11 @@ from app.models.enums import RolUsuario
 from app.models.espacio import Espacio
 from app.models.zona import Zona
 from app.schemas.espacio import EspacioCreate, EspacioLoteCreate, EspacioLoteResultado, EspacioRead
-from app.services import espacio_service, realtime_service
+from app.schemas.mantenimiento import MantenimientoCreate, MantenimientoRead
+from app.services import espacio_service, mantenimiento_service, realtime_service
 
 router = APIRouter(prefix="/espacios", tags=["espacios"])
+logger = logging.getLogger(__name__)
 
 
 # GET /espacios (cualquier usuario): espacios, opcionalmente de una zona.
@@ -60,3 +63,80 @@ def crear_espacios_lote(
         aviso = zona_ajustada or zona
         background_tasks.add_task(realtime_service.broadcast_actualizacion_zona, aviso.id, aviso.cupos_disponibles)
     return EspacioLoteResultado(creados=creados, existentes=len(set(datos.codigos)) - creados)
+
+
+# GET /espacios/mantenimientos (admin): los puestos que estan en mantenimiento ahora, opcionalmente de una zona.
+@router.get("/mantenimientos", response_model=list[MantenimientoRead])
+def listar_mantenimientos(
+    zona_id: uuid.UUID | None = None,
+    db: Session = Depends(get_db),
+    _: UsuarioToken = Depends(require_role(RolUsuario.ADMIN)),
+):
+    return mantenimiento_service.listar_activos(db, zona_id)
+
+
+# POST /espacios/{id}/mantenimiento (admin): pone un puesto libre en mantenimiento y baja un cupo de la zona.
+@router.post("/{espacio_id}/mantenimiento", response_model=EspacioRead)
+def poner_en_mantenimiento(
+    espacio_id: uuid.UUID,
+    datos: MantenimientoCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    admin: UsuarioToken = Depends(require_role(RolUsuario.ADMIN)),
+):
+    try:
+        espacio, zona = mantenimiento_service.poner_en_mantenimiento(db, espacio_id, datos.motivo, admin.id)
+    except _ERRORES_DE_MANTENIMIENTO as exc:
+        db.rollback()
+        raise _error_http(exc) from exc
+    return _confirmar(db, espacio, zona, background_tasks, "en mantenimiento")
+
+
+# POST /espacios/{id}/habilitar (admin): devuelve a libre un puesto en mantenimiento y sube un cupo de la zona.
+@router.post("/{espacio_id}/habilitar", response_model=EspacioRead)
+def habilitar_espacio(
+    espacio_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    admin: UsuarioToken = Depends(require_role(RolUsuario.ADMIN)),
+):
+    try:
+        espacio, zona = mantenimiento_service.habilitar(db, espacio_id, admin.id)
+    except _ERRORES_DE_MANTENIMIENTO as exc:
+        db.rollback()
+        raise _error_http(exc) from exc
+    return _confirmar(db, espacio, zona, background_tasks, "habilitado")
+
+
+# Errores del servicio que se traducen a 404 o 409.
+_ERRORES_DE_MANTENIMIENTO = (
+    mantenimiento_service.EspacioNoEncontradoError,
+    mantenimiento_service.EstadoNoPermitidoError,
+    mantenimiento_service.ZonaSinCupoError,
+)
+
+
+# Puesto que no existe: 404; estado o cupo que no lo permiten: 409.
+def _error_http(exc: Exception) -> HTTPException:
+    if isinstance(exc, mantenimiento_service.EspacioNoEncontradoError):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+
+# Guarda el cambio, avisa al mapa por /ws/zonas despues de responder y lo deja en la consola.
+def _confirmar(
+    db: Session, espacio: Espacio, zona: Zona, background_tasks: BackgroundTasks, accion: str
+) -> Espacio:
+    db.commit()
+    db.refresh(espacio)
+    db.refresh(zona)
+    background_tasks.add_task(realtime_service.broadcast_actualizacion_zona, zona.id, zona.cupos_disponibles)
+    logger.info(
+        "Parqueadero: puesto %s %s en %s; quedan %s de %s cupos",
+        espacio.codigo,
+        accion,
+        zona.nombre,
+        zona.cupos_disponibles,
+        zona.capacidad_total,
+    )
+    return espacio

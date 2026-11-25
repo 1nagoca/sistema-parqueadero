@@ -722,6 +722,122 @@
               }
             }
           ]
+        },
+        {
+          "name": "Poner puesto en mantenimiento",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/espacios/{{espacio_id}}/mantenimiento",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motivo\": \"Prueba de Postman: piso dañado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Queda en mantenimiento\", () => pm.expect(json.estado).to.eql(\"mantenimiento\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mantenimiento repetido (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/espacios/{{espacio_id}}/mantenimiento",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motivo\": \"Prueba de Postman: piso dañado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Dice que ya esta en mantenimiento\", () => pm.expect(pm.response.json().detail).to.eql(\"El puesto P-01 ya esta en mantenimiento\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar puestos en mantenimiento",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/espacios/mantenimientos?zona_id={{zona_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const lista = pm.response.json();",
+                  "pm.test(\"Trae el puesto con su motivo\", () => {",
+                  "  pm.expect(lista).to.have.lengthOf(1);",
+                  "  pm.expect(lista[0].espacio_id).to.eql(pm.collectionVariables.get(\"espacio_id\"));",
+                  "  pm.expect(lista[0].motivo).to.eql(\"Prueba de Postman: piso dañado\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Habilitar puesto",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/espacios/{{espacio_id}}/habilitar"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Vuelve a libre\", () => pm.expect(pm.response.json().estado).to.eql(\"libre\"));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

@@ -18,3 +18,10 @@ class EstadoEspacio(str, enum.Enum):
     LIBRE = "libre"
     OCUPADO = "ocupado"
     MANTENIMIENTO = "mantenimiento"
+
+
+# Acciones que quedan en la auditoria (coinciden con auditoria_accion_enum de la migracion 0003).
+class AccionAuditoria(str, enum.Enum):
+    CREACION = "creacion"
+    ACTUALIZACION = "actualizacion"
+    ELIMINACION = "eliminacion"

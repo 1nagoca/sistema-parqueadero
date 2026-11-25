@@ -3,9 +3,9 @@
 // Hay una base de datos por microservicio (ver los TableGroup al final):
 //   parqueadero_identidad (backend-identidad): usuarios, vehiculos, documentos, auditoria_identidad
 //   parqueadero           (backend-accesos): accesos, auditoria_accesos
-//   parqueadero_zonas     (backend-parqueadero): zonas, espacios
+//   parqueadero_zonas     (backend-parqueadero): zonas, espacios, mantenimientos, auditoria_parqueadero
 // Entre bases no hay llaves foraneas: accesos y auditoria_accesos guardan solo los identificadores
-// de vehiculos, usuarios, zonas y espacios.
+// de vehiculos, usuarios, zonas y espacios; mantenimientos y auditoria_parqueadero, solo el de usuarios.
 // Fuente de verdad: alembic/versions de backend-identidad, backend-accesos y backend-parqueadero.
 
 Enum usuario_rol_enum {
@@ -35,7 +35,7 @@ Enum documento_tipo_enum {
   tarjeta_propiedad
 }
 
-// Existe con el mismo nombre en parqueadero_identidad y en parqueadero.
+// Existe con el mismo nombre en parqueadero_identidad, parqueadero y parqueadero_zonas.
 Enum auditoria_accion_enum {
   creacion
   actualizacion
@@ -197,6 +197,34 @@ Table espacios {
   }
 }
 
+Table mantenimientos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  espacio_id uuid [not null, unique, ref: - espacios.id]
+  motivo varchar(200) [not null, note: 'CHECK de 3 a 200 caracteres']
+  iniciado_por_id uuid [not null, note: 'Id de usuarios en la base parqueadero_identidad (sin FK)']
+  inicio timestamptz [not null, default: `now()`]
+  Note: 'Bitacora: solo los puestos que estan en mantenimiento ahora; al habilitar, la fila se borra y todo queda en auditoria_parqueadero'
+}
+
+Table auditoria_parqueadero {
+  id uuid [pk, default: `gen_random_uuid()`]
+  tabla_afectada varchar(50) [not null]
+  registro_id uuid [not null, note: 'En el mantenimiento, el id del espacio']
+  accion auditoria_accion_enum [not null]
+  valores_anteriores jsonb
+  valores_nuevos jsonb
+  realizado_por_id uuid [not null, note: 'Id de usuarios en la base parqueadero_identidad (sin FK)']
+  motivo text
+  fecha_hora timestamptz [not null, default: `now()`]
+  ip_origen varchar(45)
+  Note: 'Append-only por convencion: no se modifica ni se borra'
+
+  indexes {
+    fecha_hora
+    (tabla_afectada, registro_id)
+  }
+}
+
 TableGroup parqueadero_identidad {
   usuarios
   vehiculos
@@ -212,4 +240,6 @@ TableGroup parqueadero {
 TableGroup parqueadero_zonas {
   zonas
   espacios
+  mantenimientos
+  auditoria_parqueadero
 }

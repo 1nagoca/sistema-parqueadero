@@ -8,7 +8,7 @@ Hay **una base de datos por microservicio**:
 |---|---|---|---|
 | `parqueadero_identidad` | `backend-identidad` | `usuarios`, `vehiculos`, `documentos`, `auditoria_identidad` | `backend-identidad/alembic/versions` (0001) |
 | `parqueadero` | `backend-accesos` | `accesos`, `auditoria_accesos` | `backend-accesos/alembic/versions` (0001 a 0005) |
-| `parqueadero_zonas` | `backend-parqueadero` | `zonas`, `espacios` | `backend-parqueadero/alembic/versions` (0001) |
+| `parqueadero_zonas` | `backend-parqueadero` | `zonas`, `espacios`, `mantenimientos`, `auditoria_parqueadero` | `backend-parqueadero/alembic/versions` (0001 a 0003) |
 
 Entre bases no hay llaves foráneas. `accesos` y `auditoria_accesos` guardan identificadores de vehículos y usuarios (base de identidad) y de zonas y espacios (base de parqueadero); la consistencia la cuida el código.
 
@@ -24,6 +24,8 @@ Entre bases no hay llaves foráneas. `accesos` y `auditoria_accesos` guardan ide
 | `auditoria_accesos` | `parqueadero` | Bitácora de accesos (solo se agrega, nunca se modifica ni se borra) |
 | `zonas` | `parqueadero_zonas` | Zonas del parqueadero y sus cupos en tiempo real |
 | `espacios` | `parqueadero_zonas` | Puestos individuales dentro de una zona |
+| `mantenimientos` | `parqueadero_zonas` | Bitácora de los puestos que están en mantenimiento ahora |
+| `auditoria_parqueadero` | `parqueadero_zonas` | Bitácora del mantenimiento de puestos (solo se agrega, nunca se modifica ni se borra) |
 
 ## Relaciones
 
@@ -36,6 +38,7 @@ Llaves foráneas, siempre dentro de una misma base:
 | `documentos.vehiculo_id` | `vehiculos.id` | muchos a uno (opcional) | CASCADE |
 | `auditoria_identidad.realizado_por_id` | `usuarios.id` | muchos a uno | RESTRICT |
 | `espacios.zona_id` | `zonas.id` | muchos a uno | RESTRICT |
+| `mantenimientos.espacio_id` | `espacios.id` | uno a uno (opcional: solo mientras dura el mantenimiento) | RESTRICT |
 
 Referencias a otra base, sin llave foránea:
 
@@ -47,6 +50,8 @@ Referencias a otra base, sin llave foránea:
 | `auditoria_accesos.realizado_por_id` | `usuarios.id` (identidad) | muchos a uno |
 | `accesos.zona_id` | `zonas.id` (parqueadero) | muchos a uno |
 | `accesos.espacio_id` | `espacios.id` (parqueadero) | muchos a uno (opcional) |
+| `mantenimientos.iniciado_por_id` | `usuarios.id` (identidad) | muchos a uno |
+| `auditoria_parqueadero.realizado_por_id` | `usuarios.id` (identidad) | muchos a uno |
 
 ## Base `parqueadero_identidad`
 
@@ -197,6 +202,39 @@ Restricciones: `ck_zonas_capacidad_positiva`, `ck_zonas_cupos_en_rango`.
 
 Restricciones: único `(zona_id, codigo)`. Índice en `zona_id`.
 
+### mantenimientos
+
+Bitácora de los puestos que están en mantenimiento **ahora**. Al poner un puesto en mantenimiento se agrega su fila (y el puesto pasa a `mantenimiento` y la zona pierde un cupo); al habilitarlo, la fila se borra y todo lo que tenía queda en `auditoria_parqueadero`.
+
+| Columna | Tipo | Nulo | Por defecto | Descripción |
+|---|---|---|---|---|
+| `id` | uuid | No | `gen_random_uuid()` | PK |
+| `espacio_id` | uuid | No | | FK a `espacios`; único |
+| `motivo` | varchar(200) | No | | De 3 a 200 caracteres |
+| `iniciado_por_id` | uuid | No | | Id del administrador en la base de identidad (sin FK) |
+| `inicio` | timestamptz | No | `now()` | |
+
+Restricciones: `uq_mantenimientos_espacio_id`, `fk_mantenimientos_espacio_id` (RESTRICT), `ck_mantenimientos_motivo_largo`.
+
+### auditoria_parqueadero
+
+Bitácora del servicio de parqueadero, con las mismas columnas que `auditoria_accesos`. Tabla **append-only** por convención de la aplicación: no se actualiza ni se borra. Cada mantenimiento deja dos trazas sobre `espacios` (`registro_id` = id del espacio, acción `actualizacion`): al empezar (libre → mantenimiento, con motivo, inicio y quién lo puso) y al habilitar (mantenimiento → libre, con todo lo de la bitácora más el fin y quién lo habilitó). El downgrade de la migración 0003 se detiene si la tabla tiene trazas.
+
+| Columna | Tipo | Nulo | Por defecto | Descripción |
+|---|---|---|---|---|
+| `id` | uuid | No | `gen_random_uuid()` | PK |
+| `tabla_afectada` | varchar(50) | No | | Tabla que cambió |
+| `registro_id` | uuid | No | | Registro que cambió |
+| `accion` | `auditoria_accion_enum` | No | | creacion, actualizacion, eliminacion |
+| `valores_anteriores` | jsonb | Sí | | |
+| `valores_nuevos` | jsonb | Sí | | |
+| `realizado_por_id` | uuid | No | | Id del usuario en la base de identidad (sin FK) |
+| `motivo` | text | Sí | | |
+| `fecha_hora` | timestamptz | No | `now()` | |
+| `ip_origen` | varchar(45) | Sí | | IPv4 o IPv6 |
+
+Índices en `fecha_hora` y en `(tabla_afectada, registro_id)`.
+
 ## Enumeraciones
 
 | Enum | Base | Valores |
@@ -205,6 +243,6 @@ Restricciones: único `(zona_id, codigo)`. Índice en `zona_id`.
 | `vehiculo_tipo_enum` | `parqueadero_identidad` | carro, moto, bicicleta, otro |
 | `verificacion_estado_enum` | `parqueadero_identidad` | pendiente, aprobado, rechazado |
 | `documento_tipo_enum` | `parqueadero_identidad` | carnet, foto_placa, tarjeta_propiedad |
-| `auditoria_accion_enum` | `parqueadero_identidad` y `parqueadero` | creacion, actualizacion, eliminacion |
+| `auditoria_accion_enum` | `parqueadero_identidad`, `parqueadero` y `parqueadero_zonas` | creacion, actualizacion, eliminacion |
 | `acceso_tipo_enum` | `parqueadero` | normal, visitante |
 | `espacio_estado_enum` | `parqueadero_zonas` | libre, ocupado, mantenimiento |
