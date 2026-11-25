@@ -103,6 +103,16 @@ export interface Espacio {
   actualizado_en: string;
 }
 
+// Puesto que esta en mantenimiento ahora (bitacora del servicio de parqueadero).
+export interface MantenimientoActivo {
+  espacio_id: string;
+  codigo: string;
+  zona_id: string;
+  motivo: string;
+  inicio: string;
+  iniciado_por_id: string;
+}
+
 // Acceso (accesos).
 export interface Acceso {
   id: string;

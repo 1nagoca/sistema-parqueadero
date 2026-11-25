@@ -12,7 +12,10 @@ import {
   PUESTOS,
   type Rectangulo,
 } from "@/components/map/planoParqueadero";
-import type { Espacio } from "@/types/api";
+import type { Espacio, EstadoEspacio } from "@/types/api";
+
+// Por defecto solo se eligen puestos libres.
+const SOLO_LIBRES: readonly EstadoEspacio[] = ["libre"];
 
 // Lo necesario para que cada puesto se pueda tocar.
 interface Interaccion {
@@ -20,8 +23,10 @@ interface Interaccion {
   textoDe: (espacio: Espacio | undefined) => string;
   consultado: string | null;
   seleccionadoId?: string;
-  // Si es verdadero, los puestos libres se muestran como elegibles.
+  // Si es verdadero, los puestos de los estados elegibles se muestran como elegibles.
   sePuedeElegir: boolean;
+  // Estados que se pueden elegir; por defecto, solo libres.
+  estadosElegibles?: readonly EstadoEspacio[];
 }
 
 interface Props {
@@ -117,7 +122,10 @@ export default function DibujoPlano({ vista, letras, porCodigo, esDeVisitante, i
           if (!interaccion) {
             return <rect key={puesto.codigo} x={puesto.x} y={puesto.y} width={PUESTO} height={PUESTO} rx={3} fill={relleno} />;
           }
-          const elegible = interaccion.sePuedeElegir && espacio?.estado === "libre";
+          const elegible =
+            interaccion.sePuedeElegir &&
+            espacio !== undefined &&
+            (interaccion.estadosElegibles ?? SOLO_LIBRES).includes(espacio.estado);
           const elegido = espacio !== undefined && espacio.id === interaccion.seleccionadoId;
           return (
             <rect

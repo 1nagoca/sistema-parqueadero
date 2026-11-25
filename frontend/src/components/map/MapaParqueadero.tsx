@@ -14,6 +14,9 @@ const ESCALA_BLOQUE_MINIMA = 24 / 14;
 const ESCALA_BLOQUE_MAXIMA = 2;
 const ESCALA_PLANO_MAXIMA = 1.25;
 
+// Por defecto solo se eligen puestos libres (vigilante).
+const SOLO_LIBRES: readonly EstadoEspacio[] = ["libre"];
+
 // Texto de cada estado.
 const etiquetaPorEstado: Record<EstadoEspacio, string> = {
   libre: "Libre",
@@ -23,15 +26,23 @@ const etiquetaPorEstado: Record<EstadoEspacio, string> = {
 
 interface Props {
   espacios: Espacio[];
-  // Si se pasa, tocar un puesto libre lo elige (vigilante).
+  // Si se pasa, tocar un puesto elegible lo elige (vigilante y admin).
   onSeleccionar?: (espacio: Espacio) => void;
   seleccionadoId?: string;
+  // Estados que se pueden elegir al tocar un puesto; por defecto, solo libres.
+  estadosElegibles?: readonly EstadoEspacio[];
   // Ids de los espacios que ocupa un visitante; sin esta prop no se marcan (mapa publico).
   espaciosVisitante?: Set<string>;
 }
 
 // Plano del parqueadero con cada puesto pintado segun su estado; en celular se elige un bloque para verlo en grande.
-export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoId, espaciosVisitante }: Props) {
+export default function MapaParqueadero({
+  espacios,
+  onSeleccionar,
+  seleccionadoId,
+  estadosElegibles = SOLO_LIBRES,
+  espaciosVisitante,
+}: Props) {
   const [consultado, setConsultado] = useState<string | null>(null);
   // Bloque en grande; null es el plano completo.
   const [bloqueId, setBloqueId] = useState<string | null>(null);
@@ -65,11 +76,11 @@ export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoI
     [resumen],
   );
 
-  // Al tocar un puesto: lo muestra y, si es libre y se puede elegir, lo elige.
+  // Al tocar un puesto: lo muestra y, si su estado se puede elegir, lo elige.
   function tocar(codigo: string) {
     setConsultado(codigo);
     const espacio = porCodigo.get(codigo);
-    if (onSeleccionar && espacio?.estado === "libre") onSeleccionar(espacio);
+    if (onSeleccionar && espacio && estadosElegibles.includes(espacio.estado)) onSeleccionar(espacio);
   }
 
   // Solo cuenta como de visitante si el puesto sigue ocupado.
@@ -86,7 +97,14 @@ export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoI
   const espacioConsultado = consultado ? porCodigo.get(consultado) : undefined;
   const libresTotales = resumen.reduce((suma, fila) => suma + fila.libres, 0);
   const bloque = BLOQUES.find((opcion) => opcion.id === bloqueId);
-  const interaccion = { onTocar: tocar, textoDe, consultado, seleccionadoId, sePuedeElegir: onSeleccionar !== undefined };
+  const interaccion = {
+    onTocar: tocar,
+    textoDe,
+    consultado,
+    seleccionadoId,
+    sePuedeElegir: onSeleccionar !== undefined,
+    estadosElegibles,
+  };
 
   // Boton de un bloque con sus libres y su total.
   const botonesBloques = resumenBloques.map(({ bloque: opcion, libres, total }) => (

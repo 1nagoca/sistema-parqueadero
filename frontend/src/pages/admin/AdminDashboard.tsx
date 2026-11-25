@@ -9,7 +9,13 @@ import { useAuth } from "@/context/useAuth";
 import { listarAccesosActivos } from "@/services/api/accesos";
 import { listarAuditoria, listarAuditoriaVerificaciones } from "@/services/api/auditoria";
 import { ApiError } from "@/services/api/client";
-import { crearEspaciosLote, listarEspacios } from "@/services/api/espacios";
+import {
+  crearEspaciosLote,
+  habilitarEspacio,
+  listarEspacios,
+  listarMantenimientos,
+  ponerEnMantenimiento,
+} from "@/services/api/espacios";
 import {
   crearUsuario,
   darDeBajaUsuario,
@@ -24,7 +30,9 @@ import type {
   AccesoActivo,
   AuditoriaPagina,
   Espacio,
+  EstadoEspacio,
   FiltrosAuditoria,
+  MantenimientoActivo,
   RolUsuario,
   SolicitudVerificacion,
   Usuario,
@@ -747,6 +755,9 @@ function SeccionZonas() {
 }
 
 // Mapa de los puestos de una zona y boton para crear los del plano.
+// El admin puede elegir puestos libres (para el mantenimiento) y en mantenimiento (para habilitarlos).
+const ELEGIBLES_ADMIN: readonly EstadoEspacio[] = ["libre", "mantenimiento"];
+
 function SeccionEspacios() {
   const [zonas, setZonas] = useState<Zona[]>([]);
   const [zonaId, setZonaId] = useState("");
@@ -755,6 +766,11 @@ function SeccionEspacios() {
   const [error, setError] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
+  const [mantenimientos, setMantenimientos] = useState<MantenimientoActivo[]>([]);
+  const [nombresAdmin, setNombresAdmin] = useState<Record<string, string>>({});
+  const [seleccionadoId, setSeleccionadoId] = useState<string | undefined>();
+  const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
+  const [procesandoPuesto, setProcesandoPuesto] = useState(false);
 
   // Carga las zonas y elige la primera.
   const cargarZonas = useCallback(() => {
@@ -778,15 +794,30 @@ function SeccionEspacios() {
     listarAccesosActivos(zonaId).then(setAccesosActivos).catch(() => setAccesosActivos([]));
   }, [zonaId]);
 
+  // Trae lo que esta en mantenimiento ahora en la zona.
+  const cargarMantenimientos = useCallback(() => {
+    if (!zonaId) return;
+    listarMantenimientos(zonaId).then(setMantenimientos).catch(() => setMantenimientos([]));
+  }, [zonaId]);
+
   useEffect(cargarZonas, [cargarZonas]);
   useEffect(cargarEspacios, [cargarEspacios]);
   useEffect(cargarAccesos, [cargarAccesos]);
+  useEffect(cargarMantenimientos, [cargarMantenimientos]);
 
-  // Cada entrada o salida avisa por /ws/zonas y el mapa se refresca.
+  // Nombres de los administradores para decir quien puso cada mantenimiento; si identidad no responde, quedan sin nombre.
+  useEffect(() => {
+    listarUsuarios({ rol: "admin", por_pagina: 100 })
+      .then((pagina) => setNombresAdmin(Object.fromEntries(pagina.items.map((u) => [u.id, u.nombre_completo]))))
+      .catch(() => setNombresAdmin({}));
+  }, []);
+
+  // Cada entrada, salida o mantenimiento avisa por /ws/zonas y el mapa se refresca.
   useActualizacionesZona(() => {
     cargarZonas();
     cargarEspacios();
     cargarAccesos();
+    cargarMantenimientos();
   });
 
   // Puestos ocupados por un visitante, para pintarlos distinto en el mapa.
@@ -819,6 +850,43 @@ function SeccionEspacios() {
     }
   }
 
+  // Pone en mantenimiento o habilita un puesto; al terminar recarga y, si salio bien, limpia el puesto elegido.
+  async function cambiarPuesto(accion: () => Promise<Espacio>, exito: (espacio: Espacio) => string, fallo: string) {
+    setProcesandoPuesto(true);
+    setAviso(null);
+    try {
+      const espacio = await accion();
+      setAviso({ ok: true, texto: exito(espacio) });
+      setSeleccionadoId(undefined);
+    } catch (err) {
+      setAviso({ ok: false, texto: err instanceof ApiError ? err.message : fallo });
+    } finally {
+      setProcesandoPuesto(false);
+      cargarZonas();
+      cargarEspacios();
+      cargarMantenimientos();
+    }
+  }
+
+  function ponerPuesto(espacio: Espacio, motivo: string) {
+    void cambiarPuesto(
+      () => ponerEnMantenimiento(espacio.id, motivo),
+      (hecho) => `${hecho.codigo} quedó en mantenimiento.`,
+      "No se pudo poner el puesto en mantenimiento",
+    );
+  }
+
+  function habilitarPuesto(espacioId: string) {
+    void cambiarPuesto(
+      () => habilitarEspacio(espacioId),
+      (hecho) => `${hecho.codigo} habilitado.`,
+      "No se pudo habilitar el puesto",
+    );
+  }
+
+  const nombreDe = (id: string) => nombresAdmin[id] ?? "Administrador";
+  // Solo sigue elegido si todavia esta libre o en mantenimiento (una entrada puede ocuparlo).
+  const elegido = espacios.find((espacio) => espacio.id === seleccionadoId && ELEGIBLES_ADMIN.includes(espacio.estado));
   const zona = zonas.find((z) => z.id === zonaId);
   const creados = new Set(espacios.map((espacio) => espacio.codigo));
   const faltantes = CODIGOS_PLANO.filter((codigo) => !creados.has(codigo)).length;
@@ -854,8 +922,188 @@ function SeccionEspacios() {
         )}
         {mensaje && <p className="rounded-xl bg-emerald-100 p-3 text-emerald-800">{mensaje}</p>}
         {error && <p className="rounded-xl bg-red-100 p-3 text-red-800">{error}</p>}
-        <MapaParqueadero espacios={espacios} espaciosVisitante={espaciosVisitante} />
+        <MapaParqueadero
+          espacios={espacios}
+          espaciosVisitante={espaciosVisitante}
+          onSeleccionar={(espacio) => {
+            setSeleccionadoId(espacio.id);
+            setAviso(null);
+          }}
+          seleccionadoId={elegido?.id}
+          estadosElegibles={ELEGIBLES_ADMIN}
+        />
+
+        {aviso && (
+          <p className={`rounded-xl p-3 ${aviso.ok ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
+            {aviso.texto}
+          </p>
+        )}
+        {elegido ? (
+          <PanelMantenimiento
+            key={elegido.id}
+            espacio={elegido}
+            mantenimiento={mantenimientos.find((m) => m.espacio_id === elegido.id)}
+            nombreDe={nombreDe}
+            procesando={procesandoPuesto}
+            onPoner={(motivo) => ponerPuesto(elegido, motivo)}
+            onHabilitar={() => habilitarPuesto(elegido.id)}
+            onCancelar={() => setSeleccionadoId(undefined)}
+          />
+        ) : (
+          <p className="text-sm text-gray-500">
+            Toca un puesto libre para ponerlo en mantenimiento, o uno amarillo para habilitarlo.
+          </p>
+        )}
       </div>
+
+      <ListaMantenimientos
+        mantenimientos={mantenimientos}
+        nombreDe={nombreDe}
+        procesando={procesandoPuesto}
+        onHabilitar={habilitarPuesto}
+      />
+    </div>
+  );
+}
+
+// Inicio de un mantenimiento en hora de Colombia, por ejemplo «25 nov, 16:46».
+function desdeEnColombia(fechaHora: string): string {
+  const zona = { timeZone: "America/Bogota" } as const;
+  const fecha = new Date(fechaHora);
+  const dia = fecha.toLocaleDateString("es-CO", { ...zona, day: "numeric", month: "short" });
+  const hora = fecha.toLocaleTimeString("es-CO", { ...zona, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  return `${dia}, ${hora}`;
+}
+
+// Panel del puesto elegido: motivo para ponerlo en mantenimiento, o sus datos y el boton para habilitarlo.
+function PanelMantenimiento({
+  espacio,
+  mantenimiento,
+  nombreDe,
+  procesando,
+  onPoner,
+  onHabilitar,
+  onCancelar,
+}: {
+  espacio: Espacio;
+  mantenimiento: MantenimientoActivo | undefined;
+  nombreDe: (id: string) => string;
+  procesando: boolean;
+  onPoner: (motivo: string) => void;
+  onHabilitar: () => void;
+  onCancelar: () => void;
+}) {
+  const [motivo, setMotivo] = useState("");
+  const limpio = motivo.trim();
+  const motivoValido = limpio.length >= 3 && limpio.length <= 200;
+  const enMantenimiento = espacio.estado === "mantenimiento";
+  const cancelar = (
+    <button onClick={onCancelar} disabled={procesando} className="rounded-lg bg-gray-200 px-4 py-2 text-gray-800">
+      Cancelar
+    </button>
+  );
+
+  return (
+    <div className="space-y-2 rounded-xl border border-gray-200 p-3">
+      <p className="font-medium text-gray-900">
+        Puesto {espacio.codigo} · {enMantenimiento ? "En mantenimiento" : "Libre"}
+      </p>
+      {enMantenimiento ? (
+        <>
+          {mantenimiento ? (
+            <div className="space-y-1 text-sm text-gray-700">
+              <p className="break-words">Motivo: {mantenimiento.motivo}</p>
+              <p>
+                Desde: {desdeEnColombia(mantenimiento.inicio)} · Puesto por: {nombreDe(mantenimiento.iniciado_por_id)}
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">Sin datos de la bitácora.</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={onHabilitar}
+              disabled={procesando}
+              className="rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              Habilitar
+            </button>
+            {cancelar}
+          </div>
+        </>
+      ) : (
+        <>
+          <label className="block text-sm font-medium text-gray-700" htmlFor={`motivo-${espacio.id}`}>
+            Motivo del mantenimiento
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              id={`motivo-${espacio.id}`}
+              maxLength={200}
+              value={motivo}
+              onChange={(evento) => setMotivo(evento.target.value)}
+              placeholder="Ej. piso dañado"
+              className="min-h-10 w-full min-w-0 flex-1 rounded-lg border border-gray-300 px-3"
+            />
+            <span className="shrink-0 text-xs tabular-nums text-gray-500">{limpio.length}/200</span>
+          </div>
+          <p className="text-xs text-gray-500">De 3 a 200 caracteres.</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => onPoner(limpio)}
+              disabled={procesando || !motivoValido}
+              className="rounded-lg bg-amber-500 px-4 py-2 font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+            >
+              Poner en mantenimiento
+            </button>
+            {cancelar}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Lista de lo que esta en mantenimiento ahora en la zona, con su boton para habilitar.
+function ListaMantenimientos({
+  mantenimientos,
+  nombreDe,
+  procesando,
+  onHabilitar,
+}: {
+  mantenimientos: MantenimientoActivo[];
+  nombreDe: (id: string) => string;
+  procesando: boolean;
+  onHabilitar: (espacioId: string) => void;
+}) {
+  return (
+    <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+      <h2 className="font-semibold text-gray-900">En mantenimiento ahora ({mantenimientos.length})</h2>
+      {mantenimientos.length === 0 ? (
+        <p className="text-sm text-gray-500">Ningún puesto en mantenimiento.</p>
+      ) : (
+        <ul className="divide-y divide-gray-100">
+          {mantenimientos.map((m) => (
+            <li key={m.espacio_id} className="flex items-start justify-between gap-3 py-2">
+              <div className="min-w-0">
+                <p className="break-words text-gray-900">
+                  <b>{m.codigo}</b> {m.motivo}
+                </p>
+                <p className="text-xs text-gray-500">
+                  Desde {desdeEnColombia(m.inicio)} · {nombreDe(m.iniciado_por_id)}
+                </p>
+              </div>
+              <button
+                onClick={() => onHabilitar(m.espacio_id)}
+                disabled={procesando}
+                className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                Habilitar
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
