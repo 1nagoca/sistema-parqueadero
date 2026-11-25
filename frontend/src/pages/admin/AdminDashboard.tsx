@@ -7,7 +7,7 @@ import DocumentoVisor from "@/components/verificacion/DocumentoVisor";
 import EstadoBadge from "@/components/verificacion/EstadoBadge";
 import { useAuth } from "@/context/useAuth";
 import { listarAccesosActivos } from "@/services/api/accesos";
-import { listarAuditoria, listarAuditoriaVerificaciones } from "@/services/api/auditoria";
+import { listarAuditoria, listarAuditoriaMantenimiento, listarAuditoriaVerificaciones } from "@/services/api/auditoria";
 import { ApiError } from "@/services/api/client";
 import {
   crearEspaciosLote,
@@ -754,10 +754,10 @@ function SeccionZonas() {
   );
 }
 
-// Mapa de los puestos de una zona y boton para crear los del plano.
 // El admin puede elegir puestos libres (para el mantenimiento) y en mantenimiento (para habilitarlos).
 const ELEGIBLES_ADMIN: readonly EstadoEspacio[] = ["libre", "mantenimiento"];
 
+// Mapa de los puestos de una zona y boton para crear los del plano.
 function SeccionEspacios() {
   const [zonas, setZonas] = useState<Zona[]>([]);
   const [zonaId, setZonaId] = useState("");
@@ -1108,8 +1108,8 @@ function ListaMantenimientos({
   );
 }
 
-// Las dos bitacoras: cada una vive en su microservicio y se pide y pagina por separado.
-type Bitacora = "accesos" | "verificaciones";
+// Las tres bitacoras: cada una vive en su microservicio y se pide y pagina por separado.
+type Bitacora = "accesos" | "verificaciones" | "mantenimiento";
 
 const BITACORAS: Record<
   Bitacora,
@@ -1126,6 +1126,12 @@ const BITACORAS: Record<
     tablas: ["usuarios", "vehiculos"],
     listar: listarAuditoriaVerificaciones,
     error: "No se pudo cargar la auditoria de verificaciones: el servicio no responde.",
+  },
+  mantenimiento: {
+    etiqueta: "Mantenimiento",
+    tablas: ["espacios"],
+    listar: listarAuditoriaMantenimiento,
+    error: "No se pudo cargar la auditoria de mantenimiento: el servicio no responde.",
   },
 };
 
@@ -1181,11 +1187,11 @@ function SeccionAuditoria() {
       .catch(() => undefined);
   }, []);
 
-  // Nombres de quien registro las trazas de accesos de esta pagina que aun no se conocen.
+  // Nombres de quien registro las trazas de accesos y de mantenimiento de esta pagina que aun no se conocen.
   useEffect(() => {
     const faltan = new Set(
       (pagina?.items ?? [])
-        .filter((t) => t.tabla_afectada === "accesos" || t.tabla_afectada === "cierre_semestre")
+        .filter((t) => ["accesos", "cierre_semestre", "espacios"].includes(t.tabla_afectada))
         .map((t) => t.realizado_por_id)
         .filter((id) => !pedidos.current.has(id)),
     );

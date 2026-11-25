@@ -1,4 +1,4 @@
-// Llamadas a las dos bitacoras: la de accesos y la de verificaciones.
+// Llamadas a las tres bitacoras: accesos, verificaciones y mantenimiento.
 import type { AuditoriaPagina, FiltrosAuditoria } from "@/types/api";
 import { apiGet } from "./client";
 
@@ -22,4 +22,9 @@ export function listarAuditoria(filtros: FiltrosAuditoria = {}): Promise<Auditor
 /** Trazas de aprobar, rechazar, dar de baja o reactivar: viven en el servicio de identidad. */
 export function listarAuditoriaVerificaciones(filtros: FiltrosAuditoria = {}): Promise<AuditoriaPagina> {
   return apiGet<AuditoriaPagina>(`/verificaciones/auditoria${consulta(filtros)}`);
+}
+
+// Trazas de poner y quitar el mantenimiento de un puesto (servicio de parqueadero), por periodo y paginadas.
+export function listarAuditoriaMantenimiento(filtros: FiltrosAuditoria = {}): Promise<AuditoriaPagina> {
+  return apiGet<AuditoriaPagina>(`/espacios/auditoria${consulta(filtros)}`);
 }

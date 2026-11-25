@@ -1578,6 +1578,37 @@
           ]
         },
         {
+          "name": "Auditoría de mantenimiento",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/espacios/auditoria?tabla_afectada=espacios&pagina=1&por_pagina=200"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Es una página\", () => pm.expect(json.items).to.be.an(\"array\"));",
+                  "pm.test(\"Trae el total y el rango\", () => {",
+                  "    pm.expect(json.total).to.be.a(\"number\");",
+                  "    pm.expect(json.desde).to.be.a(\"string\");",
+                  "    pm.expect(json.hasta).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Trae las dos trazas del puesto de esta corrida\", () => {",
+                  "    const delPuesto = json.items.filter((t) => t.registro_id === pm.collectionVariables.get(\"espacio_id\"));",
+                  "    pm.expect(delPuesto.map((t) => t.valores_nuevos.estado)).to.include.members([\"mantenimiento\", \"libre\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Auditoría con rango de más de 184 días (422)",
           "request": {
             "method": "GET",

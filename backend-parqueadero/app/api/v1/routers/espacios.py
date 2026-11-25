@@ -1,16 +1,18 @@
 import logging
 import uuid
+from datetime import date
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import UsuarioToken, get_current_user, get_db, require_role
 from app.models.enums import RolUsuario
 from app.models.espacio import Espacio
 from app.models.zona import Zona
+from app.schemas.auditoria_parqueadero import AuditoriaParqueaderoPagina, AuditoriaParqueaderoRead
 from app.schemas.espacio import EspacioCreate, EspacioLoteCreate, EspacioLoteResultado, EspacioRead
 from app.schemas.mantenimiento import MantenimientoCreate, MantenimientoRead
-from app.services import espacio_service, mantenimiento_service, realtime_service
+from app.services import auditoria_service, espacio_service, mantenimiento_service, realtime_service
 
 router = APIRouter(prefix="/espacios", tags=["espacios"])
 logger = logging.getLogger(__name__)
@@ -73,6 +75,36 @@ def listar_mantenimientos(
     _: UsuarioToken = Depends(require_role(RolUsuario.ADMIN)),
 ):
     return mantenimiento_service.listar_activos(db, zona_id)
+
+
+# GET /espacios/auditoria (admin): trazas del parqueadero entre dos fechas (por defecto el semestre actual), paginadas.
+@router.get("/auditoria", response_model=AuditoriaParqueaderoPagina)
+def listar_auditoria(
+    desde: date | None = None,
+    hasta: date | None = None,
+    tabla_afectada: str | None = None,
+    pagina: int = Query(1, ge=1),
+    por_pagina: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    _: UsuarioToken = Depends(require_role(RolUsuario.ADMIN)),
+) -> AuditoriaParqueaderoPagina:
+    """Solo lectura: las trazas las escribe unicamente mantenimiento_service y no hay rutas para
+    cambiarlas ni borrarlas."""
+    try:
+        desde, hasta = auditoria_service.resolver_rango(desde, hasta)
+    except auditoria_service.RangoInvalidoError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    trazas, total = auditoria_service.listar_auditoria(
+        db, desde=desde, hasta=hasta, tabla_afectada=tabla_afectada, pagina=pagina, por_pagina=por_pagina
+    )
+    return AuditoriaParqueaderoPagina(
+        items=[AuditoriaParqueaderoRead.model_validate(traza) for traza in trazas],
+        total=total,
+        pagina=pagina,
+        por_pagina=por_pagina,
+        desde=desde,
+        hasta=hasta,
+    )
 
 
 # POST /espacios/{id}/mantenimiento (admin): pone un puesto libre en mantenimiento y baja un cupo de la zona.

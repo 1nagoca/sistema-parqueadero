@@ -1,4 +1,4 @@
-// Frases en espanol para las trazas de las dos bitacoras de auditoria.
+// Frases en espanol para las trazas de las tres bitacoras de auditoria.
 import type { AuditoriaAcceso, DetalleAcceso, DetalleVerificacion } from "@/types/api";
 
 // Nombres que el panel ya resolvio: de quien registro (por id) y de cada zona (por id).
@@ -18,6 +18,8 @@ export function fraseDeTraza(traza: AuditoriaAcceso, nombres: NombresAuditoria):
       return fraseDeUsuario(traza, traza.realizado_por_nombre ?? null);
     case "vehiculos":
       return fraseDeVehiculo(traza, traza.realizado_por_nombre ?? null);
+    case "espacios":
+      return fraseDeMantenimiento(traza, nombres.usuarios[traza.realizado_por_id] ?? null, nombres.zonas);
     default:
       return null;
   }
@@ -97,4 +99,34 @@ function fraseDeVehiculo(traza: AuditoriaAcceso, autor: string | null): string |
   if (!detalle?.placa || (estado !== "aprobado" && estado !== "rechazado")) return null;
   const dueno = detalle.nombre ? ` de ${detalle.nombre}` : " (visitante)";
   return conAutor(`Moto ${detalle.placa}${dueno} ${estado === "aprobado" ? "aprobada" : "rechazada"}`, autor, " por ");
+}
+
+// Un puesto que entra en mantenimiento (con su motivo) o que se habilita (con cuanto duro).
+function fraseDeMantenimiento(
+  traza: AuditoriaAcceso,
+  autor: string | null,
+  zonas: Record<string, string>,
+): string | null {
+  const nuevos: Record<string, unknown> = traza.valores_nuevos ?? {};
+  const { codigo, zona, zona_id: zonaId, estado, motivo } = nuevos;
+  if (typeof codigo !== "string") return null;
+  const nombreZona = typeof zona === "string" ? zona : typeof zonaId === "string" ? zonas[zonaId] : undefined;
+  const puesto = `Puesto ${codigo}${nombreZona ? ` de ${nombreZona}` : ""}`;
+  if (estado === "mantenimiento") {
+    if (typeof motivo !== "string") return null;
+    return conAutor(`${puesto} en mantenimiento: ${motivo}`, autor, ", por ");
+  }
+  if (estado === "libre") {
+    const minutos = minutosEntre(traza.valores_anteriores?.inicio, nuevos.fin);
+    const tras = minutos != null ? ` tras ${duracion(minutos)}` : "";
+    return conAutor(`${puesto} habilitado${tras}`, autor, ", por ");
+  }
+  return null;
+}
+
+// Minutos redondeados entre dos fechas ISO; null si falta alguna o no se entiende.
+function minutosEntre(desde: unknown, hasta: unknown): number | null {
+  if (typeof desde !== "string" || typeof hasta !== "string") return null;
+  const diferencia = new Date(hasta).getTime() - new Date(desde).getTime();
+  return Number.isNaN(diferencia) || diferencia < 0 ? null : Math.round(diferencia / 60000);
 }
