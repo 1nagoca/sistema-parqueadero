@@ -17,5 +17,4 @@ class RolUsuario(str, enum.Enum):
 class EstadoEspacio(str, enum.Enum):
     LIBRE = "libre"
     OCUPADO = "ocupado"
-    RESERVADO = "reservado"
     MANTENIMIENTO = "mantenimiento"

@@ -8,7 +8,6 @@ export default {
         cupo: {
           libre: "#22c55e",
           ocupado: "#ef4444",
-          reservado: "#eab308",
           mantenimiento: "#eab308",
         },
       },

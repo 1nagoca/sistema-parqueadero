@@ -190,7 +190,7 @@ Restricciones: `ck_zonas_capacidad_positiva`, `ck_zonas_cupos_en_rango`.
 | `id` | uuid | No | `gen_random_uuid()` | PK |
 | `zona_id` | uuid | No | | FK a `zonas` |
 | `codigo` | varchar(20) | No | | Código del puesto, único dentro de la zona |
-| `estado` | `espacio_estado_enum` | No | `libre` | libre, ocupado, reservado, mantenimiento |
+| `estado` | `espacio_estado_enum` | No | `libre` | libre, ocupado, mantenimiento |
 | `tipo_espacio` | varchar(20) | Sí | | |
 | `creado_en` | timestamptz | No | `now()` | |
 | `actualizado_en` | timestamptz | No | `now()` | |
@@ -207,4 +207,4 @@ Restricciones: único `(zona_id, codigo)`. Índice en `zona_id`.
 | `documento_tipo_enum` | `parqueadero_identidad` | carnet, foto_placa, tarjeta_propiedad |
 | `auditoria_accion_enum` | `parqueadero_identidad` y `parqueadero` | creacion, actualizacion, eliminacion |
 | `acceso_tipo_enum` | `parqueadero` | normal, visitante |
-| `espacio_estado_enum` | `parqueadero_zonas` | libre, ocupado, reservado, mantenimiento |
+| `espacio_estado_enum` | `parqueadero_zonas` | libre, ocupado, mantenimiento |

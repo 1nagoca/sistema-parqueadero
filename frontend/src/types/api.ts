@@ -3,7 +3,7 @@
 // Valores fijos (coinciden con los enums de los backends).
 export type RolUsuario = "estudiante" | "docente" | "administrativo" | "vigilante" | "admin";
 export type TipoVehiculo = "carro" | "moto" | "bicicleta" | "otro";
-export type EstadoEspacio = "libre" | "ocupado" | "reservado" | "mantenimiento";
+export type EstadoEspacio = "libre" | "ocupado" | "mantenimiento";
 export type TipoAcceso = "normal" | "visitante";
 export type EstadoVerificacion = "pendiente" | "aprobado" | "rechazado";
 export type TipoDocumento = "carnet" | "foto_placa" | "tarjeta_propiedad";

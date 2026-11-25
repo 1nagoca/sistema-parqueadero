@@ -50,7 +50,6 @@ Enum acceso_tipo_enum {
 Enum espacio_estado_enum {
   libre
   ocupado
-  reservado
   mantenimiento
 }
 

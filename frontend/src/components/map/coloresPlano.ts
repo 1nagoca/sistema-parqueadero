@@ -4,7 +4,6 @@ import type { EstadoEspacio } from "@/types/api";
 export const colorPorEstado: Record<EstadoEspacio, string> = {
   libre: "#22c55e",
   ocupado: "#ef4444",
-  reservado: "#eab308",
   mantenimiento: "#eab308",
 };
 export const COLOR_SIN_CREAR = "#d1d5db";

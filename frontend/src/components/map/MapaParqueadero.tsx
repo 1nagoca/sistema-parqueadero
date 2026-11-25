@@ -18,7 +18,6 @@ const ESCALA_PLANO_MAXIMA = 1.25;
 const etiquetaPorEstado: Record<EstadoEspacio, string> = {
   libre: "Libre",
   ocupado: "Ocupado",
-  reservado: "Reservado",
   mantenimiento: "Mantenimiento",
 };
 
@@ -110,7 +109,7 @@ export default function MapaParqueadero({ espacios, onSeleccionar, seleccionadoI
         <Leyenda color={colorPorEstado.libre} texto="Libre" />
         <Leyenda color={colorPorEstado.ocupado} texto="Ocupado" />
         {espaciosVisitante && <Leyenda color={MUESTRA_VISITANTE} texto={TEXTO_VISITANTE} />}
-        <Leyenda color={colorPorEstado.mantenimiento} texto="Reservado / Mantenimiento" />
+        <Leyenda color={colorPorEstado.mantenimiento} texto="Mantenimiento" />
         <Leyenda color={COLOR_SIN_CREAR} texto="Sin crear" />
         <span className="font-medium text-gray-800">
           {libresTotales} de {PUESTOS.length} libres

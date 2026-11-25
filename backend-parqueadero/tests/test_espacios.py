@@ -5,10 +5,14 @@ import os
 import uuid
 
 import pytest
+from sqlalchemy import text
+from sqlalchemy.exc import DataError
 
 if not os.environ.get("DATABASE_URL"):
     pytest.skip("requiere DATABASE_URL de una BD de pruebas", allow_module_level=True)
 
+from app.db.session import SessionLocal  # noqa: E402
+from app.models.enums import EstadoEspacio  # noqa: E402
 from app.services import realtime_service  # noqa: E402
 from tests.test_cupos import API, _espacio, _token, admin, client, zona  # noqa: E402,F401
 
@@ -96,3 +100,14 @@ def test_lote_solo_admin_y_zona_existente(client, admin, zona):
     assert client.post(f"{API}/espacios/lote", headers=admin, json=otra).status_code == 404
     assert client.post(f"{API}/espacios/lote", headers=admin, json={**lote, "codigos": []}).status_code == 422
     assert client.post(f"{API}/espacios/lote", headers=admin, json={**lote, "codigos": ["X" * 21]}).status_code == 422
+
+
+# El estado reservado ya no existe ni en el enum ni en la base (migracion 0002).
+def test_estado_reservado_ya_no_existe(zona):
+    assert "reservado" not in {estado.value for estado in EstadoEspacio}
+    with SessionLocal() as sesion:
+        with pytest.raises(DataError):
+            sesion.execute(
+                text("INSERT INTO espacios (zona_id, codigo, estado) VALUES (:zona_id, 'R-01', 'reservado')"),
+                {"zona_id": zona["id"]},
+            )

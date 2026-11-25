@@ -21,7 +21,7 @@ espacio_estado_enum = ENUM(
 # Tabla espacios: cada puesto de una zona con su estado.
 class Espacio(Base):
     """Espacio fisico individual dentro de una zona; su ``estado`` alimenta el mapa con
-    colores (libre=verde, ocupado=rojo, reservado/mantenimiento=amarillo). Zonas que solo
+    colores (libre=verde, ocupado=rojo, mantenimiento=amarillo). Zonas que solo
     llevan conteo agregado (sin mapa granular) simplemente no tienen filas aqui."""
 
     __tablename__ = "espacios"
