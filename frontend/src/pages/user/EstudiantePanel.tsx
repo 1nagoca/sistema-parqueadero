@@ -432,15 +432,17 @@ function FormularioVehiculo({ onCreado }: { onCreado: () => void }) {
       <div className="grid gap-3 sm:grid-cols-2">
         {electrica ? (
           <div className="sm:col-span-2">
-            <input
-              required
-              aria-label="Número de serie o VIN"
-              placeholder="Número de serie o VIN (ej. EB2024-00871)"
-              value={serie}
-              maxLength={17}
-              onChange={(e) => setSerie(e.target.value.toUpperCase().replace(/\s/g, ""))}
-              className={`${campo} font-mono uppercase`}
-            />
+            <label className="block text-sm text-gray-700">
+              Número de serie o VIN
+              <input
+                required
+                placeholder="Ej. EB2024-00871"
+                value={serie}
+                maxLength={17}
+                onChange={(e) => setSerie(e.target.value.toUpperCase().replace(/\s/g, ""))}
+                className={`${campo} mt-1 font-mono uppercase`}
+              />
+            </label>
             <p className="mt-1 text-xs text-gray-500">Está grabado en el chasis o en la lámina técnica.</p>
           </div>
         ) : (
