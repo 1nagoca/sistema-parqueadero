@@ -1019,6 +1019,143 @@
           ]
         },
         {
+          "name": "Buscar por número de serie inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/vehiculos/serie/{{serie_1}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Serial al azar (EB- y 10 letras o números) que no está registrado.",
+                  "const caracter = () => \"ABCDEFGHJKLMNPRSTUVWXYZ0123456789\"[Math.floor(Math.random() * 33)];",
+                  "pm.collectionVariables.set(\"serie_1\", \"EB-\" + Array.from({ length: 10 }, caracter).join(\"\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// La moto eléctrica no tiene placa y se busca por su serial: sin espacios, en mayúsculas y sin contar guiones.",
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Vehiculo no encontrado\", () => pm.expect(pm.response.json().detail).to.eql(\"Vehiculo no encontrado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RN-09: dueño por número de serie (404 genérico)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/vehiculos/serie/{{serie_1}}/propietario"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Mismo 404 que por placa: no dice si la moto no existe o si no está aprobada.",
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Mensaje genérico\", () => pm.expect(pm.response.json().detail).to.eql(\"Propietario no disponible\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RN-09: carnet por número de serie (404 genérico)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/vehiculos/serie/{{serie_1}}/carnet"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Mensaje genérico\", () => pm.expect(pm.response.json().detail).to.eql(\"Propietario no disponible\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estudiante no puede buscar por número de serie (403)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_estudiante}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/vehiculos/serie/{{serie_1}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Visitante con moto eléctrica (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/vehiculos",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"placa\": \"ELE12A\",\n  \"tipo_vehiculo\": \"moto\",\n  \"es_visitante\": true,\n  \"es_electrica\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Solo estudiantes: el visitante no entra con moto eléctrica.",
+                  "pm.test(\"Status 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Lo dice el mensaje\", () => pm.expect(pm.response.json().detail[0].msg).to.include(\"la moto eléctrica la registra el estudiante desde su panel\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Vehículo sin dueño ni visitante (422)",
           "request": {
             "method": "POST",
@@ -1811,6 +1948,11 @@
     },
     {
       "key": "placa_2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "serie_1",
       "value": "",
       "type": "string"
     },

@@ -67,13 +67,18 @@ def resolver_usuario(
     return _aplicar(db, usuario, "usuarios", aprobar, motivo, admin_id)
 
 
-# Aprueba o rechaza un vehiculo; para aprobar exige foto de placa y tarjeta.
+# Aprueba o rechaza un vehiculo; para aprobar exige la foto (placa, o serial si es electrica) y la tarjeta.
 def resolver_vehiculo(
     db: Session, vehiculo: Vehiculo, aprobar: bool, motivo: str | None, admin_id: uuid.UUID
 ) -> Vehiculo:
-    requeridos = {TipoDocumento.FOTO_PLACA, TipoDocumento.TARJETA_PROPIEDAD}
+    if vehiculo.es_electrica:
+        requeridos = {TipoDocumento.FOTO_SERIAL, TipoDocumento.TARJETA_PROPIEDAD}
+        faltan = "Faltan la foto del número de serie o la prueba de propiedad (factura o tarjeta)"
+    else:
+        requeridos = {TipoDocumento.FOTO_PLACA, TipoDocumento.TARJETA_PROPIEDAD}
+        faltan = "Faltan la foto de la placa o la tarjeta de propiedad"
     if aprobar and not requeridos <= _tipos_de(vehiculo.documentos):
-        raise VerificacionError("Faltan la foto de la placa o la tarjeta de propiedad")
+        raise VerificacionError(faltan)
     return _aplicar(db, vehiculo, "vehiculos", aprobar, motivo, admin_id)
 
 

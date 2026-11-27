@@ -21,6 +21,16 @@ router = APIRouter(prefix="/vehiculos", tags=["vehiculos"])
 _PLACA_MOTO = re.compile(r"^(?:[A-Z]{3}\d{2}[A-Z]?|[A-Z]{2}\d[A-Z]\d{2}[A-Z])$")
 
 
+# Mensajes del registro y el reenvio segun la moto sea normal o electrica.
+_ELECTRICA_SIN_PLACA = "La moto eléctrica no lleva placa: usa su número de serie y la foto del serial"
+_SOLO_ELECTRICA_SERIE = "Solo la moto eléctrica lleva número de serie y foto del serial"
+
+
+# Responde 422 con el texto indicado.
+def _error_422(detalle: str) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detalle)
+
+
 # Responde 422 si la placa no tiene formato de moto (RN-05).
 def _validar_placa_moto(placa: str) -> None:
     if not _PLACA_MOTO.match(placa):
@@ -47,29 +57,19 @@ def crear_vehiculo(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La placa ya esta registrada") from exc
 
 
-# GET /vehiculos/placa/{placa}/propietario (admin, vigilante): nombre del dueno y si hay carnet para mostrar (RN-09).
-@router.get("/placa/{placa}/propietario", response_model=PropietarioVigilante)
-def ver_propietario(
-    placa: str,
-    db: Session = Depends(get_db),
-    _: Usuario = Depends(require_role(RolUsuario.ADMIN, RolUsuario.VIGILANTE)),
-) -> PropietarioVigilante:
+# Nombre del dueno y si hay carnet, o el 404 generico de RN-09.
+def _propietario(db: Session, vehiculo: Vehiculo | None) -> PropietarioVigilante:
     try:
-        dueno, carnet = vehiculo_service.propietario_para_vigilante(db, placa)
+        dueno, carnet = vehiculo_service.propietario_para_vigilante(db, vehiculo)
     except vehiculo_service.PropietarioNoVisibleError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return PropietarioVigilante(nombre_completo=dueno.nombre_completo, tiene_carnet=carnet is not None)
 
 
-# GET /vehiculos/placa/{placa}/carnet (admin, vigilante): el carnet del dueno para confirmar quien trae la moto (RN-09).
-@router.get("/placa/{placa}/carnet")
-def ver_carnet_propietario(
-    placa: str,
-    db: Session = Depends(get_db),
-    _: Usuario = Depends(require_role(RolUsuario.ADMIN, RolUsuario.VIGILANTE)),
-) -> FileResponse:
+# El carnet del dueno sin cache, o el 404 generico de RN-09.
+def _carnet(db: Session, vehiculo: Vehiculo | None) -> FileResponse:
     try:
-        _dueno, carnet = vehiculo_service.propietario_para_vigilante(db, placa)
+        _dueno, carnet = vehiculo_service.propietario_para_vigilante(db, vehiculo)
     except vehiculo_service.PropietarioNoVisibleError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     if carnet is None:
@@ -81,6 +81,26 @@ def ver_carnet_propietario(
     )
 
 
+# GET /vehiculos/placa/{placa}/propietario (admin, vigilante): nombre del dueno y si hay carnet para mostrar (RN-09).
+@router.get("/placa/{placa}/propietario", response_model=PropietarioVigilante)
+def ver_propietario(
+    placa: str,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role(RolUsuario.ADMIN, RolUsuario.VIGILANTE)),
+) -> PropietarioVigilante:
+    return _propietario(db, vehiculo_service.obtener_por_placa(db, placa))
+
+
+# GET /vehiculos/placa/{placa}/carnet (admin, vigilante): el carnet del dueno para confirmar quien trae la moto (RN-09).
+@router.get("/placa/{placa}/carnet")
+def ver_carnet_propietario(
+    placa: str,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role(RolUsuario.ADMIN, RolUsuario.VIGILANTE)),
+) -> FileResponse:
+    return _carnet(db, vehiculo_service.obtener_por_placa(db, placa))
+
+
 # GET /vehiculos/placa/{placa} (admin, vigilante): busca un vehiculo por su placa.
 @router.get("/placa/{placa}", response_model=VehiculoRead)
 def buscar_por_placa(
@@ -89,6 +109,39 @@ def buscar_por_placa(
     _: Usuario = Depends(require_role(RolUsuario.ADMIN, RolUsuario.VIGILANTE)),
 ):
     vehiculo = vehiculo_service.obtener_por_placa(db, placa)
+    if vehiculo is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehiculo no encontrado")
+    return vehiculo
+
+
+# GET /vehiculos/serie/{numero_serie}/propietario (admin, vigilante): como el de placa, para la moto electrica (RN-09).
+@router.get("/serie/{numero_serie}/propietario", response_model=PropietarioVigilante)
+def ver_propietario_por_serie(
+    numero_serie: str,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role(RolUsuario.ADMIN, RolUsuario.VIGILANTE)),
+) -> PropietarioVigilante:
+    return _propietario(db, vehiculo_service.obtener_por_serie(db, numero_serie))
+
+
+# GET /vehiculos/serie/{numero_serie}/carnet (admin, vigilante): como el de placa, para la moto electrica (RN-09).
+@router.get("/serie/{numero_serie}/carnet")
+def ver_carnet_por_serie(
+    numero_serie: str,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role(RolUsuario.ADMIN, RolUsuario.VIGILANTE)),
+) -> FileResponse:
+    return _carnet(db, vehiculo_service.obtener_por_serie(db, numero_serie))
+
+
+# GET /vehiculos/serie/{numero_serie} (admin, vigilante): busca una moto electrica por su numero de serie.
+@router.get("/serie/{numero_serie}", response_model=VehiculoRead)
+def buscar_por_serie(
+    numero_serie: str,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role(RolUsuario.ADMIN, RolUsuario.VIGILANTE)),
+):
+    vehiculo = vehiculo_service.obtener_por_serie(db, numero_serie)
     if vehiculo is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehiculo no encontrado")
     return vehiculo
@@ -105,36 +158,65 @@ def listar_mis_vehiculos(
     )
 
 
-# POST /vehiculos/mis-vehiculos (estudiante): registra su vehiculo con foto de placa y tarjeta.
+# POST /vehiculos/mis-vehiculos (estudiante): registra su moto con la foto (placa o serial) y la tarjeta.
 @router.post("/mis-vehiculos", response_model=VehiculoConDocumentos, status_code=status.HTTP_201_CREATED)
 async def registrar_mi_vehiculo(
-    placa: str = Form(...),
+    es_electrica: bool = Form(False),
+    placa: str | None = Form(None),
+    numero_serie: str | None = Form(None),
     tipo_vehiculo: TipoVehiculo = Form(TipoVehiculo.MOTO),
     marca: str | None = Form(None, max_length=50),
     modelo: str | None = Form(None, max_length=50),
     color: str | None = Form(None, max_length=30),
-    foto_placa: UploadFile = File(...),
+    foto_placa: UploadFile | None = File(None),
+    foto_serial: UploadFile | None = File(None),
     tarjeta_propiedad: UploadFile = File(...),
     db: Session = Depends(get_db),
     estudiante: Usuario = Depends(require_role(RolUsuario.ESTUDIANTE)),
 ):
-    """El propio estudiante registra su vehiculo con la foto de la placa y la tarjeta de
-    propiedad. Queda ``pendiente`` hasta que el administrador lo apruebe."""
-    placa = placa.strip().upper()
+    """El propio estudiante registra su moto: la normal con placa y foto de la placa; la
+    electrica sin placa, con su numero de serie y la foto del serial. Las dos llevan la tarjeta
+    de propiedad o la factura y quedan ``pendiente`` hasta que el administrador las apruebe."""
+    placa = (placa or "").strip().upper() or None
+    numero_serie = (numero_serie or "").strip() or None
     if tipo_vehiculo != TipoVehiculo.MOTO:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Solo se registran motos")
-    _validar_placa_moto(placa)
-    if vehiculo_service.obtener_por_placa(db, placa) is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La placa ya esta registrada")
+    if es_electrica:
+        if placa is not None:
+            raise _error_422(_ELECTRICA_SIN_PLACA)
+        if numero_serie is None:
+            raise _error_422("Indica el número de serie de la moto eléctrica")
+        try:
+            numero_serie = vehiculo_service.validar_numero_serie(numero_serie)
+        except vehiculo_service.NumeroSerieInvalidoError as exc:
+            raise _error_422(str(exc)) from exc
+        foto, tipo_foto = _foto_segun_moto(True, foto_placa, foto_serial)
+        repetido = str(vehiculo_service.NumeroSerieRepetidoError())
+        try:
+            vehiculo_service.comprobar_serie_libre(db, numero_serie)
+        except vehiculo_service.NumeroSerieRepetidoError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    else:
+        if numero_serie is not None:
+            raise _error_422(_SOLO_ELECTRICA_SERIE)
+        if placa is None:
+            raise _error_422("Indica la placa de la moto")
+        _validar_placa_moto(placa)
+        foto, tipo_foto = _foto_segun_moto(False, foto_placa, foto_serial)
+        repetido = "La placa ya esta registrada"
+        if vehiculo_service.obtener_por_placa(db, placa) is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=repetido)
     # el bloqueo puede esperar a otro registro: va en un hilo para no frenar el servidor
     try:
         await run_in_threadpool(vehiculo_service.comprobar_maximo_de_motos, db, estudiante.id)
     except vehiculo_service.MaximoDeMotosError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
-    archivos = await _guardar_documentos_vehiculo(foto_placa, tarjeta_propiedad)
+    archivos = await _guardar_documentos_vehiculo(foto, tipo_foto, tarjeta_propiedad)
     vehiculo = Vehiculo(
         placa=placa,
+        es_electrica=es_electrica,
+        numero_serie=numero_serie,
         tipo_vehiculo=tipo_vehiculo,
         marca=marca,
         modelo=modelo,
@@ -159,7 +241,7 @@ async def registrar_mi_vehiculo(
     except IntegrityError as exc:
         db.rollback()
         verificacion_service.borrar_archivos([ruta for ruta, _, _ in archivos.values()])
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La placa ya esta registrada") from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=repetido) from exc
     except Exception:
         db.rollback()
         verificacion_service.borrar_archivos([ruta for ruta, _, _ in archivos.values()])
@@ -172,12 +254,14 @@ async def registrar_mi_vehiculo(
 @router.post("/mis-vehiculos/{vehiculo_id}/reenviar", response_model=VehiculoConDocumentos)
 async def reenviar_documentos_vehiculo(
     vehiculo_id: uuid.UUID,
-    foto_placa: UploadFile = File(...),
+    foto_placa: UploadFile | None = File(None),
+    foto_serial: UploadFile | None = File(None),
     tarjeta_propiedad: UploadFile = File(...),
     db: Session = Depends(get_db),
     estudiante: Usuario = Depends(require_role(RolUsuario.ESTUDIANTE)),
 ):
-    """Corregir y reenviar los documentos de un vehiculo rechazado."""
+    """Corregir y reenviar los documentos de un vehiculo rechazado: la foto de la placa, o la
+    del serial si es electrica, y la tarjeta de propiedad."""
     vehiculo = db.get(Vehiculo, vehiculo_id)
     if vehiculo is None or vehiculo.usuario_id != estudiante.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehiculo no encontrado")
@@ -186,7 +270,8 @@ async def reenviar_documentos_vehiculo(
             status_code=status.HTTP_409_CONFLICT, detail="Solo se pueden reenviar documentos de un vehiculo rechazado"
         )
 
-    archivos = await _guardar_documentos_vehiculo(foto_placa, tarjeta_propiedad)
+    foto, tipo_foto = _foto_segun_moto(vehiculo.es_electrica, foto_placa, foto_serial)
+    archivos = await _guardar_documentos_vehiculo(foto, tipo_foto, tarjeta_propiedad)
     viejas: list[str] = []
     try:
         for tipo, (ruta, content_type, tamano) in archivos.items():
@@ -211,16 +296,32 @@ async def reenviar_documentos_vehiculo(
     return vehiculo
 
 
-# Guarda la foto de la placa y la tarjeta en disco.
+# La foto que lleva la moto: la de la placa si es normal, la del serial si es electrica; 422 si falta o sobra.
+def _foto_segun_moto(
+    es_electrica: bool, foto_placa: UploadFile | None, foto_serial: UploadFile | None
+) -> tuple[UploadFile, TipoDocumento]:
+    if es_electrica:
+        if foto_placa is not None:
+            raise _error_422(_ELECTRICA_SIN_PLACA)
+        if foto_serial is None:
+            raise _error_422("Falta la foto del número de serie")
+        return foto_serial, TipoDocumento.FOTO_SERIAL
+    if foto_serial is not None:
+        raise _error_422(_SOLO_ELECTRICA_SERIE)
+    if foto_placa is None:
+        raise _error_422("Falta la foto de la placa")
+    return foto_placa, TipoDocumento.FOTO_PLACA
+
+
+# Guarda la foto (placa o serial) y la tarjeta en disco.
 async def _guardar_documentos_vehiculo(
-    foto_placa: UploadFile, tarjeta_propiedad: UploadFile
+    foto: UploadFile, tipo_foto: TipoDocumento, tarjeta_propiedad: UploadFile
 ) -> dict[TipoDocumento, tuple[str, str, int]]:
-    """Guarda ambos archivos; si el segundo es invalido, borra el primero para no dejar basura."""
+    """Guarda ambos archivos; si el segundo es invalido, borra el primero para no dejar basura.
+    La foto solo puede ser imagen; la tarjeta, imagen o PDF."""
     guardados: dict[TipoDocumento, tuple[str, str, int]] = {}
     try:
-        guardados[TipoDocumento.FOTO_PLACA] = await documento_service.guardar_archivo(
-            foto_placa, permitir_pdf=False
-        )
+        guardados[tipo_foto] = await documento_service.guardar_archivo(foto, permitir_pdf=False)
         guardados[TipoDocumento.TARJETA_PROPIEDAD] = await documento_service.guardar_archivo(tarjeta_propiedad)
     except documento_service.ArchivoInvalidoError as exc:
         verificacion_service.borrar_archivos([ruta for ruta, _, _ in guardados.values()])

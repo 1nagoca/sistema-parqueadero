@@ -33,6 +33,7 @@ Enum documento_tipo_enum {
   carnet
   foto_placa
   tarjeta_propiedad
+  foto_serial [note: 'Foto del serial del chasis o de la lámina técnica de la moto eléctrica (solo imagen)']
 }
 
 // Existe con el mismo nombre en parqueadero_identidad, parqueadero y parqueadero_zonas.
@@ -74,19 +75,22 @@ Table usuarios {
 
 Table vehiculos {
   id uuid [pk, default: `gen_random_uuid()`]
-  placa varchar(10) [not null, unique, note: 'Siempre en mayúsculas (CHECK)']
+  placa varchar(10) [unique, note: 'Siempre en mayúsculas (CHECK); NULL solo si es_electrica = true']
   tipo_vehiculo vehiculo_tipo_enum [not null]
   marca varchar(50)
   modelo varchar(50)
   color varchar(30)
   usuario_id uuid [ref: > usuarios.id, note: 'Obligatorio salvo que es_visitante = true (CHECK)']
   es_visitante boolean [not null, default: false]
+  es_electrica boolean [not null, default: false, note: 'Moto eléctrica liviana sin placa; solo de estudiantes, con dueño y nunca de visitante (CHECK)']
+  numero_serie varchar(17) [note: 'Serial o VIN de fábrica, en mayúsculas (CHECK); obligatorio si es_electrica = true y NULL si no (CHECK)']
   estado_verificacion verificacion_estado_enum [not null, default: 'aprobado']
   motivo_rechazo text
   creado_en timestamptz [not null, default: `now()`]
 
   indexes {
     usuario_id
+    `replace(numero_serie, '-', '')` [unique, name: 'uq_vehiculos_numero_serie', note: 'Serial único sin contar guiones; parcial: WHERE numero_serie IS NOT NULL']
   }
 }
 

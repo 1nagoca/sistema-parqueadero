@@ -40,3 +40,5 @@ class TipoDocumento(str, enum.Enum):
     CARNET = "carnet"
     FOTO_PLACA = "foto_placa"
     TARJETA_PROPIEDAD = "tarjeta_propiedad"
+    # Foto del serial del chasis o de la lamina tecnica de la moto electrica.
+    FOTO_SERIAL = "foto_serial"

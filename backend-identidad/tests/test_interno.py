@@ -66,6 +66,8 @@ def test_vehiculo_con_propietario_solo_expone_lo_del_contrato(client, sufijo):
     assert r.json() == {
         "id": vehiculo_id,
         "placa": placa,
+        "es_electrica": False,
+        "numero_serie": None,
         "es_visitante": False,
         "estado_verificacion": "aprobado",
         "propietario": {"id": propietario_id, "estado_verificacion": "pendiente", "activo": True},
@@ -91,6 +93,8 @@ def test_vehiculo_de_visitante_no_tiene_propietario_y_el_inexistente_da_404(clie
     assert r.json() == {
         "id": vehiculo_id,
         "placa": placa,
+        "es_electrica": False,
+        "numero_serie": None,
         "es_visitante": True,
         "estado_verificacion": "aprobado",
         "propietario": None,

@@ -22,7 +22,10 @@ class VehiculoInterno(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    placa: str
+    # La electrica no tiene placa: va por su numero de serie.
+    placa: str | None
+    es_electrica: bool
+    numero_serie: str | None
     es_visitante: bool
     estado_verificacion: EstadoVerificacion
     propietario: PropietarioInterno | None

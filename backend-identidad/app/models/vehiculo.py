@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, func, text
 from sqlalchemy.dialects.postgresql import ENUM, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,7 +20,7 @@ tipo_vehiculo_enum = ENUM(
 )
 
 
-# Tabla vehiculos: placa unica en mayusculas; sin dueno solo si es de visitante.
+# Tabla vehiculos: placa unica en mayusculas, o serial unico si es electrica; sin dueno solo si es de visitante.
 class Vehiculo(Base):
     __tablename__ = "vehiculos"
     __table_args__ = (
@@ -29,13 +29,33 @@ class Vehiculo(Base):
             "usuario_id IS NOT NULL OR es_visitante = true",
             name="ck_vehiculos_propietario_o_visitante",
         ),
+        CheckConstraint(
+            "(es_electrica = false AND placa IS NOT NULL AND numero_serie IS NULL)"
+            " OR (es_electrica = true AND placa IS NULL AND numero_serie IS NOT NULL)",
+            name="ck_vehiculos_placa_o_numero_serie",
+        ),
+        CheckConstraint(
+            "es_electrica = false OR (usuario_id IS NOT NULL AND es_visitante = false)",
+            name="ck_vehiculos_electrica_solo_estudiante",
+        ),
+        CheckConstraint("numero_serie = upper(numero_serie)", name="ck_vehiculos_numero_serie_mayusculas"),
         Index("idx_vehiculos_usuario_id", "usuario_id"),
+        # el serial es unico sin contar guiones
+        Index(
+            "uq_vehiculos_numero_serie",
+            text("replace(numero_serie, '-', '')"),
+            unique=True,
+            postgresql_where=text("numero_serie IS NOT NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
     )
-    placa: Mapped[str] = mapped_column(String(10), nullable=False, unique=True)
+    # Sin placa solo la moto electrica, que se identifica por su numero de serie.
+    placa: Mapped[str | None] = mapped_column(String(10), nullable=True, unique=True)
+    es_electrica: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    numero_serie: Mapped[str | None] = mapped_column(String(17), nullable=True)
     tipo_vehiculo: Mapped[TipoVehiculo] = mapped_column(tipo_vehiculo_enum, nullable=False)
     marca: Mapped[str | None] = mapped_column(String(50), nullable=True)
     modelo: Mapped[str | None] = mapped_column(String(50), nullable=True)

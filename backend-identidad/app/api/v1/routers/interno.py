@@ -19,11 +19,14 @@ router = APIRouter(prefix="/interno", tags=["interno"], dependencies=[Depends(ve
 def obtener_vehiculo(vehiculo_id: uuid.UUID, db: Session = Depends(get_db)):
     """Si el vehiculo existe, su placa y si el y su dueno estan aprobados."""
     vehiculo = db.get(Vehiculo, vehiculo_id)
-    if vehiculo is None:
+    # hasta la E3 accesos no sabe guardar una moto sin placa: la electrica responde como no encontrada
+    if vehiculo is None or vehiculo.es_electrica:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehiculo no encontrado")
     return VehiculoInterno(
         id=vehiculo.id,
         placa=vehiculo.placa,
+        es_electrica=vehiculo.es_electrica,
+        numero_serie=vehiculo.numero_serie,
         es_visitante=vehiculo.es_visitante,
         estado_verificacion=vehiculo.estado_verificacion,
         propietario=vehiculo.usuario,

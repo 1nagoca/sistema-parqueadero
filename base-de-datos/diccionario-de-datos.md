@@ -6,7 +6,7 @@ Hay **una base de datos por microservicio**:
 
 | Base de datos | Servicio | Tablas | Migraciones |
 |---|---|---|---|
-| `parqueadero_identidad` | `backend-identidad` | `usuarios`, `vehiculos`, `documentos`, `auditoria_identidad` | `backend-identidad/alembic/versions` (0001) |
+| `parqueadero_identidad` | `backend-identidad` | `usuarios`, `vehiculos`, `documentos`, `auditoria_identidad` | `backend-identidad/alembic/versions` (0001 y 0002) |
 | `parqueadero` | `backend-accesos` | `accesos`, `auditoria_accesos` | `backend-accesos/alembic/versions` (0001 a 0005) |
 | `parqueadero_zonas` | `backend-parqueadero` | `zonas`, `espacios`, `mantenimientos`, `auditoria_parqueadero` | `backend-parqueadero/alembic/versions` (0001 a 0003) |
 
@@ -79,18 +79,20 @@ Referencias a otra base, sin llave foránea:
 | Columna | Tipo | Nulo | Por defecto | Descripción |
 |---|---|---|---|---|
 | `id` | uuid | No | `gen_random_uuid()` | PK |
-| `placa` | varchar(10) | No | | Única, siempre en mayúsculas |
+| `placa` | varchar(10) | Sí | | Única, siempre en mayúsculas; vacía solo en la moto eléctrica |
 | `tipo_vehiculo` | `vehiculo_tipo_enum` | No | | carro, moto, bicicleta, otro; la API solo acepta moto (RN-05) |
 | `marca` | varchar(50) | Sí | | |
 | `modelo` | varchar(50) | Sí | | |
 | `color` | varchar(30) | Sí | | |
 | `usuario_id` | uuid | Sí | | FK a `usuarios`; dueño del vehículo |
 | `es_visitante` | boolean | No | `false` | Vehículo de visitante sin dueño registrado |
+| `es_electrica` | boolean | No | `false` | Moto eléctrica liviana sin placa, que se identifica por su número de serie; solo de estudiantes |
+| `numero_serie` | varchar(17) | Sí | | Serial o VIN de fábrica de la eléctrica, sin espacios y en mayúsculas; único sin contar guiones |
 | `estado_verificacion` | `verificacion_estado_enum` | No | `aprobado` | |
 | `motivo_rechazo` | text | Sí | | |
 | `creado_en` | timestamptz | No | `now()` | |
 
-Restricciones: `ck_vehiculos_placa_mayusculas` (placa = upper(placa)); `ck_vehiculos_propietario_o_visitante` (tiene dueño o es visitante). Índice en `usuario_id`.
+Restricciones: `ck_vehiculos_placa_mayusculas` (placa = upper(placa)); `ck_vehiculos_propietario_o_visitante` (tiene dueño o es visitante); `ck_vehiculos_placa_o_numero_serie` (la normal tiene placa y no serial; la eléctrica, serial y no placa); `ck_vehiculos_electrica_solo_estudiante` (la eléctrica tiene dueño y no es de visitante); `ck_vehiculos_numero_serie_mayusculas` (numero_serie = upper(numero_serie)). Índice en `usuario_id` e índice único `uq_vehiculos_numero_serie` sobre `replace(numero_serie, '-', '')` donde `numero_serie` no es NULL (así `EB2024-00871` y `EB202400871` chocan).
 
 ### documentos
 
@@ -99,7 +101,7 @@ Restricciones: `ck_vehiculos_placa_mayusculas` (placa = upper(placa)); `ck_vehic
 | `id` | uuid | No | `gen_random_uuid()` | PK |
 | `usuario_id` | uuid | No | | FK a `usuarios`; quien subió el archivo |
 | `vehiculo_id` | uuid | Sí | | FK a `vehiculos`; vacío solo para el carnet |
-| `tipo` | `documento_tipo_enum` | No | | carnet, foto_placa, tarjeta_propiedad |
+| `tipo` | `documento_tipo_enum` | No | | carnet, foto_placa, tarjeta_propiedad, foto_serial (foto del serial de la eléctrica) |
 | `ruta_archivo` | varchar(255) | No | | Ruta en el volumen privado `identidad_uploads` |
 | `content_type` | varchar(50) | No | | Tipo MIME |
 | `tamano_bytes` | integer | No | | |
@@ -242,7 +244,7 @@ Bitácora del servicio de parqueadero, con las mismas columnas que `auditoria_ac
 | `usuario_rol_enum` | `parqueadero_identidad` | estudiante, docente, administrativo, vigilante, admin |
 | `vehiculo_tipo_enum` | `parqueadero_identidad` | carro, moto, bicicleta, otro |
 | `verificacion_estado_enum` | `parqueadero_identidad` | pendiente, aprobado, rechazado |
-| `documento_tipo_enum` | `parqueadero_identidad` | carnet, foto_placa, tarjeta_propiedad |
+| `documento_tipo_enum` | `parqueadero_identidad` | carnet, foto_placa, tarjeta_propiedad, foto_serial |
 | `auditoria_accion_enum` | `parqueadero_identidad`, `parqueadero` y `parqueadero_zonas` | creacion, actualizacion, eliminacion |
 | `acceso_tipo_enum` | `parqueadero` | normal, visitante |
 | `espacio_estado_enum` | `parqueadero_zonas` | libre, ocupado, mantenimiento |
