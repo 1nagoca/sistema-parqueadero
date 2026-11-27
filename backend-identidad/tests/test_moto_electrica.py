@@ -210,11 +210,31 @@ def test_serial_invalido_da_422_con_el_formato(client, serie):
     _, est = _estudiante(client)
     r = _electrica(client, est, serie)
     assert r.status_code == 422, r.text
-    assert _detalle(r) == (
-        f"El número de serie {serie} no tiene un formato válido: de 8 a 17 letras, números o guiones;"
-        " si tiene 17 caracteres, sin I, O ni Q"
-    )
+    assert _detalle(r) == _formato_invalido(serie)
     assert _archivos_en_disco() == []
+
+
+# El 422 de un serial con otro formato.
+def _formato_invalido(serie):
+    return (
+        f"El número de serie {serie} no tiene un formato válido: de 8 a 17 letras, números o guiones,"
+        " con al menos 8 letras o números; si tiene 17 caracteres, sin I, O ni Q"
+    )
+
+
+def test_serial_necesita_8_letras_o_numeros_sin_contar_guiones(client):
+    uid, est = _estudiante(client)
+    for serie in ("--------", "AB------", "ABC-12-4-"):
+        r = _electrica(client, est, serie)
+        assert r.status_code == 422, (serie, r.text)
+        assert _detalle(r) == _formato_invalido(serie)
+    assert _motos_de(uid) == 0 and _archivos_en_disco() == []
+
+    # con 8 letras o numeros y guiones en medio si vale
+    serie = "ABC-1234-5"
+    r = _electrica(client, est, serie)
+    assert r.status_code == 201, r.text
+    assert r.json()["numero_serie"] == serie
 
 
 def test_electrica_con_placa_o_foto_de_placa_da_422(client):

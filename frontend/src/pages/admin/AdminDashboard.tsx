@@ -215,16 +215,23 @@ function SeccionVerificaciones() {
 
           {vehiculos.map((vehiculo) => (
             <div key={vehiculo.id} className="space-y-2 rounded-xl border border-gray-200 p-3">
-              <p className="text-sm font-medium text-gray-700">
-                Vehiculo <span className="font-mono text-base font-semibold">{vehiculo.placa}</span>{" "}
+              <p className="break-words text-sm font-medium text-gray-700">
+                {vehiculo.es_electrica ? "Moto eléctrica" : "Vehiculo"}{" "}
+                <span className="font-mono text-base font-semibold">
+                  {vehiculo.es_electrica ? vehiculo.numero_serie : vehiculo.placa}
+                </span>{" "}
                 <span className="capitalize text-gray-500">
                   ({[vehiculo.tipo_vehiculo, vehiculo.marca, vehiculo.color].filter(Boolean).join(", ")})
                 </span>
               </p>
-              <p className="text-xs text-gray-500">La placa de la foto y de la tarjeta de propiedad deben coincidir.</p>
+              <p className="text-xs text-gray-500">
+                {vehiculo.es_electrica
+                  ? "El número de serie de la foto y el de la factura o tarjeta deben coincidir."
+                  : "La placa de la foto y de la tarjeta de propiedad deben coincidir."}
+              </p>
               <div className="flex flex-wrap gap-4">
                 {vehiculo.documentos.map((doc) => (
-                  <DocumentoVisor key={doc.id} documento={doc} />
+                  <DocumentoVisor key={doc.id} documento={doc} deMotoElectrica={vehiculo.es_electrica} />
                 ))}
               </div>
               <div className="flex gap-2">

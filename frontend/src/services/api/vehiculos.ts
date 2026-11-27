@@ -1,10 +1,10 @@
 // Llamadas a vehiculos (servicio de identidad).
-import type { PropietarioVigilante, TipoVehiculo, Vehiculo, VehiculoConDocumentos } from "@/types/api";
+import type { PropietarioVigilante, TipoVehiculo, VehiculoConDocumentos, VehiculoConPlaca } from "@/types/api";
 import { apiGet, apiGetBlob, apiPost, apiPostForm } from "./client";
 
 // Busca un vehiculo por placa (vigilante, admin).
-export function buscarPorPlaca(placa: string): Promise<Vehiculo> {
-  return apiGet<Vehiculo>(`/vehiculos/placa/${encodeURIComponent(placa)}`);
+export function buscarPorPlaca(placa: string): Promise<VehiculoConPlaca> {
+  return apiGet<VehiculoConPlaca>(`/vehiculos/placa/${encodeURIComponent(placa)}`);
 }
 
 // Nombre del dueno y si hay carnet para mostrar (vigilante, admin; RN-09).
@@ -29,8 +29,8 @@ export interface CrearVehiculoPayload {
 }
 
 // Crea un vehiculo (vigilante, admin).
-export function crearVehiculo(datos: CrearVehiculoPayload): Promise<Vehiculo> {
-  return apiPost<Vehiculo>("/vehiculos", datos);
+export function crearVehiculo(datos: CrearVehiculoPayload): Promise<VehiculoConPlaca> {
+  return apiPost<VehiculoConPlaca>("/vehiculos", datos);
 }
 
 // Los vehiculos del estudiante.
@@ -38,39 +38,60 @@ export function listarMisVehiculos(): Promise<VehiculoConDocumentos[]> {
   return apiGet<VehiculoConDocumentos[]>("/vehiculos/mis-vehiculos");
 }
 
-// Datos y archivos para registrar el vehiculo del estudiante.
-export interface RegistrarMiVehiculoPayload {
-  placa: string;
+// Datos comunes de la moto del estudiante; las dos llevan tarjeta de propiedad o factura.
+interface DatosMiMoto {
   tipo_vehiculo: TipoVehiculo;
   marca?: string;
   modelo?: string;
   color?: string;
-  foto_placa: File;
   tarjeta_propiedad: File;
 }
 
-// Envia el vehiculo con sus dos fotos como formulario multipart.
+// Moto normal: con placa y foto de la placa.
+export interface MiMotoNormal extends DatosMiMoto {
+  es_electrica?: false;
+  placa: string;
+  foto_placa: File;
+}
+
+// Moto electrica: sin placa, con numero de serie y foto del serial.
+export interface MiMotoElectrica extends DatosMiMoto {
+  es_electrica: true;
+  numero_serie: string;
+  foto_serial: File;
+}
+
+export type RegistrarMiVehiculoPayload = MiMotoNormal | MiMotoElectrica;
+
+// Envia la moto con sus dos documentos como formulario multipart; solo los campos de su tipo.
 export function registrarMiVehiculo(datos: RegistrarMiVehiculoPayload): Promise<VehiculoConDocumentos> {
   const formulario = new FormData();
-  formulario.append("placa", datos.placa);
+  if (datos.es_electrica) {
+    formulario.append("es_electrica", "true");
+    formulario.append("numero_serie", datos.numero_serie);
+  } else {
+    formulario.append("placa", datos.placa);
+  }
   formulario.append("tipo_vehiculo", datos.tipo_vehiculo);
   for (const campo of ["marca", "modelo", "color"] as const) {
     const valor = datos[campo]?.trim();
     if (valor) formulario.append(campo, valor);
   }
-  formulario.append("foto_placa", datos.foto_placa);
+  if (datos.es_electrica) formulario.append("foto_serial", datos.foto_serial);
+  else formulario.append("foto_placa", datos.foto_placa);
   formulario.append("tarjeta_propiedad", datos.tarjeta_propiedad);
   return apiPostForm<VehiculoConDocumentos>("/vehiculos/mis-vehiculos", formulario);
 }
 
-// Reenvia los documentos de un vehiculo rechazado.
+// Reenvia los documentos de un vehiculo rechazado: la foto va como foto_serial si es electrica.
 export function reenviarDocumentosVehiculo(
   vehiculoId: string,
-  fotoPlaca: File,
+  foto: File,
   tarjetaPropiedad: File,
+  esElectrica: boolean,
 ): Promise<VehiculoConDocumentos> {
   const formulario = new FormData();
-  formulario.append("foto_placa", fotoPlaca);
+  formulario.append(esElectrica ? "foto_serial" : "foto_placa", foto);
   formulario.append("tarjeta_propiedad", tarjetaPropiedad);
   return apiPostForm<VehiculoConDocumentos>(`/vehiculos/mis-vehiculos/${vehiculoId}/reenviar`, formulario);
 }

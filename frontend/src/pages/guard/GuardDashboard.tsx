@@ -19,15 +19,15 @@ import { buscarPorPlaca, crearVehiculo } from "@/services/api/vehiculos";
 import type { LecturaPlaca } from "@/services/api/vision";
 import { listarZonas } from "@/services/api/zonas";
 import { useActualizacionesZona } from "@/services/realtime/useActualizacionesZona";
-import type { Acceso, AccesoActivo, Espacio, Vehiculo, Zona } from "@/types/api";
+import type { Acceso, AccesoActivo, Espacio, VehiculoConPlaca, Zona } from "@/types/api";
 
 // Lo que se muestra al buscar una placa: nada, cargando, ya esta adentro, registrado, visitante que necesita autorizacion o no registrado.
 type Resultado =
   | { estado: "vacio" }
   | { estado: "cargando" }
   | { estado: "con_acceso_activo"; placa: string; acceso: Acceso }
-  | { estado: "vehiculo_registrado"; vehiculo: Vehiculo }
-  | { estado: "visitante_sin_autorizacion"; vehiculo: Vehiculo }
+  | { estado: "vehiculo_registrado"; vehiculo: VehiculoConPlaca }
+  | { estado: "visitante_sin_autorizacion"; vehiculo: VehiculoConPlaca }
   | { estado: "no_registrado"; placa: string };
 
 // Panel del vigilante: buscar placa (a mano, con foto o con QR) y registrar entradas y salidas.

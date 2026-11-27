@@ -16,6 +16,9 @@ MOTIVO_REACTIVACION = "Cuenta reactivada por el administrador"
 MOTIVO_VEHICULO_REACTIVADO = (
     "Cuenta reactivada: vuelve a subir la foto de la placa y la tarjeta de propiedad"
 )
+MOTIVO_ELECTRICA_REACTIVADA = (
+    "Cuenta reactivada: vuelve a subir la foto del número de serie y la factura o tarjeta de propiedad"
+)
 
 
 class UsuarioNoEncontradoError(Exception):
@@ -125,8 +128,9 @@ def reactivar(db: Session, usuario_id: uuid.UUID, admin_id: uuid.UUID) -> Usuari
         # Cada vehiculo que pasa a rechazado deja su propia traza.
         for vehiculo in usuario.vehiculos:
             estado_anterior = vehiculo.estado_verificacion.value
+            motivo = MOTIVO_ELECTRICA_REACTIVADA if vehiculo.es_electrica else MOTIVO_VEHICULO_REACTIVADO
             vehiculo.estado_verificacion = EstadoVerificacion.RECHAZADO
-            vehiculo.motivo_rechazo = MOTIVO_VEHICULO_REACTIVADO
+            vehiculo.motivo_rechazo = motivo
             auditoria_service.registrar_auditoria(
                 db,
                 tabla_afectada="vehiculos",
@@ -135,7 +139,7 @@ def reactivar(db: Session, usuario_id: uuid.UUID, admin_id: uuid.UUID) -> Usuari
                 realizado_por_id=admin_id,
                 valores_anteriores={"estado_verificacion": estado_anterior},
                 valores_nuevos={"estado_verificacion": EstadoVerificacion.RECHAZADO.value},
-                motivo=MOTIVO_VEHICULO_REACTIVADO,
+                motivo=motivo,
             )
 
     auditoria_service.registrar_auditoria(

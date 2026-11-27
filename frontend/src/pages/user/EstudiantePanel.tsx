@@ -265,19 +265,19 @@ function TarjetaVehiculos({ vehiculos, onCambio }: { vehiculos: VehiculoConDocum
 
 // Un vehiculo con su estado; si fue rechazado, permite reenviar los documentos.
 function FilaVehiculo({ vehiculo, onCambio }: { vehiculo: VehiculoConDocumentos; onCambio: () => void }) {
-  const [fotoPlaca, setFotoPlaca] = useState<File | null>(null);
+  const [foto, setFoto] = useState<File | null>(null);
   const [tarjeta, setTarjeta] = useState<File | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reenvia la foto de la placa y la tarjeta.
+  // Reenvia la foto (de la placa, o del serial si es electrica) y la tarjeta.
   async function reenviar(evento: FormEvent) {
     evento.preventDefault();
-    if (!fotoPlaca || !tarjeta) return;
+    if (!foto || !tarjeta) return;
     setEnviando(true);
     setError(null);
     try {
-      await reenviarDocumentosVehiculo(vehiculo.id, fotoPlaca, tarjeta);
+      await reenviarDocumentosVehiculo(vehiculo.id, foto, tarjeta, vehiculo.es_electrica);
       onCambio();
     } catch (err) {
       setError(mensajeDe(err, "No se pudieron reenviar los documentos"));
@@ -288,11 +288,16 @@ function FilaVehiculo({ vehiculo, onCambio }: { vehiculo: VehiculoConDocumentos;
 
   return (
     <div className="space-y-2 rounded-xl border border-gray-200 p-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="font-mono text-lg font-semibold text-gray-900">{vehiculo.placa}</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          {vehiculo.es_electrica && <p className="text-xs font-medium text-emerald-700">Moto eléctrica</p>}
+          <p className="break-all font-mono text-lg font-semibold text-gray-900">
+            {vehiculo.es_electrica ? vehiculo.numero_serie : vehiculo.placa}
+          </p>
           <p className="text-sm capitalize text-gray-500">
-            {[vehiculo.tipo_vehiculo, vehiculo.marca, vehiculo.color].filter(Boolean).join(" · ")}
+            {[vehiculo.es_electrica ? null : vehiculo.tipo_vehiculo, vehiculo.marca, vehiculo.color]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         </div>
         <EstadoBadge estado={vehiculo.estado_verificacion} />
@@ -305,17 +310,17 @@ function FilaVehiculo({ vehiculo, onCambio }: { vehiculo: VehiculoConDocumentos;
           <form onSubmit={reenviar} className="space-y-2">
             <p className="text-sm font-medium text-gray-700">Sube de nuevo los documentos corregidos</p>
             <label className="block text-xs text-gray-600">
-              Foto de la placa
+              {vehiculo.es_electrica ? "Foto del número de serie" : "Foto de la placa"}
               <input
                 type="file"
                 required
                 accept={ACEPTA_IMAGEN}
-                onChange={(e) => setFotoPlaca(e.target.files?.[0] ?? null)}
+                onChange={(e) => setFoto(e.target.files?.[0] ?? null)}
                 className="block w-full text-sm"
               />
             </label>
             <label className="block text-xs text-gray-600">
-              Tarjeta de propiedad
+              {vehiculo.es_electrica ? "Factura de compra o tarjeta de propiedad" : "Tarjeta de propiedad"}
               <input
                 type="file"
                 required
@@ -325,7 +330,7 @@ function FilaVehiculo({ vehiculo, onCambio }: { vehiculo: VehiculoConDocumentos;
               />
             </label>
             {error && <p className="text-sm text-red-600">{error}</p>}
-            <Button type="submit" disabled={enviando || !fotoPlaca || !tarjeta}>
+            <Button type="submit" disabled={enviando || !foto || !tarjeta}>
               {enviando ? "Enviando..." : "Reenviar"}
             </Button>
           </form>
@@ -335,39 +340,49 @@ function FilaVehiculo({ vehiculo, onCambio }: { vehiculo: VehiculoConDocumentos;
   );
 }
 
-// Formulario para registrar un vehiculo con sus dos documentos.
+// Formulario para registrar una moto, normal (placa) o electrica (serial), con sus dos documentos.
 function FormularioVehiculo({ onCreado }: { onCreado: () => void }) {
   const [abierto, setAbierto] = useState(false);
+  const [electrica, setElectrica] = useState(false);
   const [placa, setPlaca] = useState("");
+  const [serie, setSerie] = useState("");
   const [marca, setMarca] = useState("");
   const [modelo, setModelo] = useState("");
   const [color, setColor] = useState("");
-  const [fotoPlaca, setFotoPlaca] = useState<File | null>(null);
+  const [foto, setFoto] = useState<File | null>(null);
   const [tarjeta, setTarjeta] = useState<File | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Envia el vehiculo y sus documentos.
+  // Al cambiar de tipo se borran la placa, el serial y la foto.
+  function cambiarTipo(esElectrica: boolean) {
+    setElectrica(esElectrica);
+    setPlaca("");
+    setSerie("");
+    setFoto(null);
+    setError(null);
+  }
+
+  // Envia la moto y sus documentos; el formato de la placa o el serial lo valida el backend.
   async function enviar(evento: FormEvent) {
     evento.preventDefault();
-    if (!fotoPlaca || !tarjeta) return;
+    if (!foto || !tarjeta) return;
     setEnviando(true);
     setError(null);
+    const comunes = { tipo_vehiculo: "moto" as const, marca, modelo, color, tarjeta_propiedad: tarjeta };
     try {
-      await registrarMiVehiculo({
-        placa,
-        tipo_vehiculo: "moto",
-        marca,
-        modelo,
-        color,
-        foto_placa: fotoPlaca,
-        tarjeta_propiedad: tarjeta,
-      });
+      await registrarMiVehiculo(
+        electrica
+          ? { ...comunes, es_electrica: true, numero_serie: serie, foto_serial: foto }
+          : { ...comunes, placa, foto_placa: foto },
+      );
+      setElectrica(false);
       setPlaca("");
+      setSerie("");
       setMarca("");
       setModelo("");
       setColor("");
-      setFotoPlaca(null);
+      setFoto(null);
       setTarjeta(null);
       setAbierto(false);
       onCreado();
@@ -386,33 +401,66 @@ function FormularioVehiculo({ onCreado }: { onCreado: () => void }) {
     );
   }
 
+  const faltanDatos = !(electrica ? serie.trim() : placa.trim()) || !foto || !tarjeta;
+  const opcion = "flex min-h-12 flex-1 items-center gap-2 rounded-lg border px-3 text-sm";
+
   return (
     <form onSubmit={enviar} className="space-y-3 rounded-xl border border-emerald-200 p-3">
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium text-gray-700">Tipo de moto</legend>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <label className={`${opcion} ${electrica ? "border-gray-300" : "border-emerald-500 bg-emerald-50"}`}>
+            <input type="radio" name="tipo-moto" checked={!electrica} onChange={() => cambiarTipo(false)} />
+            Normal (con placa)
+          </label>
+          <label className={`${opcion} ${electrica ? "border-emerald-500 bg-emerald-50" : "border-gray-300"}`}>
+            <input type="radio" name="tipo-moto" checked={electrica} onChange={() => cambiarTipo(true)} />
+            Eléctrica (sin placa)
+          </label>
+        </div>
+        <p className="text-xs text-gray-500">Si tu moto eléctrica tiene placa, regístrala como normal.</p>
+      </fieldset>
       <div className="grid gap-3 sm:grid-cols-2">
-        <input
-          required
-          placeholder="Placa de la moto (ej. ABC12D o AB1C23D)"
-          value={placa}
-          maxLength={7}
-          onChange={(e) => setPlaca(e.target.value.toUpperCase())}
-          className={`${campo} font-mono uppercase`}
-        />
+        {electrica ? (
+          <div className="sm:col-span-2">
+            <input
+              required
+              aria-label="Número de serie o VIN"
+              placeholder="Número de serie o VIN (ej. EB2024-00871)"
+              value={serie}
+              maxLength={17}
+              onChange={(e) => setSerie(e.target.value.toUpperCase().replace(/\s/g, ""))}
+              className={`${campo} font-mono uppercase`}
+            />
+            <p className="mt-1 text-xs text-gray-500">Está grabado en el chasis o en la lámina técnica.</p>
+          </div>
+        ) : (
+          <input
+            required
+            placeholder="Placa de la moto (ej. ABC12D o AB1C23D)"
+            value={placa}
+            maxLength={7}
+            onChange={(e) => setPlaca(e.target.value.toUpperCase())}
+            className={`${campo} font-mono uppercase`}
+          />
+        )}
         <input placeholder="Marca" value={marca} onChange={(e) => setMarca(e.target.value)} className={campo} />
         <input placeholder="Modelo" value={modelo} onChange={(e) => setModelo(e.target.value)} className={campo} />
         <input placeholder="Color" value={color} onChange={(e) => setColor(e.target.value)} className={campo} />
       </div>
       <label className="block text-sm text-gray-700">
-        Foto de la placa del vehiculo
+        {electrica ? "Foto del número de serie" : "Foto de la placa del vehiculo"}
         <input
+          key={electrica ? "foto-serial" : "foto-placa"}
           type="file"
           required
           accept={ACEPTA_IMAGEN}
-          onChange={(e) => setFotoPlaca(e.target.files?.[0] ?? null)}
+          onChange={(e) => setFoto(e.target.files?.[0] ?? null)}
           className="block w-full text-sm"
         />
       </label>
       <label className="block text-sm text-gray-700">
-        Tarjeta de propiedad
+        {electrica ? "Factura de compra o tarjeta de propiedad" : "Tarjeta de propiedad"}
         <input
           type="file"
           required
@@ -421,10 +469,14 @@ function FormularioVehiculo({ onCreado }: { onCreado: () => void }) {
           className="block w-full text-sm"
         />
       </label>
-      <p className="text-xs text-gray-500">JPG, PNG, WEBP (la tarjeta tambien PDF). Maximo 5 MB cada uno.</p>
+      <p className="text-xs text-gray-500">
+        {electrica
+          ? "JPG, PNG, WEBP (la factura o tarjeta también PDF). Máximo 5 MB cada uno."
+          : "JPG, PNG, WEBP (la tarjeta tambien PDF). Maximo 5 MB cada uno."}
+      </p>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex gap-2">
-        <Button type="submit" disabled={enviando || !fotoPlaca || !tarjeta}>
+        <Button type="submit" disabled={enviando || faltanDatos}>
           {enviando ? "Enviando..." : "Enviar para revision"}
         </Button>
         <Button type="button" variante="secundaria" onClick={() => setAbierto(false)}>

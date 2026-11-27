@@ -594,6 +594,37 @@ def test_reactivar_estudiante_con_dos_motos_deja_una_traza_por_vehiculo(client, 
     assert de_la_reactivacion == 2
 
 
+def test_reactivar_da_a_la_electrica_su_propio_motivo(client, sufijo):
+    _, admin = _personal(client, RolUsuario.ADMIN, sufijo)
+    est, uid, normal = _estudiante_con_carnet_y_vehiculo(client, sufijo)
+    serie = "EB" + uuid.uuid4().hex[:10].upper()
+    r = client.post(
+        f"{API}/vehiculos/mis-vehiculos",
+        headers=est,
+        data={"es_electrica": "true", "numero_serie": serie},
+        files={
+            "foto_serial": ("serial.png", PNG, "image/png"),
+            "tarjeta_propiedad": ("factura.pdf", PDF, "application/pdf"),
+        },
+    )
+    assert r.status_code == 201, r.text
+    electrica = r.json()["id"]
+    assert client.post(f"{API}/usuarios/{uid}/desactivar", headers=admin, json={"motivo": "Se retiró"}).status_code == 200
+
+    assert client.post(f"{API}/usuarios/{uid}/reactivar", headers=admin).status_code == 200
+
+    esperado = {
+        normal: "Cuenta reactivada: vuelve a subir la foto de la placa y la tarjeta de propiedad",
+        electrica: "Cuenta reactivada: vuelve a subir la foto del número de serie y la factura o tarjeta de propiedad",
+    }
+    est = _login(client, f"est-{sufijo}@ufps.edu.co", "clave-segura-1")
+    motos = {v["id"]: v for v in client.get(f"{API}/vehiculos/mis-vehiculos", headers=est).json()}
+    for vehiculo_id, motivo in esperado.items():
+        assert motos[vehiculo_id]["estado_verificacion"] == "rechazado"
+        assert motos[vehiculo_id]["motivo_rechazo"] == motivo
+        assert _trazas(vehiculo_id)[-1].motivo == motivo
+
+
 def _estudiante_con_4_motos(client, sufijo):
     # Estudiante con 4 motos pendientes (2 colombianas y 2 venezolanas); devuelve (cabeceras, id, ids de motos).
     assert _registrar(client, sufijo).status_code == 201

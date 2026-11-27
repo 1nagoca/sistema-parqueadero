@@ -6,7 +6,7 @@ export type TipoVehiculo = "carro" | "moto" | "bicicleta" | "otro";
 export type EstadoEspacio = "libre" | "ocupado" | "mantenimiento";
 export type TipoAcceso = "normal" | "visitante";
 export type EstadoVerificacion = "pendiente" | "aprobado" | "rechazado";
-export type TipoDocumento = "carnet" | "foto_placa" | "tarjeta_propiedad";
+export type TipoDocumento = "carnet" | "foto_placa" | "tarjeta_propiedad" | "foto_serial";
 export type AccionAuditoria = "creacion" | "actualizacion" | "eliminacion";
 
 // Usuario (identidad).
@@ -25,19 +25,26 @@ export interface Usuario {
   actualizado_en: string;
 }
 
-// Vehiculo (identidad).
+// Vehiculo (identidad); la moto electrica no tiene placa y va por su numero de serie.
 export interface Vehiculo {
   id: string;
-  placa: string;
+  placa: string | null;
   tipo_vehiculo: TipoVehiculo;
   marca: string | null;
   modelo: string | null;
   color: string | null;
   usuario_id: string | null;
   es_visitante: boolean;
+  es_electrica: boolean;
+  numero_serie: string | null;
   estado_verificacion: EstadoVerificacion;
   motivo_rechazo: string | null;
   creado_en: string;
+}
+
+// Moto con placa: la que devuelven la busqueda por placa y el registro de visitantes.
+export interface VehiculoConPlaca extends Vehiculo {
+  placa: string;
 }
 
 // Lo que ve el vigilante del dueno de una moto (RN-09).

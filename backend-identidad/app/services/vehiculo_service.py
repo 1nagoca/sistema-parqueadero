@@ -68,13 +68,17 @@ def normalizar_numero_serie(numero_serie: str) -> str:
     return "".join(numero_serie.split()).upper()
 
 
-# Devuelve el serial normalizado o NumeroSerieInvalidoError; con 17 caracteres sigue la regla del VIN.
+# Devuelve el serial normalizado o NumeroSerieInvalidoError; al menos 8 letras o numeros y, con 17, la regla del VIN.
 def validar_numero_serie(numero_serie: str) -> str:
     serie = normalizar_numero_serie(numero_serie)
-    if not _NUMERO_SERIE.match(serie) or (len(serie) == 17 and set(serie) & {"I", "O", "Q"}):
+    if (
+        not _NUMERO_SERIE.match(serie)
+        or len(serie.replace("-", "")) < 8
+        or (len(serie) == 17 and set(serie) & {"I", "O", "Q"})
+    ):
         raise NumeroSerieInvalidoError(
-            f"El número de serie {serie} no tiene un formato válido: de 8 a 17 letras, números o guiones;"
-            " si tiene 17 caracteres, sin I, O ni Q"
+            f"El número de serie {serie} no tiene un formato válido: de 8 a 17 letras, números o guiones,"
+            " con al menos 8 letras o números; si tiene 17 caracteres, sin I, O ni Q"
         )
     return serie
 
