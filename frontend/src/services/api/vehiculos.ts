@@ -1,5 +1,11 @@
 // Llamadas a vehiculos (servicio de identidad).
-import type { PropietarioVigilante, TipoVehiculo, VehiculoConDocumentos, VehiculoConPlaca } from "@/types/api";
+import type {
+  PropietarioVigilante,
+  TipoVehiculo,
+  Vehiculo,
+  VehiculoConDocumentos,
+  VehiculoConPlaca,
+} from "@/types/api";
 import { apiGet, apiGetBlob, apiPost, apiPostForm } from "./client";
 
 // Busca un vehiculo por placa (vigilante, admin).
@@ -15,6 +21,21 @@ export function verPropietario(placa: string): Promise<PropietarioVigilante> {
 // El carnet del dueno de la moto como archivo (vigilante, admin; RN-09).
 export function descargarCarnetPropietario(placa: string): Promise<Blob> {
   return apiGetBlob(`/vehiculos/placa/${encodeURIComponent(placa)}/carnet`);
+}
+
+// Busca una moto electrica por su numero de serie (vigilante, admin).
+export function buscarPorSerie(numeroSerie: string): Promise<Vehiculo> {
+  return apiGet<Vehiculo>(`/vehiculos/serie/${encodeURIComponent(numeroSerie)}`);
+}
+
+// Nombre del dueno de la moto electrica y si hay carnet para mostrar (vigilante, admin; RN-09).
+export function verPropietarioPorSerie(numeroSerie: string): Promise<PropietarioVigilante> {
+  return apiGet<PropietarioVigilante>(`/vehiculos/serie/${encodeURIComponent(numeroSerie)}/propietario`);
+}
+
+// El carnet del dueno de la moto electrica como archivo (vigilante, admin; RN-09).
+export function descargarCarnetPorSerie(numeroSerie: string): Promise<Blob> {
+  return apiGetBlob(`/vehiculos/serie/${encodeURIComponent(numeroSerie)}/carnet`);
 }
 
 // Datos para crear un vehiculo, por ejemplo de un visitante.

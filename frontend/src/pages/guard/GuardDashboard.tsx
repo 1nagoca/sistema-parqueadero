@@ -3,32 +3,38 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "@/components/common/Button";
 import MapaParqueadero from "@/components/map/MapaParqueadero";
 import PlateReader from "@/components/scanner/PlateReader";
-import PlateSearchBar from "@/components/scanner/PlateSearchBar";
+import PlateSearchBar, { type ModoBusqueda } from "@/components/scanner/PlateSearchBar";
 import QRScanner from "@/components/scanner/QRScanner";
 import CarnetPropietario from "@/components/verificacion/CarnetPropietario";
 import { useAuth } from "@/context/useAuth";
 import { ApiError } from "@/services/api/client";
 import {
-  buscarAccesoActivoPorPlaca,
+  buscarAccesoActivo,
   listarAccesosActivos,
   registrarEntrada,
   registrarSalida,
 } from "@/services/api/accesos";
 import { listarEspacios } from "@/services/api/espacios";
-import { buscarPorPlaca, crearVehiculo } from "@/services/api/vehiculos";
+import { buscarPorPlaca, buscarPorSerie, crearVehiculo } from "@/services/api/vehiculos";
 import type { LecturaPlaca } from "@/services/api/vision";
 import { listarZonas } from "@/services/api/zonas";
 import { useActualizacionesZona } from "@/services/realtime/useActualizacionesZona";
-import type { Acceso, AccesoActivo, Espacio, VehiculoConPlaca, Zona } from "@/types/api";
+import type { Acceso, AccesoActivo, Espacio, MotoBuscada, Vehiculo, VehiculoConPlaca, Zona } from "@/types/api";
 
-// Lo que se muestra al buscar una placa: nada, cargando, ya esta adentro, registrado, visitante que necesita autorizacion o no registrado.
+// Lo que se muestra al buscar una moto: nada, cargando, ya esta adentro, registrada, visitante que necesita autorizacion, no registrada o electrica no registrada.
 type Resultado =
   | { estado: "vacio" }
   | { estado: "cargando" }
-  | { estado: "con_acceso_activo"; placa: string; acceso: Acceso }
-  | { estado: "vehiculo_registrado"; vehiculo: VehiculoConPlaca }
+  | { estado: "con_acceso_activo"; moto: MotoBuscada; acceso: Acceso }
+  | { estado: "vehiculo_registrado"; moto: MotoBuscada; vehiculo: Vehiculo }
   | { estado: "visitante_sin_autorizacion"; vehiculo: VehiculoConPlaca }
-  | { estado: "no_registrado"; placa: string };
+  | { estado: "no_registrado"; placa: string }
+  | { estado: "electrica_no_registrada"; numeroSerie: string };
+
+// Solo una moto con placa puede seguir como visitante (la electrica es de un estudiante).
+function tienePlaca(vehiculo: Vehiculo): vehiculo is VehiculoConPlaca {
+  return vehiculo.placa !== null;
+}
 
 // Panel del vigilante: buscar placa (a mano, con foto o con QR) y registrar entradas y salidas.
 export default function GuardDashboard() {
@@ -39,6 +45,8 @@ export default function GuardDashboard() {
   const [espacioId, setEspacioId] = useState("");
   const [accesosActivos, setAccesosActivos] = useState<AccesoActivo[]>([]);
   const [resultado, setResultado] = useState<Resultado>({ estado: "vacio" });
+  // Que busca el vigilante: placas (con foto y QR) o el serial de una moto electrica.
+  const [modo, setModo] = useState<ModoBusqueda>("placa");
   // Contenedor del resultado, para bajar hasta el carnet al verificar una salida.
   const resultadoRef = useRef<HTMLDivElement>(null);
   const [mostrarScanner, setMostrarScanner] = useState(false);
@@ -104,34 +112,55 @@ export default function GuardDashboard() {
 
   /** `lectura` solo llega cuando la placa la leyo el microservicio de vision; una busqueda
    * manual o por QR la descarta para no marcar el acceso como detectado por ALPR. */
-  async function buscar(placa: string, lectura: LecturaPlaca | null = null) {
+  async function buscar(moto: MotoBuscada, lectura: LecturaPlaca | null = null) {
     setLecturaAlpr(lectura);
     setMostrarScanner(false);
     setMensaje(null);
     setError(null);
     setResultado({ estado: "cargando" });
     try {
-      // Primero mira si ya esta adentro (ofrece salida); si no, si esta registrado (ofrece entrada).
-      const accesoActivo = await buscarAccesoActivoPorPlaca(placa);
+      // Primero mira si ya esta adentro (ofrece salida); si no, si esta registrada (ofrece entrada).
+      const accesoActivo = await buscarAccesoActivo(moto);
       if (accesoActivo) {
         // La salida no consulta a identidad para que funcione aunque identidad este caida.
-        setResultado({ estado: "con_acceso_activo", placa, acceso: accesoActivo });
+        setResultado({ estado: "con_acceso_activo", moto, acceso: accesoActivo });
         return;
       }
       try {
-        const vehiculo = await buscarPorPlaca(placa);
-        setResultado({ estado: "vehiculo_registrado", vehiculo });
+        if ("placa" in moto) {
+          const vehiculo = await buscarPorPlaca(moto.placa);
+          setResultado({ estado: "vehiculo_registrado", moto, vehiculo });
+        } else {
+          const vehiculo = await buscarPorSerie(moto.numeroSerie);
+          // Se muestra el serial como quedo en identidad (con sus guiones).
+          setResultado({
+            estado: "vehiculo_registrado",
+            moto: { numeroSerie: vehiculo.numero_serie ?? moto.numeroSerie },
+            vehiculo,
+          });
+        }
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {
-          setResultado({ estado: "no_registrado", placa });
+          setResultado(
+            "placa" in moto
+              ? { estado: "no_registrado", placa: moto.placa }
+              : { estado: "electrica_no_registrada", numeroSerie: moto.numeroSerie },
+          );
         } else {
           throw err;
         }
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Error buscando la placa");
+      const porDefecto = "placa" in moto ? "Error buscando la placa" : "Error buscando el número de serie";
+      setError(err instanceof ApiError ? err.message : porDefecto);
       setResultado({ estado: "vacio" });
     }
+  }
+
+  // Al cambiar de modo se cierra la camara del QR (solo existe en el modo placa).
+  function cambiarModo(nuevo: ModoBusqueda) {
+    setModo(nuevo);
+    setMostrarScanner(false);
   }
 
   // Marca el acceso como leido por vision si la placa vino de una foto.
@@ -156,7 +185,8 @@ export default function GuardDashboard() {
       fallo instanceof ApiError &&
       fallo.status === 409 &&
       resultado.estado === "vehiculo_registrado" &&
-      resultado.vehiculo.es_visitante
+      resultado.vehiculo.es_visitante &&
+      tienePlaca(resultado.vehiculo)
     ) {
       setResultado({ estado: "visitante_sin_autorizacion", vehiculo: resultado.vehiculo });
     }
@@ -184,8 +214,10 @@ export default function GuardDashboard() {
   }
 
   // Desde la lista abre la misma verificacion que la busqueda (carnet del dueno, RN-09) y baja hasta ella.
-  async function verificarSalida(placa: string) {
-    await buscar(placa);
+  async function verificarSalida(acceso: AccesoActivo) {
+    const electrica = acceso.es_electrica && acceso.numero_serie !== null;
+    cambiarModo(electrica ? "serie" : "placa");
+    await buscar(electrica ? { numeroSerie: acceso.numero_serie ?? "" } : { placa: acceso.placa ?? "" });
     resultadoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -269,23 +301,32 @@ export default function GuardDashboard() {
       </section>
 
       <section className="mb-4 space-y-3 rounded-2xl bg-white p-4 shadow-sm">
-        <PlateSearchBar onBuscar={buscar} buscando={resultado.estado === "cargando"} />
-        <PlateReader onDetectada={(lectura) => buscar(lectura.placa, lectura)} />
-        {lecturaAlpr && (
-          <p className="text-sm text-gray-600">
-            Placa leida por camara: <span className="font-semibold">{lecturaAlpr.placa}</span> (confianza{" "}
-            {Math.round(lecturaAlpr.confianza * 100)}%)
-          </p>
+        <PlateSearchBar
+          modo={modo}
+          onCambiarModo={cambiarModo}
+          onBuscar={(moto) => buscar(moto)}
+          buscando={resultado.estado === "cargando"}
+        />
+        {modo === "placa" && (
+          <>
+            <PlateReader onDetectada={(lectura) => buscar({ placa: lectura.placa }, lectura)} />
+            {lecturaAlpr && (
+              <p className="text-sm text-gray-600">
+                Placa leida por camara: <span className="font-semibold">{lecturaAlpr.placa}</span> (confianza{" "}
+                {Math.round(lecturaAlpr.confianza * 100)}%)
+              </p>
+            )}
+            <Button
+              type="button"
+              variante="secundaria"
+              className="w-full"
+              onClick={() => setMostrarScanner((valor) => !valor)}
+            >
+              {mostrarScanner ? "Cerrar camara" : "Escanear QR"}
+            </Button>
+            <QRScanner activo={mostrarScanner} onDetectado={(placa) => buscar({ placa })} />
+          </>
         )}
-        <Button
-          type="button"
-          variante="secundaria"
-          className="w-full"
-          onClick={() => setMostrarScanner((valor) => !valor)}
-        >
-          {mostrarScanner ? "Cerrar camara" : "Escanear QR"}
-        </Button>
-        <QRScanner activo={mostrarScanner} onDetectado={(placa) => buscar(placa)} />
       </section>
 
       {mensaje && <p className="mb-4 rounded-xl bg-emerald-100 p-3 text-emerald-800">{mensaje}</p>}
@@ -301,11 +342,18 @@ export default function GuardDashboard() {
           <ul className="divide-y divide-gray-100">
             {accesosActivos.map((acceso) => (
               <li key={acceso.id} className="flex items-center justify-between gap-3 py-3">
-                <div>
-                  <p className="font-medium text-gray-900">
-                    {acceso.placa}
+                <div className="min-w-0">
+                  <p className="break-words font-medium text-gray-900">
+                    {acceso.es_electrica ? (
+                      <>
+                        <span className="block text-xs font-medium text-emerald-700">Moto eléctrica</span>
+                        <span className="whitespace-nowrap font-mono">{acceso.numero_serie}</span>
+                      </>
+                    ) : (
+                      acceso.placa
+                    )}
                     {acceso.espacio_codigo && (
-                      <span className="ml-2 text-sm font-normal text-gray-500">({acceso.espacio_codigo})</span>
+                      <span className="ml-2 whitespace-nowrap text-sm font-normal text-gray-500">({acceso.espacio_codigo})</span>
                     )}
                     {acceso.tipo_acceso === "visitante" && (
                       <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800">
@@ -321,7 +369,7 @@ export default function GuardDashboard() {
                   variante="secundaria"
                   disabled={procesando}
                   className="min-h-10 px-4 py-2 text-sm"
-                  onClick={() => verificarSalida(acceso.placa)}
+                  onClick={() => verificarSalida(acceso)}
                 >
                   Verificar salida
                 </Button>
@@ -390,7 +438,8 @@ function ResultadoPanel({
   if (resultado.estado === "vacio") {
     return (
       <p className="rounded-2xl bg-white p-6 text-center text-gray-400 shadow-sm">
-        Busca una placa, lee una con foto o escanea un QR para comenzar.
+        Busca una placa o el número de serie de una moto eléctrica, lee una placa con foto o escanea un QR para
+        comenzar.
       </p>
     );
   }
@@ -402,11 +451,11 @@ function ResultadoPanel({
   if (resultado.estado === "con_acceso_activo") {
     return (
       <div className="rounded-2xl bg-white p-4 shadow-sm">
-        <p className="text-lg font-semibold text-gray-900">{resultado.placa}</p>
+        <NombreMoto moto={resultado.moto} />
         <p className="text-sm text-gray-500">
           Dentro desde {new Date(resultado.acceso.fecha_hora_entrada).toLocaleString("es-CO")}
         </p>
-        {resultado.acceso.tipo_acceso !== "visitante" && <CarnetPropietario placa={resultado.placa} />}
+        {resultado.acceso.tipo_acceso !== "visitante" && <CarnetPropietario moto={resultado.moto} />}
         <Button
           variante="peligro"
           className="mt-4 w-full"
@@ -422,9 +471,11 @@ function ResultadoPanel({
   if (resultado.estado === "vehiculo_registrado") {
     return (
       <div className="rounded-2xl bg-white p-4 shadow-sm">
-        <p className="text-lg font-semibold text-gray-900">{resultado.vehiculo.placa}</p>
-        <p className="text-sm text-gray-500">{resultado.vehiculo.tipo_vehiculo}</p>
-        {!resultado.vehiculo.es_visitante && <CarnetPropietario placa={resultado.vehiculo.placa} />}
+        <NombreMoto moto={resultado.moto} />
+        {!resultado.vehiculo.es_electrica && (
+          <p className="text-sm text-gray-500">{resultado.vehiculo.tipo_vehiculo}</p>
+        )}
+        {!resultado.vehiculo.es_visitante && <CarnetPropietario moto={resultado.moto} />}
         <Button
           className="mt-4 w-full"
           disabled={procesando || sinCupos || !puesto}
@@ -454,6 +505,17 @@ function ResultadoPanel({
     );
   }
 
+  if (resultado.estado === "electrica_no_registrada") {
+    return (
+      <div className="rounded-2xl bg-white p-4 shadow-sm">
+        <NombreMoto moto={{ numeroSerie: resultado.numeroSerie }} />
+        <p className="mt-2 text-sm text-amber-600">
+          Moto eléctrica no registrada: la registra el estudiante desde su panel y la aprueba el administrador
+        </p>
+      </div>
+    );
+  }
+
   return (
     <FormularioVisitante
       placa={resultado.placa}
@@ -463,6 +525,19 @@ function ResultadoPanel({
       puesto={puesto}
       onConfirmar={onRegistrarVehiculoVisitante}
     />
+  );
+}
+
+// La placa como hoy, o «Moto eléctrica» y el numero de serie.
+function NombreMoto({ moto }: { moto: MotoBuscada }) {
+  if ("placa" in moto) {
+    return <p className="text-lg font-semibold text-gray-900">{moto.placa}</p>;
+  }
+  return (
+    <>
+      <p className="text-xs font-medium text-emerald-700">Moto eléctrica</p>
+      <p className="break-all font-mono text-lg font-semibold text-gray-900">{moto.numeroSerie}</p>
+    </>
   );
 }
 

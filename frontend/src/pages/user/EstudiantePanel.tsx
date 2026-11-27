@@ -153,8 +153,17 @@ function TarjetaMiMoto({ hayVehiculoAprobado }: { hayVehiculoAprobado: boolean }
         <p className="text-sm text-gray-500">Ninguna de tus motos esta en el parqueadero ahora.</p>
       ) : (
         accesos.map((acceso) => (
-          <p key={acceso.placa} className="break-words text-gray-900">
-            Tu moto <span className="font-semibold">{acceso.placa}</span> esta{" "}
+          <p key={acceso.placa ?? acceso.numero_serie} className="break-words text-gray-900">
+            {acceso.es_electrica ? (
+              <>
+                Tu moto eléctrica <span className="font-mono font-semibold">{acceso.numero_serie}</span>
+              </>
+            ) : (
+              <>
+                Tu moto <span className="font-semibold">{acceso.placa}</span>
+              </>
+            )}{" "}
+            esta{" "}
             {acceso.espacio_codigo ? (
               <>
                 en el puesto <span className="whitespace-nowrap font-semibold">{acceso.espacio_codigo}</span>

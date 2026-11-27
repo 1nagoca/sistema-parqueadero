@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 
-import { descargarCarnetPropietario, verPropietario } from "@/services/api/vehiculos";
+import {
+  descargarCarnetPorSerie,
+  descargarCarnetPropietario,
+  verPropietario,
+  verPropietarioPorSerie,
+} from "@/services/api/vehiculos";
+import type { MotoBuscada } from "@/types/api";
 
 // Lo que se muestra mientras carga, si no hay carnet o con el carnet listo.
 type Estado =
@@ -8,12 +14,16 @@ type Estado =
   | { tipo: "sin_carnet"; nombre: string | null }
   | { tipo: "listo"; nombre: string; url: string; esPdf: boolean };
 
-/** RN-09: nombre y carnet del dueno para que el vigilante confirme quien trae la moto. El carnet
- *  se baja con el token y se muestra desde una URL local (blob:) que se libera al desmontar o al
- *  cambiar de placa. Si algo falla no bloquea la entrada ni la salida. */
-export default function CarnetPropietario({ placa }: { placa: string }) {
+/** RN-09: nombre y carnet del dueno para que el vigilante confirme quien trae la moto (por su
+ *  placa o, si es electrica, por su numero de serie). El carnet se baja con el token y se muestra
+ *  desde una URL local (blob:) que se libera al desmontar o al cambiar de moto. Si algo falla no
+ *  bloquea la entrada ni la salida. */
+export default function CarnetPropietario({ moto }: { moto: MotoBuscada }) {
   const [estado, setEstado] = useState<Estado>({ tipo: "cargando" });
   const [ampliado, setAmpliado] = useState(false);
+  // Texto y no el objeto: el efecto se recarga solo si cambia la placa o el serial.
+  const placa = "placa" in moto ? moto.placa : null;
+  const serie = "numeroSerie" in moto ? moto.numeroSerie : null;
 
   useEffect(() => {
     let creada: string | null = null;
@@ -24,10 +34,11 @@ export default function CarnetPropietario({ placa }: { placa: string }) {
     (async () => {
       let nombre: string | null = null;
       try {
-        const propietario = await verPropietario(placa);
+        const propietario = placa !== null ? await verPropietario(placa) : await verPropietarioPorSerie(serie ?? "");
         nombre = propietario.nombre_completo;
         if (!propietario.tiene_carnet) throw new Error("Sin carnet");
-        const blob = await descargarCarnetPropietario(placa);
+        const blob =
+          placa !== null ? await descargarCarnetPropietario(placa) : await descargarCarnetPorSerie(serie ?? "");
         if (cancelado) return;
         creada = URL.createObjectURL(blob);
         setEstado({ tipo: "listo", nombre, url: creada, esPdf: blob.type === "application/pdf" });
@@ -39,7 +50,7 @@ export default function CarnetPropietario({ placa }: { placa: string }) {
       cancelado = true;
       if (creada) URL.revokeObjectURL(creada);
     };
-  }, [placa]);
+  }, [placa, serie]);
 
   if (estado.tipo === "cargando") {
     return <p className="mt-3 text-sm text-gray-400">Cargando dueño...</p>;

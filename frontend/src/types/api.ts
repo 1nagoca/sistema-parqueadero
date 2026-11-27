@@ -42,6 +42,9 @@ export interface Vehiculo {
   creado_en: string;
 }
 
+// La moto que busca el vigilante: por su placa o, si es electrica, por su numero de serie.
+export type MotoBuscada = { placa: string } | { numeroSerie: string };
+
 // Moto con placa: la que devuelven la busqueda por placa y el registro de visitantes.
 export interface VehiculoConPlaca extends Vehiculo {
   placa: string;
@@ -137,15 +140,19 @@ export interface Acceso {
   confianza_alpr: string | null;
 }
 
-// Acceso abierto con su placa y el codigo del espacio.
+// Acceso abierto con su placa (o el serial de la electrica) y el codigo del espacio.
 export interface AccesoActivo extends Acceso {
-  placa: string;
+  placa: string | null;
+  es_electrica: boolean;
+  numero_serie: string | null;
   espacio_codigo: string | null;
 }
 
 // Lo que ve el estudiante de su moto adentro.
 export interface MiAcceso {
-  placa: string;
+  placa: string | null;
+  es_electrica: boolean;
+  numero_serie: string | null;
   espacio_codigo: string | null;
   fecha_hora_entrada: string;
 }
