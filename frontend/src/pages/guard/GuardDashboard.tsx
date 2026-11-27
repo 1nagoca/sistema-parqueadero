@@ -123,7 +123,9 @@ export default function GuardDashboard() {
       const accesoActivo = await buscarAccesoActivo(moto);
       if (accesoActivo) {
         // La salida no consulta a identidad para que funcione aunque identidad este caida.
-        setResultado({ estado: "con_acceso_activo", moto, acceso: accesoActivo });
+        // El serial guardado (con sus guiones), aunque se haya buscado sin ellos.
+        const guardada = accesoActivo.numero_serie ? { numeroSerie: accesoActivo.numero_serie } : moto;
+        setResultado({ estado: "con_acceso_activo", moto: guardada, acceso: accesoActivo });
         return;
       }
       try {

@@ -138,6 +138,8 @@ export interface Acceso {
   justificacion: string | null;
   placa_detectada_por_alpr: boolean;
   confianza_alpr: string | null;
+  es_electrica: boolean;
+  numero_serie: string | null;
 }
 
 // Acceso abierto con su placa (o el serial de la electrica) y el codigo del espacio.
@@ -262,7 +264,9 @@ export interface AuditoriaAcceso {
 
 // Datos del acceso de una traza (bitacora de accesos).
 export interface DetalleAcceso {
-  placa: string;
+  placa: string | null;
+  es_electrica: boolean;
+  numero_serie: string | null;
   tipo_acceso: TipoAcceso;
   zona_id: string;
   espacio_codigo: string | null;
@@ -274,4 +278,5 @@ export interface DetalleVerificacion {
   nombre: string | null;
   rol: RolUsuario | null;
   placa: string | null;
+  numero_serie: string | null;
 }

@@ -34,7 +34,7 @@ CAMPOS = {
     "id", "tabla_afectada", "registro_id", "accion", "valores_anteriores", "valores_nuevos",
     "realizado_por_id", "motivo", "fecha_hora", "ip_origen", "detalle", "realizado_por_nombre",
 }
-ESTUDIANTE = {"nombre": "Estudiante Prueba", "rol": "estudiante", "placa": None}
+ESTUDIANTE = {"nombre": "Estudiante Prueba", "rol": "estudiante", "placa": None, "numero_serie": None}
 
 
 def _trazas_de(client, admin, registro_id, **params):
@@ -88,8 +88,38 @@ def test_rechazar_y_aprobar_al_estudiante_y_su_moto_traen_quien_y_que(client, su
     assert rechazo["valores_nuevos"] == {"estado_verificacion": "rechazado"} and rechazo["motivo"] == "Carnet ilegible"
 
     (moto,) = _trazas_de(client, admin, vehiculo_id)
-    assert moto["detalle"] == {"nombre": "Estudiante Prueba", "rol": "estudiante", "placa": _placa_de(vehiculo_id)}
+    assert moto["detalle"] == {
+        "nombre": "Estudiante Prueba", "rol": "estudiante", "placa": _placa_de(vehiculo_id), "numero_serie": None,
+    }
     assert moto["realizado_por_nombre"] == "Admin Prueba"
+
+
+def test_rechazar_y_aprobar_una_electrica_traen_al_dueno_y_su_serial(client, sufijo):
+    _, admin = _personal(client, RolUsuario.ADMIN, sufijo)
+    assert _registrar(client, sufijo).status_code == 201
+    est = _login(client, f"est-{sufijo}@ufps.edu.co", "clave-segura-1")
+    serie = "EB-" + uuid.uuid4().hex[:10].upper()
+    r = client.post(
+        f"{API}/vehiculos/mis-vehiculos",
+        headers=est,
+        data={"es_electrica": "true", "numero_serie": serie},
+        files={
+            "foto_serial": ("serial.png", PNG, "image/png"),
+            "tarjeta_propiedad": ("factura.png", PNG, "image/png"),
+        },
+    )
+    assert r.status_code == 201, r.text
+    vehiculo_id = r.json()["id"]
+    resolver = f"{API}/verificaciones/vehiculos/{vehiculo_id}/resolver"
+    assert client.post(resolver, headers=admin, json={"aprobar": False, "motivo": "Serial borroso"}).status_code == 200
+    assert client.post(resolver, headers=admin, json={"aprobar": True}).status_code == 200
+
+    rechazo, aprobacion = _trazas_de(client, admin, vehiculo_id)
+    for traza in (rechazo, aprobacion):
+        assert traza["detalle"] == {"nombre": "Estudiante Prueba", "rol": "estudiante", "placa": None, "numero_serie": serie}
+        assert traza["realizado_por_nombre"] == "Admin Prueba"
+    assert rechazo["valores_nuevos"] == {"estado_verificacion": "rechazado"}
+    assert aprobacion["valores_nuevos"] == {"estado_verificacion": "aprobado"}
 
 
 def test_moto_de_visitante_sin_dueno_trae_la_placa_sin_nombre(client, sufijo):
@@ -103,7 +133,7 @@ def test_moto_de_visitante_sin_dueno_trae_la_placa_sin_nombre(client, sufijo):
     _insertar_trazas(dict(tabla_afectada="vehiculos", registro_id=vehiculo_id, realizado_por_id=uuid.UUID(admin_id)))
 
     (traza,) = _trazas_de(client, admin, vehiculo_id)
-    assert traza["detalle"] == {"nombre": None, "rol": None, "placa": placa}
+    assert traza["detalle"] == {"nombre": None, "rol": None, "placa": placa, "numero_serie": None}
     assert traza["realizado_por_nombre"] == "Admin Prueba"
 
 
@@ -123,7 +153,9 @@ def test_baja_y_reactivacion_del_estudiante_traen_al_estudiante_y_su_moto(client
 
     _, rechazada = _trazas_de(client, admin, vehiculo_id)
     assert rechazada["valores_nuevos"] == {"estado_verificacion": "rechazado"}
-    assert rechazada["detalle"] == {"nombre": "Estudiante Prueba", "rol": "estudiante", "placa": _placa_de(vehiculo_id)}
+    assert rechazada["detalle"] == {
+        "nombre": "Estudiante Prueba", "rol": "estudiante", "placa": _placa_de(vehiculo_id), "numero_serie": None,
+    }
 
 
 def test_vigilante_dado_de_baja_trae_su_rol(client, sufijo):
@@ -133,7 +165,7 @@ def test_vigilante_dado_de_baja_trae_su_rol(client, sufijo):
     assert r.status_code == 200, r.text
 
     (traza,) = _trazas_de(client, admin, vigilante_id)
-    assert traza["detalle"] == {"nombre": "Vigilante Prueba", "rol": "vigilante", "placa": None}
+    assert traza["detalle"] == {"nombre": "Vigilante Prueba", "rol": "vigilante", "placa": None, "numero_serie": None}
 
 
 def test_traza_sin_registro_trae_detalle_null_y_el_autor(client, sufijo):

@@ -45,8 +45,6 @@ def listar_accesos_activos(
         AccesoActivoRead(
             **AccesoRead.model_validate(acceso).model_dump(),
             placa=acceso.placa,
-            es_electrica=acceso.es_electrica,
-            numero_serie=acceso.numero_serie,
             espacio_codigo=codigos.get(acceso.espacio_id),
         )
         for acceso in accesos

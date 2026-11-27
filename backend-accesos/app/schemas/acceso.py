@@ -50,6 +50,9 @@ class AccesoRead(BaseModel):
     justificacion: str | None
     placa_detectada_por_alpr: bool
     confianza_alpr: Decimal | None
+    # La moto electrica: el panel muestra el serial guardado aunque se haya buscado sin guiones.
+    es_electrica: bool
+    numero_serie: str | None
 
 
 # Un acceso abierto con su placa (o serial si es electrica) y el codigo del espacio, para la lista de vehiculos adentro.

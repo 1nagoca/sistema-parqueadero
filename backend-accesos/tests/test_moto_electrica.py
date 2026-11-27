@@ -86,6 +86,8 @@ def test_buscar_por_serial_con_espacios_minusculas_y_sin_guion(client, admin, pa
         r = _buscar(client, admin, numero_serie=consulta)
         assert r.status_code == 200, (consulta, r.text)
         assert r.json()["id"] == acceso_id
+        # el serial guardado, con sus guiones, aunque se busque sin ellos
+        assert r.json()["es_electrica"] is True and r.json()["numero_serie"] == serie
 
 
 def test_buscar_exige_placa_o_serial_y_solo_uno(client, admin, parqueadero, identidad):
@@ -174,14 +176,14 @@ def test_la_salida_es_como_la_de_las_demas(client, admin, parqueadero, identidad
     assert _buscar(client, admin, numero_serie=moto["serie"]).status_code == 404
 
 
-def test_la_traza_de_su_entrada_no_da_500(client, admin, parqueadero, identidad):
+def test_la_traza_de_su_entrada_trae_el_serial(client, admin, parqueadero, identidad):
     moto = _electrica(identidad)
     acceso_id = _entrada(client, admin, moto["id"]).json()["id"]
     r = client.get(f"{API}/auditoria", headers=admin, params={"tabla_afectada": "accesos", "por_pagina": 200})
     assert r.status_code == 200, r.text
     (traza,) = [t for t in r.json()["items"] if t["registro_id"] == acceso_id]
-    # hasta la E5 el detalle de la electrica sale vacio y el frontend la muestra en JSON
-    assert traza["detalle"] is None
+    detalle = traza["detalle"]
+    assert detalle["placa"] is None and detalle["es_electrica"] is True and detalle["numero_serie"] == moto["serie"]
 
 
 @pytest.mark.parametrize(

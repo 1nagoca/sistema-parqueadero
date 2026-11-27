@@ -117,7 +117,16 @@ def listar_auditoria(
             Acceso,
             and_(AuditoriaAcceso.tabla_afectada == "accesos", Acceso.id == AuditoriaAcceso.registro_id),
         )
-        .add_columns(Acceso.placa, Acceso.tipo_acceso, Acceso.zona_id, Acceso.espacio_id, Acceso.duracion_minutos)
+        .add_columns(
+            Acceso.id.label("acceso_id"),
+            Acceso.placa,
+            Acceso.es_electrica,
+            Acceso.numero_serie,
+            Acceso.tipo_acceso,
+            Acceso.zona_id,
+            Acceso.espacio_id,
+            Acceso.duracion_minutos,
+        )
         .order_by(AuditoriaAcceso.fecha_hora.desc(), AuditoriaAcceso.id.desc())
         .offset((pagina - 1) * por_pagina)
         .limit(por_pagina)
@@ -138,13 +147,15 @@ def _codigos_de_la_pagina(espacio_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
         return {}
 
 
-# Detalle de una traza de acceso; None si no es de un acceso o el acceso ya no existe.
+# Detalle de una traza de acceso; None si no es de un acceso o el acceso ya no existe (se mira el id, no la placa).
 def _detalle(fila, codigos: dict[uuid.UUID, str]) -> DetalleAcceso | None:
     traza = fila[0]
-    if fila.placa is None:
+    if fila.acceso_id is None:
         return None
     return DetalleAcceso(
         placa=fila.placa,
+        es_electrica=fila.es_electrica,
+        numero_serie=fila.numero_serie,
         tipo_acceso=fila.tipo_acceso,
         zona_id=fila.zona_id,
         espacio_codigo=codigos.get(fila.espacio_id),

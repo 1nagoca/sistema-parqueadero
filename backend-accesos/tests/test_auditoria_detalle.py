@@ -16,6 +16,8 @@ from app.db.session import SessionLocal  # noqa: E402
 from app.models.auditoria_acceso import AuditoriaAcceso  # noqa: E402
 from app.models.enums import AccionAuditoria  # noqa: E402
 from app.parqueadero_client import client as parqueadero_client  # noqa: E402
+from sqlalchemy import text  # noqa: E402
+from test_moto_electrica import _electrica  # noqa: E402
 from test_accesos import (  # noqa: E402, F401
     _entrada_visitante,
     admin,
@@ -76,6 +78,8 @@ def test_entrada_y_salida_traen_placa_tipo_zona_puesto_y_la_duracion_solo_en_la_
     assert set(trazas["creacion"]) == CAMPOS
     assert trazas["creacion"]["detalle"] == {
         "placa": entrada["placa"],
+        "es_electrica": False,
+        "numero_serie": None,
         "tipo_acceso": "normal",
         "zona_id": entrada["zona_id"],
         "espacio_codigo": "B-12",
@@ -170,3 +174,41 @@ def test_una_pagina_sin_trazas_de_accesos_no_consulta_a_parqueadero(client, admi
     r = client.get(f"{API}/auditoria", headers=admin, params={"tabla_afectada": f"vacia-{uuid.uuid4().hex[:8]}"})
     assert r.status_code == 200 and r.json()["items"] == []
     assert codigos.llamadas == []
+
+
+def test_la_electrica_trae_su_serial_en_la_entrada_y_la_salida(client, admin, identidad, codigos):
+    moto = _electrica(identidad)
+    espacio_id = uuid.uuid4()
+    codigos.nombres[espacio_id] = "W-05"
+    zona_id = str(uuid.uuid4())
+    r = client.post(
+        f"{API}/accesos/entrada",
+        headers=admin,
+        json={"vehiculo_id": moto["id"], "zona_id": zona_id, "espacio_id": str(espacio_id)},
+    )
+    assert r.status_code == 201, r.text
+    acceso_id = r.json()["id"]
+    salida = client.post(f"{API}/accesos/{acceso_id}/salida", headers=admin)
+    assert salida.status_code == 200, salida.text
+
+    trazas = _trazas_de(client, admin, acceso_id)
+    assert trazas["creacion"]["detalle"] == {
+        "placa": None,
+        "es_electrica": True,
+        "numero_serie": moto["serie"],
+        "tipo_acceso": "normal",
+        "zona_id": zona_id,
+        "espacio_codigo": "W-05",
+        "duracion_minutos": None,
+    }
+    assert trazas["actualizacion"]["detalle"] == {
+        **trazas["creacion"]["detalle"],
+        "duracion_minutos": salida.json()["duracion_minutos"],
+    }
+
+    # si la fila del acceso ya no existe (cierre de semestre), sus trazas quedan sin detalle
+    with SessionLocal() as db:
+        db.execute(text("DELETE FROM accesos WHERE id = :id"), {"id": acceso_id})
+        db.commit()
+    trazas = _trazas_de(client, admin, acceso_id)
+    assert trazas["creacion"]["detalle"] is None and trazas["actualizacion"]["detalle"] is None

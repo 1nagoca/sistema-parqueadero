@@ -36,6 +36,12 @@ function duracion(minutos: number): string {
   return `${Math.floor(minutos / 60)} h ${String(minutos % 60).padStart(2, "0")} min`;
 }
 
+// La moto en una frase: «moto ABC12D» o «moto eléctrica EB-…»; null si falta la placa o el serial.
+function nombreDeMoto(placa: string | null, numeroSerie: string | null | undefined): string | null {
+  if (numeroSerie) return `moto eléctrica ${numeroSerie}`;
+  return placa ? `moto ${placa}` : null;
+}
+
 // 1 acceso, 3 accesos.
 function plural(cantidad: number, palabra: string): string {
   return `${cantidad} ${palabra}${cantidad === 1 ? "" : "s"}`;
@@ -45,17 +51,19 @@ function plural(cantidad: number, palabra: string): string {
 function fraseDeAcceso(traza: AuditoriaAcceso, autor: string | null, zonas: Record<string, string>): string | null {
   const detalle = traza.detalle as DetalleAcceso | null | undefined;
   if (!detalle) return null;
+  const moto = nombreDeMoto(detalle.placa, detalle.numero_serie);
+  if (!moto) return null;
   if (traza.accion === "creacion") {
     const visitante = detalle.tipo_acceso === "visitante" ? " (visitante)" : "";
     const zona = zonas[detalle.zona_id];
     let destino = "";
     if (detalle.espacio_codigo) destino = ` al puesto ${detalle.espacio_codigo}${zona ? ` de ${zona}` : ""}`;
     else if (zona) destino = ` a ${zona}`;
-    return conAutor(`Entrada de la moto ${detalle.placa}${visitante}${destino}`, autor, ", registrada por ");
+    return conAutor(`Entrada de la ${moto}${visitante}${destino}`, autor, ", registrada por ");
   }
   if (traza.accion === "actualizacion") {
     const tras = detalle.duracion_minutos != null ? ` tras ${duracion(detalle.duracion_minutos)}` : "";
-    return conAutor(`Salida de la moto ${detalle.placa}${tras}`, autor, ", registrada por ");
+    return conAutor(`Salida de la ${moto}${tras}`, autor, ", registrada por ");
   }
   return null;
 }
@@ -96,9 +104,11 @@ function fraseDeUsuario(traza: AuditoriaAcceso, autor: string | null): string | 
 function fraseDeVehiculo(traza: AuditoriaAcceso, autor: string | null): string | null {
   const detalle = traza.detalle as DetalleVerificacion | null | undefined;
   const estado = traza.valores_nuevos?.estado_verificacion;
-  if (!detalle?.placa || (estado !== "aprobado" && estado !== "rechazado")) return null;
+  const moto = detalle ? nombreDeMoto(detalle.placa, detalle.numero_serie) : null;
+  if (!detalle || !moto || (estado !== "aprobado" && estado !== "rechazado")) return null;
   const dueno = detalle.nombre ? ` de ${detalle.nombre}` : " (visitante)";
-  return conAutor(`Moto ${detalle.placa}${dueno} ${estado === "aprobado" ? "aprobada" : "rechazada"}`, autor, " por ");
+  const motoEnMayuscula = moto.charAt(0).toUpperCase() + moto.slice(1);
+  return conAutor(`${motoEnMayuscula}${dueno} ${estado === "aprobado" ? "aprobada" : "rechazada"}`, autor, " por ");
 }
 
 // Un puesto que entra en mantenimiento (con su motivo) o que se habilita (con cuanto duro).

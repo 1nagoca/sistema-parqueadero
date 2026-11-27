@@ -128,7 +128,9 @@ def listar_auditoria(
         .add_columns(
             afectado.nombre_completo.label("afectado_nombre"),
             afectado.rol.label("afectado_rol"),
+            Vehiculo.id.label("vehiculo_id"),
             Vehiculo.placa.label("placa"),
+            Vehiculo.numero_serie.label("numero_serie"),
             dueno.nombre_completo.label("dueno_nombre"),
             dueno.rol.label("dueno_rol"),
             autor.nombre_completo.label("autor_nombre"),
@@ -141,10 +143,12 @@ def listar_auditoria(
     return [(fila[0], _detalle(fila), fila.autor_nombre) for fila in filas], total
 
 
-# Detalle de una traza segun su tabla; None si no es de usuarios o vehiculos o el registro no existe.
+# Detalle de una traza segun su tabla; None si no es de usuarios o vehiculos o el registro no existe (por su id).
 def _detalle(fila) -> DetalleVerificacion | None:
     if fila.afectado_nombre is not None:
-        return DetalleVerificacion(nombre=fila.afectado_nombre, rol=fila.afectado_rol, placa=None)
-    if fila.placa is not None:
-        return DetalleVerificacion(nombre=fila.dueno_nombre, rol=fila.dueno_rol, placa=fila.placa)
+        return DetalleVerificacion(nombre=fila.afectado_nombre, rol=fila.afectado_rol, placa=None, numero_serie=None)
+    if fila.vehiculo_id is not None:
+        return DetalleVerificacion(
+            nombre=fila.dueno_nombre, rol=fila.dueno_rol, placa=fila.placa, numero_serie=fila.numero_serie
+        )
     return None

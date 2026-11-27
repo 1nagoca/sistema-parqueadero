@@ -10,7 +10,10 @@ from app.models.enums import AccionAuditoria, TipoAcceso
 
 # Datos del acceso de una traza para escribirla en frases; el nombre de la zona y de quien la registro los pone el panel.
 class DetalleAcceso(BaseModel):
-    placa: str
+    # Sin placa si es una moto electrica: va con su numero de serie.
+    placa: str | None
+    es_electrica: bool
+    numero_serie: str | None
     tipo_acceso: TipoAcceso
     zona_id: uuid.UUID
     espacio_codigo: str | None

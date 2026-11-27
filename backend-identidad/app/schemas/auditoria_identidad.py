@@ -8,11 +8,12 @@ from pydantic import BaseModel, ConfigDict
 from app.models.enums import AccionAuditoria, RolUsuario
 
 
-# A quien se refiere una traza: en usuarios, el usuario; en vehiculos, la placa y su dueno (null si es de visitante).
+# A quien se refiere una traza: en usuarios, el usuario; en vehiculos, la placa (o el serial de la electrica) y su dueno (null si es de visitante).
 class DetalleVerificacion(BaseModel):
     nombre: str | None
     rol: RolUsuario | None
     placa: str | None
+    numero_serie: str | None
 
 
 # Una traza de la bitacora de verificaciones.
