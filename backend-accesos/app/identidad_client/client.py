@@ -21,7 +21,8 @@ class VehiculoIdentidad:
     """Lo que accesos necesita saber de un vehiculo para registrar su entrada."""
 
     id: uuid.UUID
-    placa: str
+    # None si es una moto electrica: va por su numero de serie.
+    placa: str | None
     es_visitante: bool
     estado_verificacion: str
     # None cuando el vehiculo no tiene dueno registrado (visitante).
@@ -29,6 +30,9 @@ class VehiculoIdentidad:
     propietario_estado_verificacion: str | None
     # False si el dueno fue dado de baja (RN-08).
     propietario_activo: bool | None
+    # Moto electrica sin placa; una identidad sin estos campos se lee como moto con placa.
+    es_electrica: bool = False
+    numero_serie: str | None = None
 
 
 # Pide a identidad un vehiculo por su id (si no existe, VehiculoNoEncontradoError).
@@ -41,9 +45,15 @@ def obtener_vehiculo(vehiculo_id: uuid.UUID) -> VehiculoIdentidad:
     cuerpo = _json(respuesta)
     try:
         propietario = cuerpo["propietario"]
+        placa = cuerpo["placa"]
+        es_electrica = bool(cuerpo.get("es_electrica", False))
+        numero_serie = cuerpo.get("numero_serie")
+        # placa o serial segun el tipo; si no cuadran (el CHECK de accesos fallaria), es una respuesta inesperada
+        if (placa is None) != es_electrica or (numero_serie is None) == es_electrica:
+            raise IdentidadNoDisponibleError("El servicio de identidad no esta disponible")
         return VehiculoIdentidad(
             id=uuid.UUID(cuerpo["id"]),
-            placa=str(cuerpo["placa"]),
+            placa=None if placa is None else str(placa),
             es_visitante=bool(cuerpo["es_visitante"]),
             estado_verificacion=str(cuerpo["estado_verificacion"]),
             propietario_id=uuid.UUID(propietario["id"]) if propietario is not None else None,
@@ -51,6 +61,8 @@ def obtener_vehiculo(vehiculo_id: uuid.UUID) -> VehiculoIdentidad:
                 str(propietario["estado_verificacion"]) if propietario is not None else None
             ),
             propietario_activo=bool(propietario["activo"]) if propietario is not None else None,
+            es_electrica=es_electrica,
+            numero_serie=None if numero_serie is None else str(numero_serie),
         )
     except (KeyError, TypeError, ValueError, AttributeError) as exc:
         raise IdentidadNoDisponibleError("El servicio de identidad no esta disponible") from exc

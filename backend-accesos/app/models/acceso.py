@@ -29,9 +29,16 @@ acceso_tipo_enum = ENUM(
 # Tabla accesos: cada entrada y salida de un vehiculo.
 class Acceso(Base):
     __tablename__ = "accesos"
-    # Reglas: placa en mayusculas, salida despues de entrada, visitante autorizado y un acceso abierto por vehiculo.
+    # Reglas: placa (o serial de la electrica) en mayusculas, salida despues de entrada, visitante autorizado y un acceso abierto por vehiculo.
     __table_args__ = (
         CheckConstraint("placa = upper(placa)", name="ck_accesos_placa_mayusculas"),
+        CheckConstraint(
+            "(es_electrica = false AND placa IS NOT NULL AND numero_serie IS NULL)"
+            " OR (es_electrica = true AND placa IS NULL AND numero_serie IS NOT NULL)",
+            name="ck_accesos_placa_o_numero_serie",
+        ),
+        CheckConstraint("numero_serie = upper(numero_serie)", name="ck_accesos_numero_serie_mayusculas"),
+        CheckConstraint("es_electrica = false OR tipo_acceso = 'normal'", name="ck_accesos_electrica_solo_normal"),
         CheckConstraint(
             "fecha_hora_salida IS NULL OR fecha_hora_salida > fecha_hora_entrada",
             name="ck_accesos_salida_posterior_entrada",
@@ -57,9 +64,11 @@ class Acceso(Base):
     # Vehiculo y usuarios pertenecen al servicio de identidad: aqui solo se guarda su
     # identificador, sin llave foranea.
     vehiculo_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    # Copia de la placa al registrar la entrada: la lista de vehiculos adentro, la busqueda
-    # por placa y las salidas no dependen de identidad.
-    placa: Mapped[str] = mapped_column(String(10), nullable=False)
+    # Copia de la placa (o del serial de la electrica) al registrar la entrada: la lista de
+    # vehiculos adentro, la busqueda y las salidas no dependen de identidad.
+    placa: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    es_electrica: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    numero_serie: Mapped[str | None] = mapped_column(String(17), nullable=True)
     # Conductor al momento del ingreso; puede diferir del dueno registrado del vehiculo
     # (ej. prestamo).
     usuario_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)

@@ -52,16 +52,20 @@ class AccesoRead(BaseModel):
     confianza_alpr: Decimal | None
 
 
-# Un acceso abierto con su placa y el codigo del espacio, para la lista de vehiculos adentro.
+# Un acceso abierto con su placa (o serial si es electrica) y el codigo del espacio, para la lista de vehiculos adentro.
 class AccesoActivoRead(AccesoRead):
     """AccesoRead + datos denormalizados para listar 'vehiculos adentro' sin N+1 requests."""
 
-    placa: str
+    placa: str | None
+    es_electrica: bool
+    numero_serie: str | None
     espacio_codigo: str | None = None
 
 
-# Lo que ve el estudiante de su moto adentro: solo placa, puesto y hora de entrada (Ley 1581).
+# Lo que ve el estudiante de su moto adentro: solo placa (o serial), puesto y hora de entrada (Ley 1581).
 class MiAccesoRead(BaseModel):
-    placa: str
+    placa: str | None
+    es_electrica: bool
+    numero_serie: str | None
     espacio_codigo: str | None
     fecha_hora_entrada: datetime

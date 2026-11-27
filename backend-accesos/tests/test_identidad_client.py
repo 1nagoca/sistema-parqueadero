@@ -74,6 +74,37 @@ def test_obtener_vehiculo_con_y_sin_propietario(identidad_responde):
     assert visitante.propietario_activo is None
 
 
+def test_sin_los_campos_de_la_electrica_es_una_moto_con_placa(identidad_responde):
+    # una identidad anterior a la E1 no manda es_electrica ni numero_serie
+    identidad_responde(lambda peticion: httpx.Response(200, json=_vehiculo(None)))
+    vehiculo = identidad_client.obtener_vehiculo(VEHICULO_ID)
+    assert vehiculo.placa == "ABC123"
+    assert vehiculo.es_electrica is False and vehiculo.numero_serie is None
+
+
+def test_la_electrica_queda_con_placa_none_y_su_serial(identidad_responde):
+    propietario = {"id": str(PROPIETARIO_ID), "estado_verificacion": "aprobado", "activo": True}
+    cuerpo = {**_vehiculo(propietario), "placa": None, "es_electrica": True, "numero_serie": "EB-2024-00871"}
+    identidad_responde(lambda peticion: httpx.Response(200, json=cuerpo))
+    vehiculo = identidad_client.obtener_vehiculo(VEHICULO_ID)
+    assert vehiculo.placa is None  # nunca el texto "None"
+    assert vehiculo.es_electrica is True and vehiculo.numero_serie == "EB-2024-00871"
+
+
+@pytest.mark.parametrize(
+    "cambios",
+    [
+        {"placa": None},  # sin placa pero no electrica
+        {"es_electrica": True, "numero_serie": "EB12345678"},  # electrica con placa
+        {"placa": None, "es_electrica": True},  # electrica sin serial
+    ],
+)
+def test_placa_y_serial_que_no_cuadran_son_una_respuesta_inesperada(identidad_responde, cambios):
+    identidad_responde(lambda peticion: httpx.Response(200, json={**_vehiculo(None), **cambios}))
+    with pytest.raises(identidad_client.IdentidadNoDisponibleError):
+        identidad_client.obtener_vehiculo(VEHICULO_ID)
+
+
 def test_vehiculo_inexistente_no_es_lo_mismo_que_identidad_caida(identidad_responde):
     identidad_responde(lambda peticion: httpx.Response(404, json={"detail": "Vehiculo no encontrado"}))
     with pytest.raises(identidad_client.VehiculoNoEncontradoError):

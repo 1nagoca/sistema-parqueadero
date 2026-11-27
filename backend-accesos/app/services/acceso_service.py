@@ -58,6 +58,21 @@ class VisitanteSinAutorizacionError(Exception):
     """La moto de visitante vuelve sin autorizacion y su ultima salida no le da para reingresar (RN-03)."""
 
 
+class ElectricaSoloNormalError(Exception):
+    """La moto electrica es de un estudiante: no entra como visitante."""
+
+
+# La moto en mensajes y logs: su placa o «moto eléctrica <serial>».
+def describir_moto(placa: str | None, numero_serie: str | None) -> str:
+    return placa if placa is not None else f"moto eléctrica {numero_serie}"
+
+
+# La moto como se nombra en el log: «la moto ABC12D» o «la moto eléctrica EB-...».
+def _en_el_log(acceso: Acceso) -> str:
+    descripcion = describir_moto(acceso.placa, acceso.numero_serie)
+    return f"la {descripcion}" if acceso.es_electrica else f"la moto {descripcion}"
+
+
 # Nombre del indice que impide dos accesos abiertos del mismo vehiculo.
 INDICE_ACCESO_ACTIVO = "uq_accesos_vehiculo_activo"
 
@@ -110,6 +125,10 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
 
     # 1. Pregunta a identidad por el vehiculo y valida que pueda entrar.
     vehiculo = identidad_client.obtener_vehiculo(datos.vehiculo_id)
+    if vehiculo.es_electrica and datos.tipo_acceso != TipoAcceso.NORMAL:
+        raise ElectricaSoloNormalError(
+            "La moto eléctrica solo entra como acceso normal: es de un estudiante registrado"
+        )
     _exigir_vehiculo_verificado(vehiculo, datos.tipo_acceso)
     _exigir_usuarios_existentes(datos)
     # Con dueno, sus entradas van de una en una hasta el commit o el rollback (RN-12).
@@ -140,6 +159,8 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
         acceso = Acceso(
             vehiculo_id=datos.vehiculo_id,
             placa=vehiculo.placa,
+            es_electrica=vehiculo.es_electrica,
+            numero_serie=vehiculo.numero_serie,
             usuario_id=datos.usuario_id,
             zona_id=datos.zona_id,
             espacio_id=datos.espacio_id,
@@ -180,7 +201,7 @@ def registrar_entrada(db: Session, datos: AccesoEntradaCreate, realizado_por_id:
         raise
 
     db.refresh(acceso)
-    logger.info("Accesos: entrada registrada de la moto %s (%s)", acceso.placa, acceso.tipo_acceso.value)
+    logger.info("Accesos: entrada registrada de %s (%s)", _en_el_log(acceso), acceso.tipo_acceso.value)
     return acceso
 
 
@@ -228,7 +249,8 @@ def _exigir_ninguna_otra_moto_adentro(db: Session, vehiculo: identidad_client.Ve
     otras = [i for i in identidad_client.vehiculos_de_usuario(vehiculo.propietario_id) if i != vehiculo.id]
     abiertos = accesos_abiertos_de_vehiculos(db, otras)
     if abiertos:
-        raise OtraMotoDelDuenoAdentroError(f"El dueno ya tiene otra moto adentro ({abiertos[0].placa})")
+        otra = describir_moto(abiertos[0].placa, abiertos[0].numero_serie)
+        raise OtraMotoDelDuenoAdentroError(f"El dueno ya tiene otra moto adentro ({otra})")
 
 
 # Ultimo acceso cerrado de la moto si fue de visitante y salio dentro de la ventana; si no, el 409 de RN-03.
@@ -254,6 +276,16 @@ def _tiene_acceso_activo(db: Session, vehiculo_id: uuid.UUID) -> bool:
         .filter(Acceso.vehiculo_id == vehiculo_id, Acceso.fecha_hora_salida.is_(None))
         .first()
         is not None
+    )
+
+
+# Acceso abierto de la moto electrica con ese serial: sin espacios, en mayusculas y sin contar guiones.
+def acceso_abierto_por_serie(db: Session, numero_serie: str) -> Acceso | None:
+    buscado = "".join(numero_serie.split()).upper().replace("-", "")
+    return (
+        db.query(Acceso)
+        .filter(func.replace(Acceso.numero_serie, "-", "") == buscado, Acceso.fecha_hora_salida.is_(None))
+        .first()
     )
 
 
@@ -323,7 +355,7 @@ def registrar_salida(db: Session, acceso_id: uuid.UUID, realizado_por_id: uuid.U
         raise
 
     db.refresh(acceso)
-    logger.info("Accesos: salida registrada de la moto %s tras %s min", acceso.placa, acceso.duracion_minutos)
+    logger.info("Accesos: salida registrada de %s tras %s min", _en_el_log(acceso), acceso.duracion_minutos)
     return acceso
 
 

@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "e156daca-b185-52b4-8df7-00845caba5dc",
     "name": "Parqueadero UFPS - API (gateway)",
-    "description": "API REST del parqueadero universitario (todos los servicios a través del gateway).\n\n1. Levantar el proyecto: `docker compose up --build -d`\n2. Importar esta colección en Postman.\n3. Llenar las variables de la colección `correo_admin`, `password_admin`, `correo_vigilante` y `password_vigilante` con las cuentas de la siembra. Se llenan solo en Value (en versiones recientes de Postman puede llamarse Local value), nunca en Initial value. Las demás variables se llenan solas.\n4. Correr la colección completa con el Collection Runner (en orden) entre las 05:45 y las 22:00 (RN-11): el login guarda los tokens y cada paso guarda los ids que usa el siguiente.\n\nNunca exportes ni subas la colección con esos valores.\n\nPor defecto las peticiones usan el token de admin; las carpetas de vehículos y accesos usan el de vigilante, salvo «Crear puestos del plano en lote», que usa el de admin.",
+    "description": "API REST del parqueadero universitario (todos los servicios a través del gateway).\n\n1. Levantar el proyecto: `docker compose up --build -d`\n2. Importar esta colección en Postman.\n3. Llenar las variables de la colección `correo_admin`, `password_admin`, `correo_vigilante` y `password_vigilante` con las cuentas de la siembra. Se llenan solo en Value (en versiones recientes de Postman puede llamarse Local value), nunca en Initial value. Las demás variables se llenan solas.\n4. Correr la colección completa con el Collection Runner (en orden) entre las 05:45 y las 22:00 (RN-11): el login guarda los tokens y cada paso guarda los ids que usa el siguiente.\n\nNunca exportes ni subas la colección con esos valores.\n\n5. Opcional: para probar la moto eléctrica en accesos, llena también `electrica_id` y `serie_electrica` (solo en Value) con una eléctrica aprobada de un estudiante aprobado y activo; si quedan vacías, esas peticiones se saltan.\n\nPor defecto las peticiones usan el token de admin; las carpetas de vehículos y accesos usan el de vigilante, salvo «Crear puestos del plano en lote», que usa el de admin.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -1445,6 +1445,87 @@
           ]
         },
         {
+          "name": "Buscar acceso por número de serie sin acceso (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accesos/buscar?numero_serie=EB-NOESTA0001"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// La moto eléctrica no tiene placa: su acceso se busca por el serial (sin espacios, en mayúsculas y sin contar guiones).",
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Mensaje del serial\", () => pm.expect(pm.response.json().detail).to.eql(\"No hay un acceso activo para ese número de serie\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar acceso por número de serie sin guion (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accesos/buscar?numero_serie=ebnoesta0001"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Mensaje del serial\", () => pm.expect(pm.response.json().detail).to.eql(\"No hay un acceso activo para ese número de serie\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar acceso con placa y número de serie (422)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accesos/buscar?placa={{placa_1}}&numero_serie=EB-NOESTA0001"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Uno de los dos\", () => pm.expect(pm.response.json().detail).to.eql(\"Indica la placa o el número de serie, solo uno de los dos\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar acceso sin placa ni número de serie (422)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accesos/buscar"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Uno de los dos\", () => pm.expect(pm.response.json().detail).to.eql(\"Indica la placa o el número de serie, solo uno de los dos\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "RN-02: registrar salida",
           "request": {
             "method": "POST",
@@ -1600,6 +1681,183 @@
             }
           ]
         },        {
+          "name": "Moto eléctrica (opcional): entrada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accesos/entrada",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehiculo_id\": \"{{electrica_id}}\",\n  \"zona_id\": \"{{zona_id}}\",\n  \"espacio_id\": \"{{espacio_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Opcional: llena electrica_id y serie_electrica (Value) con una moto eléctrica aprobada de un estudiante aprobado y activo, sin otra moto adentro.",
+                  "if (!pm.collectionVariables.get(\"electrica_id\") || !pm.collectionVariables.get(\"serie_electrica\")) {",
+                  "    pm.execution.skipRequest();",
+                  "}",
+                  "pm.collectionVariables.set(\"acceso_electrica_id\", \"\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"acceso_electrica_id\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Moto eléctrica (opcional): buscar por serial",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accesos/buscar?numero_serie={{serie_electrica}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"acceso_electrica_id\")) {",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Mismo acceso\", () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"acceso_electrica_id\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Moto eléctrica (opcional): buscar por serial sin guion",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accesos/buscar?numero_serie={{serie_sin_guion}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"acceso_electrica_id\")) {",
+                  "    pm.execution.skipRequest();",
+                  "}",
+                  "pm.variables.set(\"serie_sin_guion\", pm.collectionVariables.get(\"serie_electrica\").replace(/-/g, \"\").toLowerCase());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Mismo acceso\", () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"acceso_electrica_id\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Moto eléctrica (opcional): vehículos adentro con placa null",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accesos?zona_id={{zona_id}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"acceso_electrica_id\")) {",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const acceso = pm.response.json().find((a) => a.id === pm.collectionVariables.get(\"acceso_electrica_id\"));",
+                  "pm.test(\"Sin placa, con su serial\", () => {",
+                  "    pm.expect(acceso.placa).to.be.null;",
+                  "    pm.expect(acceso.es_electrica).to.be.true;",
+                  "    pm.expect(acceso.numero_serie).to.eql(pm.collectionVariables.get(\"serie_electrica\").toUpperCase());",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Moto eléctrica (opcional): salida",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accesos/{{acceso_electrica_id}}/salida"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"acceso_electrica_id\")) {",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Acceso cerrado\", () => pm.expect(pm.response.json().fecha_hora_salida).to.not.be.null);"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Crear puestos del plano en lote",
           "request": {
             "method": "POST",
@@ -1953,6 +2211,21 @@
     },
     {
       "key": "serie_1",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "electrica_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "serie_electrica",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "acceso_electrica_id",
       "value": "",
       "type": "string"
     },

@@ -45,25 +45,41 @@ def listar_accesos_activos(
         AccesoActivoRead(
             **AccesoRead.model_validate(acceso).model_dump(),
             placa=acceso.placa,
+            es_electrica=acceso.es_electrica,
+            numero_serie=acceso.numero_serie,
             espacio_codigo=codigos.get(acceso.espacio_id),
         )
         for acceso in accesos
     ]
 
 
-# GET /accesos/buscar?placa= (vigilante, admin): el acceso abierto de una placa, para ofrecer la salida.
+# GET /accesos/buscar?placa= o ?numero_serie= (vigilante, admin): el acceso abierto de esa moto, para ofrecer la salida.
 @router.get("/buscar", response_model=AccesoRead)
 def buscar_acceso_activo(
-    placa: str,
+    placa: str | None = None,
+    numero_serie: str | None = None,
     db: Session = Depends(get_db),
     _: UsuarioToken = Depends(require_rol_activo(RolUsuario.VIGILANTE, RolUsuario.ADMIN)),
 ):
-    """Usado por el panel de vigilancia para saber si una placa tiene un acceso abierto
+    """Usado por el panel de vigilancia para saber si una moto tiene un acceso abierto
     (y por lo tanto corresponde ofrecer 'registrar salida' en vez de una nueva entrada).
-    Usa la placa guardada en el acceso, sin leer la tabla de vehiculos."""
+    Con la placa o, para la moto electrica, con el numero de serie (exactamente uno); usa lo
+    guardado en el acceso, sin leer la tabla de vehiculos."""
+    if (placa is None) == (numero_serie is None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Indica la placa o el número de serie, solo uno de los dos",
+        )
+    if numero_serie is not None:
+        por_serie = acceso_service.acceso_abierto_por_serie(db, numero_serie)
+        if por_serie is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="No hay un acceso activo para ese número de serie"
+            )
+        return por_serie
     acceso = (
         db.query(Acceso)
-        .filter(Acceso.placa == placa.strip().upper(), Acceso.fecha_hora_salida.is_(None))
+        .filter(Acceso.placa == (placa or "").strip().upper(), Acceso.fecha_hora_salida.is_(None))
         .first()
     )
     if acceso is None:
@@ -95,6 +111,8 @@ def mis_accesos_activos(
     return [
         MiAccesoRead(
             placa=acceso.placa,
+            es_electrica=acceso.es_electrica,
+            numero_serie=acceso.numero_serie,
             espacio_codigo=codigos.get(acceso.espacio_id),
             fecha_hora_entrada=acceso.fecha_hora_entrada,
         )
@@ -120,6 +138,7 @@ def registrar_entrada(
         acceso_service.VehiculoYaAdentroError,
         acceso_service.OtraMotoDelDuenoAdentroError,
         acceso_service.VisitanteSinAutorizacionError,
+        acceso_service.ElectricaSoloNormalError,
     ) as exc:
         raise _entrada_rechazada(status.HTTP_409_CONFLICT, exc) from exc
     except IdentidadNoDisponibleError as exc:

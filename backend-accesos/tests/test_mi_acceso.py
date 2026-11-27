@@ -65,6 +65,8 @@ def test_el_estudiante_ve_su_moto_con_placa_puesto_y_hora_y_nada_mas(client, adm
     assert r.json() == [
         {
             "placa": moto["placa"],
+            "es_electrica": False,
+            "numero_serie": None,
             "espacio_codigo": "B-12",
             "fecha_hora_entrada": moto["acceso"]["fecha_hora_entrada"],
         }

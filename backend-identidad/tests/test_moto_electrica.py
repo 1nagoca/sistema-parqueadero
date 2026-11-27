@@ -24,7 +24,6 @@ from app.models.documento import Documento  # noqa: E402
 from app.models.enums import EstadoVerificacion, RolUsuario, TipoDocumento, TipoVehiculo  # noqa: E402
 from app.models.usuario import Usuario  # noqa: E402
 from app.models.vehiculo import Vehiculo  # noqa: E402
-from app.schemas.interno import VehiculoInterno  # noqa: E402
 from app.services import vehiculo_service  # noqa: E402
 
 API = settings.API_V1_PREFIX
@@ -536,18 +535,20 @@ def test_busqueda_por_serial_solo_vigilante_y_admin(client):
 # --- API interna y base de datos ---
 
 
-def test_interno_no_da_la_electrica_a_accesos_hasta_la_e3(client):
+def test_interno_da_la_electrica_con_placa_null(client):
     dueno, _ = _usuario(RolUsuario.ESTUDIANTE)
-    vehiculo_id, _ = _electrica_en_bd(dueno, estado=APROBADO)
+    vehiculo_id, serie = _electrica_en_bd(dueno, estado=APROBADO)
     r = client.get(f"/interno/vehiculos/{vehiculo_id}", headers={"X-Clave-Interna": settings.CLAVE_INTERNA})
-    assert r.status_code == 404 and _detalle(r) == "Vehiculo no encontrado"
-
-    # el contrato ya admite la electrica para cuando accesos la maneje
-    interno = VehiculoInterno(
-        id=vehiculo_id, placa=None, es_electrica=True, numero_serie="EB12345678",
-        es_visitante=False, estado_verificacion=APROBADO, propietario=None,
-    )
-    assert interno.placa is None and interno.es_electrica is True
+    assert r.status_code == 200, r.text
+    assert r.json() == {
+        "id": str(vehiculo_id),
+        "placa": None,
+        "es_electrica": True,
+        "numero_serie": serie,
+        "es_visitante": False,
+        "estado_verificacion": "aprobado",
+        "propietario": {"id": str(dueno), "estado_verificacion": "aprobado", "activo": True},
+    }
 
 
 @pytest.mark.parametrize(

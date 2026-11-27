@@ -1,5 +1,5 @@
-"""Migraciones 0004_placa_en_accesos y 0005_borrar_identidad: bajan y vuelven a subir. Solo
-corren contra la base de pruebas (la prepara conftest).
+"""Migraciones 0004_placa_en_accesos, 0005_borrar_identidad y 0006_moto_electrica: bajan y
+vuelven a subir. Solo corren contra la base de pruebas (la prepara conftest).
 
 Los modelos de usuarios y vehiculos ya no existen en este servicio, asi que lo que esas tablas
 necesitan para la prueba se crea con SQL."""
@@ -17,8 +17,7 @@ from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
-from app.db.session import SessionLocal, engine  # noqa: E402
-from app.models.acceso import Acceso  # noqa: E402
+from app.db.session import engine  # noqa: E402
 from tests.conftest import RAIZ  # noqa: E402
 
 TABLAS_IDENTIDAD = {"usuarios", "vehiculos", "documentos"}
@@ -146,21 +145,24 @@ def test_0004_baja_y_vuelve_a_subir_rellenando_la_placa_de_los_accesos_existente
         id=vehiculo_id,
         placa=placa,
     )
-    with SessionLocal() as db:
-        # Los accesos de otros tests son de vehiculos que no estan en esta base: sin vehiculo no
-        # hay de donde rellenar la placa al volver a subir.
-        db.execute(text("DELETE FROM accesos WHERE vehiculo_id NOT IN (SELECT id FROM vehiculos)"))
-        cerrado = Acceso(
-            vehiculo_id=vehiculo_id,
-            placa=placa,
-            zona_id=uuid.uuid4(),
-            fecha_hora_entrada=ahora - timedelta(hours=2),
-            fecha_hora_salida=ahora - timedelta(hours=1),
-        )
-        abierto = Acceso(vehiculo_id=vehiculo_id, placa=placa, zona_id=uuid.uuid4())
-        db.add_all([cerrado, abierto])
-        db.commit()
-        ids = [cerrado.id, abierto.id]
+    # Los accesos de otros tests son de vehiculos que no estan en esta base: sin vehiculo no
+    # hay de donde rellenar la placa al volver a subir.
+    _ejecutar("DELETE FROM accesos WHERE vehiculo_id NOT IN (SELECT id FROM vehiculos)")
+    # Con SQL: el modelo Acceso ya trae columnas (0006) que en la 0004 no existen.
+    ids = [uuid.uuid4(), uuid.uuid4()]
+    _ejecutar(
+        "INSERT INTO accesos (id, vehiculo_id, placa, zona_id, fecha_hora_entrada, fecha_hora_salida) VALUES "
+        "(:cerrado, :vehiculo, :placa, :zona_cerrado, :entrada, :salida), "
+        "(:abierto, :vehiculo, :placa, :zona_abierto, now(), NULL)",
+        cerrado=ids[0],
+        abierto=ids[1],
+        vehiculo=vehiculo_id,
+        placa=placa,
+        zona_cerrado=uuid.uuid4(),
+        zona_abierto=uuid.uuid4(),
+        entrada=ahora - timedelta(hours=2),
+        salida=ahora - timedelta(hours=1),
+    )
     engine.dispose()
 
     command.downgrade(configuracion, "0003_separar_parqueadero")
@@ -183,3 +185,67 @@ def test_0004_baja_y_vuelve_a_subir_rellenando_la_placa_de_los_accesos_existente
     engine.dispose()
     command.upgrade(configuracion, "head")
     assert _escalares("SELECT placa FROM accesos WHERE id = ANY(:ids)", ids=ids) == [placa, placa]
+
+
+def _hay_restriccion(nombre):
+    return _escalares("SELECT count(*) FROM pg_constraint WHERE conname = :nombre", nombre=nombre) == [1]
+
+
+CHECKS_ELECTRICA = (
+    "ck_accesos_placa_o_numero_serie",
+    "ck_accesos_numero_serie_mayusculas",
+    "ck_accesos_electrica_solo_normal",
+)
+
+
+def _columnas_de_accesos():
+    return set(_escalares("SELECT column_name FROM information_schema.columns WHERE table_name = 'accesos'"))
+
+
+def _placa_admite_null():
+    return _escalares(
+        "SELECT is_nullable FROM information_schema.columns WHERE table_name = 'accesos' AND column_name = 'placa'"
+    ) == ["YES"]
+
+
+def test_0006_baja_y_sube_y_se_detiene_si_hay_accesos_de_electricas(configuracion):
+    # punto de partida: head, con la moto electrica
+    assert {"es_electrica", "numero_serie"} <= _columnas_de_accesos() and _placa_admite_null()
+    assert all(_hay_restriccion(nombre) for nombre in CHECKS_ELECTRICA)
+    assert _escalares("SELECT count(*) FROM accesos WHERE es_electrica") == [0]
+    accesos_antes = _escalares("SELECT count(*) FROM accesos")
+
+    # el downgrade quita columnas y CHECK y devuelve la placa obligatoria, sin tocar los accesos
+    command.downgrade(configuracion, "0005_borrar_identidad")
+    engine.dispose()
+    assert _version() == ["0005_borrar_identidad"]
+    assert not {"es_electrica", "numero_serie"} & _columnas_de_accesos() and not _placa_admite_null()
+    assert not any(_hay_restriccion(nombre) for nombre in CHECKS_ELECTRICA)
+    assert _hay_restriccion("ck_accesos_placa_mayusculas")
+    assert _escalares("SELECT count(*) FROM accesos") == accesos_antes
+
+    engine.dispose()
+    command.upgrade(configuracion, "head")
+    assert _escalares("SELECT count(*) FROM accesos WHERE es_electrica") == [0]  # los de antes quedan con placa
+
+    # con un acceso de una electrica, el downgrade se detiene y no cambia nada
+    acceso_id = uuid.uuid4()
+    ahora = datetime.now(timezone.utc)
+    _ejecutar(
+        "INSERT INTO accesos (id, vehiculo_id, placa, es_electrica, numero_serie, zona_id, "
+        "fecha_hora_entrada, fecha_hora_salida) VALUES (:id, :vehiculo, NULL, true, 'EB-MIG12345', :zona, :entrada, :salida)",
+        id=acceso_id,
+        vehiculo=uuid.uuid4(),
+        zona=uuid.uuid4(),
+        entrada=ahora - timedelta(hours=1),
+        salida=ahora,
+    )
+    engine.dispose()
+    try:
+        with pytest.raises(Exception, match="No se puede quitar la moto electrica de accesos"):
+            command.downgrade(configuracion, "0005_borrar_identidad")
+        engine.dispose()
+        assert _version() == ["0006_moto_electrica"]
+        assert {"es_electrica", "numero_serie"} <= _columnas_de_accesos()
+    finally:
+        _ejecutar("DELETE FROM accesos WHERE id = :id", id=acceso_id)

@@ -134,7 +134,9 @@ Table auditoria_identidad {
 Table accesos {
   id uuid [pk, default: `gen_random_uuid()`]
   vehiculo_id uuid [not null, note: 'Id de vehiculos en la base parqueadero_identidad (sin FK). Un vehículo solo puede tener un acceso sin salida (índice único parcial)']
-  placa varchar(10) [not null, note: 'Copia de la placa al registrar la entrada; siempre en mayúsculas (CHECK)']
+  placa varchar(10) [note: 'Copia de la placa al registrar la entrada; siempre en mayúsculas (CHECK); NULL solo si es_electrica = true']
+  es_electrica boolean [not null, default: false, note: 'Copia de identidad: moto eléctrica sin placa; solo con tipo_acceso = normal (CHECK)']
+  numero_serie varchar(17) [note: 'Copia del serial de la eléctrica, en mayúsculas (CHECK); obligatorio si es_electrica = true y NULL si no (CHECK)']
   usuario_id uuid [note: 'Id de usuarios en la base parqueadero_identidad (sin FK)']
   zona_id uuid [not null, note: 'Id de zonas en la base parqueadero_zonas (sin FK)']
   espacio_id uuid [note: 'Id de espacios en la base parqueadero_zonas (sin FK)']

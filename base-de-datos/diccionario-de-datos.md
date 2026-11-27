@@ -7,7 +7,7 @@ Hay **una base de datos por microservicio**:
 | Base de datos | Servicio | Tablas | Migraciones |
 |---|---|---|---|
 | `parqueadero_identidad` | `backend-identidad` | `usuarios`, `vehiculos`, `documentos`, `auditoria_identidad` | `backend-identidad/alembic/versions` (0001 y 0002) |
-| `parqueadero` | `backend-accesos` | `accesos`, `auditoria_accesos` | `backend-accesos/alembic/versions` (0001 a 0005) |
+| `parqueadero` | `backend-accesos` | `accesos`, `auditoria_accesos` | `backend-accesos/alembic/versions` (0001 a 0006) |
 | `parqueadero_zonas` | `backend-parqueadero` | `zonas`, `espacios`, `mantenimientos`, `auditoria_parqueadero` | `backend-parqueadero/alembic/versions` (0001 a 0003) |
 
 Entre bases no hay llaves foráneas. `accesos` y `auditoria_accesos` guardan identificadores de vehículos y usuarios (base de identidad) y de zonas y espacios (base de parqueadero); la consistencia la cuida el código.
@@ -136,7 +136,9 @@ Bitácora de aprobar o rechazar usuarios y vehículos. Tabla **append-only**: no
 |---|---|---|---|---|
 | `id` | uuid | No | `gen_random_uuid()` | PK |
 | `vehiculo_id` | uuid | No | | Id del vehículo en la base de identidad (sin FK) |
-| `placa` | varchar(10) | No | | Copia de la placa al registrar la entrada, en mayúsculas |
+| `placa` | varchar(10) | Sí | | Copia de la placa al registrar la entrada, en mayúsculas; vacía solo en la moto eléctrica |
+| `es_electrica` | boolean | No | `false` | Copia de identidad: moto eléctrica sin placa (solo entra como acceso normal) |
+| `numero_serie` | varchar(17) | Sí | | Copia del número de serie de la eléctrica, en mayúsculas |
 | `usuario_id` | uuid | Sí | | Id de quien ingresa, en la base de identidad (sin FK) |
 | `zona_id` | uuid | No | | Id de la zona en la base `parqueadero_zonas` (sin FK) |
 | `espacio_id` | uuid | Sí | | Id del espacio en la base `parqueadero_zonas` (sin FK) |
@@ -150,9 +152,9 @@ Bitácora de aprobar o rechazar usuarios y vehículos. Tabla **append-only**: no
 | `confianza_alpr` | numeric(5,2) | Sí | | Confianza de la lectura de placa |
 | `creado_en` | timestamptz | No | `now()` | |
 
-Restricciones: `ck_accesos_placa_mayusculas` (placa = upper(placa)); `ck_accesos_salida_posterior_entrada`; `ck_accesos_visitante_requiere_autorizacion` (un visitante exige `autorizado_por_id` y justificación); índice único parcial `uq_accesos_vehiculo_activo` (un vehículo no puede tener dos accesos sin salida). Índices en `usuario_id` y `zona_id`.
+Restricciones: `ck_accesos_placa_mayusculas` (placa = upper(placa)); `ck_accesos_salida_posterior_entrada`; `ck_accesos_visitante_requiere_autorizacion` (un visitante exige `autorizado_por_id` y justificación); `ck_accesos_placa_o_numero_serie` (con placa y sin serial, o eléctrica con serial y sin placa); `ck_accesos_numero_serie_mayusculas`; `ck_accesos_electrica_solo_normal` (la eléctrica nunca entra como visitante); índice único parcial `uq_accesos_vehiculo_activo` (un vehículo no puede tener dos accesos sin salida). Índices en `usuario_id` y `zona_id`.
 
-La placa se guarda aquí para que la lista de vehículos adentro, la búsqueda por placa y las salidas funcionen aunque el servicio de identidad no responda.
+La placa (o el número de serie de la eléctrica) se guarda aquí para que la lista de vehículos adentro, la búsqueda por placa o por serial y las salidas funcionen aunque el servicio de identidad no responda.
 
 ### auditoria_accesos
 
