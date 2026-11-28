@@ -57,18 +57,20 @@ export interface PuestoPlano {
   y: number;
 }
 
-// Tamano total del dibujo; empieza en x=100, justo antes de la pared izquierda.
+// Ancho total del dibujo; empieza en x=100, justo antes de la pared izquierda (el alto, mas abajo).
 export const ANCHO = 746;
-export const ALTO = 1620;
-export const PLANO: Rectangulo = { x: 100, y: 0, ancho: ANCHO, alto: ALTO };
 
 // Inicio y cantidad de las columnas del bloque de arriba y de los de abajo (800 puestos en total,
 // punto 5); paredes y pasillos llegan hasta el ultimo puesto.
 const ARRIBA = { y: 60, cantidad: 33 };
-const ABAJO = { y: 768, cantidad: 37 };
-// Primer y ultimo y de cada bloque, para paredes y flechas.
+// Ultimo y de cada bloque: lo que va debajo se mide desde aqui, con las separaciones del plano de 1000.
 const ARRIBA_FIN = ARRIBA.y + ARRIBA.cantidad * PASO - (PASO - PUESTO);
+const ABAJO = { y: ARRIBA_FIN + 38, cantidad: 37 };
 const ABAJO_FIN = ABAJO.y + ABAJO.cantidad * PASO - (PASO - PUESTO);
+
+// Alto total del dibujo, hasta debajo del cuadro de entrada y salida.
+export const ALTO = ABAJO_FIN + 118;
+export const PLANO: Rectangulo = { x: 100, y: 0, ancho: ANCHO, alto: ALTO };
 
 // Columnas de arriba (A-H) y de abajo (I-V) con su x, de izquierda a derecha.
 const COLUMNAS_ARRIBA: Array<[string, number]> = [
@@ -99,7 +101,7 @@ const COLUMNAS_ABAJO: Array<[string, number]> = [
 ];
 
 // Filas del fondo: W bajo abajo centro y X bajo abajo derecha, a cada lado de la via central.
-const FONDO = { y: 1554, cantidad: 9 };
+const FONDO = { y: ABAJO_FIN + 52, cantidad: 9 };
 // Largo de cada fila del fondo, para la pared de debajo.
 const FONDO_LARGO = FONDO.cantidad * PASO - (PASO - PUESTO);
 
@@ -121,15 +123,15 @@ export const PAREDES: Pared[] = [
   // Bloque de arriba: | A B | C D | E   F | G H |
   ...[279, 349, 419, 509, 579].map((x) => vertical(x, ARRIBA.y - 10, ARRIBA_FIN + 4)),
   // Encima de abajo izquierda y abajo centro, y encima de R-U (la entrada queda abierta sobre U-V).
-  { x1: 109, y1: 748, x2: 436, y2: 748 },
-  { x1: 486, y1: 748, x2: 596, y2: 748 },
+  { x1: 109, y1: ARRIBA_FIN + 18, x2: 436, y2: ARRIBA_FIN + 18 },
+  { x1: 486, y1: ARRIBA_FIN + 18, x2: 596, y2: ARRIBA_FIN + 18 },
   // Pared izquierda de todo el bloque de abajo.
-  vertical(109, 748, ABAJO_FIN + 4),
+  vertical(109, ARRIBA_FIN + 18, ABAJO_FIN + 4),
   // Bloques de abajo: I | J, K | L, | M, N | O, P | Q, R | S, T | U, V |
   ...[159, 229, 279, 349, 419, 509, 579, 649].map((x) => vertical(x, ABAJO.y - 10, ABAJO_FIN + 4)),
   // Debajo de las filas del fondo.
-  { x1: 278, y1: 1574, x2: 278 + FONDO_LARGO, y2: 1574 },
-  { x1: 490, y1: 1574, x2: 490 + FONDO_LARGO, y2: 1574 },
+  { x1: 278, y1: ABAJO_FIN + 72, x2: 278 + FONDO_LARGO, y2: ABAJO_FIN + 72 },
+  { x1: 490, y1: ABAJO_FIN + 72, x2: 490 + FONDO_LARGO, y2: ABAJO_FIN + 72 },
 ];
 
 // Pasillo entre dos bordes: baja por su tercio izquierdo y sube por su tercio derecho.
@@ -146,8 +148,8 @@ export const FLECHAS: Flecha[] = [
   { x1: 286, y1: 24, x2: 582, y2: 24 },
   { x1: 582, y1: 38, x2: 286, y2: 38 },
   // Via central: baja hasta la entrada y salida y sube de vuelta.
-  { x1: 455, y1: 24, x2: 455, y2: 1580 },
-  { x1: 473, y1: 1580, x2: 473, y2: 30 },
+  { x1: 455, y1: 24, x2: 455, y2: ABAJO_FIN + 78 },
+  { x1: 473, y1: ABAJO_FIN + 78, x2: 473, y2: 30 },
   // Pasillos del bloque de arriba: A-B, C-D, G-H.
   ...pasillo(296, 332, ARRIBA.y, ARRIBA_FIN),
   ...pasillo(366, 402, ARRIBA.y, ARRIBA_FIN),
@@ -161,25 +163,31 @@ export const FLECHAS: Flecha[] = [
   ...pasillo(526, 562, ABAJO.y, ABAJO_FIN),
   ...pasillo(596, 632, ABAJO.y, ABAJO_FIN),
   // Via de abajo, de la pared izquierda a la pared de V: a la izquierda y de vuelta a la derecha.
-  { x1: 649, y1: 1522, x2: 109, y2: 1522 },
-  { x1: 109, y1: 1538, x2: 649, y2: 1538 },
+  { x1: 649, y1: ABAJO_FIN + 20, x2: 109, y2: ABAJO_FIN + 20 },
+  { x1: 109, y1: ABAJO_FIN + 36, x2: 649, y2: ABAJO_FIN + 36 },
 ];
 
 // Cuadros de entrada y salida (al final de la via central) y de entrada a la universidad (a la derecha).
-export const ENTRADA_SALIDA: Caja = { x: 404, y: 1582, ancho: 120, alto: 28, lineas: ["Entrada y salida"] };
-export const ENTRADA_UNIVERSIDAD: Caja = { x: 690, y: 680, ancho: 150, alto: 52, lineas: ["Entrada", "a la universidad"] };
+export const ENTRADA_SALIDA: Caja = { x: 404, y: ABAJO_FIN + 80, ancho: 120, alto: 28, lineas: ["Entrada y salida"] };
+export const ENTRADA_UNIVERSIDAD: Caja = {
+  x: 690,
+  y: ARRIBA_FIN - 50,
+  ancho: 150,
+  alto: 52,
+  lineas: ["Entrada", "a la universidad"],
+};
 export const CAJAS: Caja[] = [ENTRADA_SALIDA, ENTRADA_UNIVERSIDAD];
 // Camino punteado desde el pasillo U-V hasta la entrada a la universidad.
-export const CAMINO_UNIVERSIDAD = "M 620 764 V 714 Q 620 706 628 706 H 686";
+export const CAMINO_UNIVERSIDAD = `M 620 ${ARRIBA_FIN + 34} V ${ARRIBA_FIN - 16} Q 620 ${ARRIBA_FIN - 24} 628 ${ARRIBA_FIN - 24} H 686`;
 
 // Bloques del selector con su rectangulo en el plano.
 export const BLOQUES: Bloque[] = [
-  { id: "arriba-izquierda", nombre: "Arriba izquierda", letras: ["A", "B", "C", "D", "E"], x: 272, y: 42, ancho: 168, alto: 696 },
-  { id: "arriba-derecha", nombre: "Arriba derecha", letras: ["F", "G", "H"], x: 486, y: 42, ancho: 100, alto: 696 },
-  { id: "abajo-izquierda", nombre: "Abajo izquierda", letras: ["I", "J", "K", "L"], x: 104, y: 742, ancho: 168, alto: 768 },
-  { id: "abajo-centro", nombre: "Abajo centro", letras: ["M", "N", "O", "P", "Q"], x: 272, y: 742, ancho: 168, alto: 768 },
-  { id: "abajo-derecha", nombre: "Abajo derecha", letras: ["R", "S", "T", "U", "V"], x: 486, y: 742, ancho: 170, alto: 768 },
-  { id: "fondo", nombre: "Fondo", letras: ["W", "X"], x: 260, y: 1544, ancho: 396, alto: 70 },
+  { id: "arriba-izquierda", nombre: "Arriba izquierda", letras: ["A", "B", "C", "D", "E"], x: 272, y: 42, ancho: 168, alto: ARRIBA_FIN - 34 },
+  { id: "arriba-derecha", nombre: "Arriba derecha", letras: ["F", "G", "H"], x: 486, y: 42, ancho: 100, alto: ARRIBA_FIN - 34 },
+  { id: "abajo-izquierda", nombre: "Abajo izquierda", letras: ["I", "J", "K", "L"], x: 104, y: ARRIBA_FIN + 12, ancho: 168, alto: ABAJO_FIN - ARRIBA_FIN - 4 },
+  { id: "abajo-centro", nombre: "Abajo centro", letras: ["M", "N", "O", "P", "Q"], x: 272, y: ARRIBA_FIN + 12, ancho: 168, alto: ABAJO_FIN - ARRIBA_FIN - 4 },
+  { id: "abajo-derecha", nombre: "Abajo derecha", letras: ["R", "S", "T", "U", "V"], x: 486, y: ARRIBA_FIN + 12, ancho: 170, alto: ABAJO_FIN - ARRIBA_FIN - 4 },
+  { id: "fondo", nombre: "Fondo", letras: ["W", "X"], x: 260, y: ABAJO_FIN + 42, ancho: 396, alto: 70 },
 ];
 
 // Codigo de un puesto: letra y numero de dos digitos (B-07).
