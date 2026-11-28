@@ -1,6 +1,11 @@
 from datetime import time
 
+from pydantic import ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Claves de ejemplo publicas: con ellas el servicio no arranca.
+CLAVES_DE_EJEMPLO = {"cambiar-esta-clave-en-produccion", "cambiar-esta-clave-interna"}
+LARGO_MINIMO_CLAVE = 32
 
 
 # Configuracion del servicio: se lee de variables de entorno (docker-compose o .env).
@@ -15,7 +20,7 @@ class Settings(BaseSettings):
     # emite; los demas solo los verifican.
     SECRET_KEY: str
     # Clave que accesos manda en X-Clave-Interna al llamar /interno; la misma en los tres servicios.
-    CLAVE_INTERNA: str = "cambiar-esta-clave-interna"
+    CLAVE_INTERNA: str
     # El token dura 8 horas.
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8
 
@@ -36,7 +41,18 @@ class Settings(BaseSettings):
     UNIVERSIDAD_NOMBRE: str = "Universidad Francisco de Paula Santander"
     UNIVERSIDAD_DOMINIOS_CORREO: list[str] = ["ufps.edu.co"]
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # Se niega a arrancar con la clave de ejemplo o con una corta, sin mostrar su valor.
+    @field_validator("SECRET_KEY", "CLAVE_INTERNA")
+    @classmethod
+    def clave_segura(cls, valor: str, info: ValidationInfo) -> str:
+        if valor in CLAVES_DE_EJEMPLO or len(valor) < LARGO_MINIMO_CLAVE:
+            raise ValueError(
+                f"{info.field_name} no puede ser la clave de ejemplo ni tener menos de "
+                f"{LARGO_MINIMO_CLAVE} caracteres; genera una con: openssl rand -hex 32"
+            )
+        return valor
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
 
 
 # Objeto unico con la configuracion; se importa donde haga falta.
