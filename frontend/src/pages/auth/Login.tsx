@@ -41,7 +41,7 @@ export default function Login() {
       <form onSubmit={manejarSubmit} className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-sm">
         {sesionVencida && (
           <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-            Tu sesión terminó. Si eres estudiante, recuerda que el parqueadero funciona de 05:45 a 22:00.
+            Tu sesión terminó. Vuelve a iniciar sesión.
           </p>
         )}
         {registroFueraDeHorario && (

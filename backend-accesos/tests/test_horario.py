@@ -10,7 +10,7 @@ import pytest
 if not os.environ.get("DATABASE_URL"):
     pytest.skip("requiere DATABASE_URL de una BD de pruebas", allow_module_level=True)
 
-from app.core.config import settings  # noqa: E402
+from app.core.config import Settings, settings  # noqa: E402
 from test_accesos import (  # noqa: E402, F401
     _accesos_abiertos,
     _entrada_visitante,
@@ -83,3 +83,8 @@ def test_el_horario_se_revisa_antes_que_identidad(client, admin, parqueadero, id
     assert r.status_code == 409, r.text  # no 503: ni siquiera se pregunto a identidad
     assert r.json()["detail"] == CERRADO
     assert parqueadero.movimientos == []
+
+
+def test_por_defecto_el_parqueadero_funciona_24_7():
+    # Desde el 2026-11-27 el horario esta desactivado en el codigo; se reactiva con HORARIO_RESTRINGIDO=true.
+    assert Settings.model_fields["HORARIO_RESTRINGIDO"].default is False

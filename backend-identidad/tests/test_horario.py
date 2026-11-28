@@ -13,7 +13,7 @@ if not os.environ.get("DATABASE_URL"):
 from fastapi.testclient import TestClient  # noqa: E402
 from jose import jwt  # noqa: E402
 
-from app.core.config import settings  # noqa: E402
+from app.core.config import Settings, settings  # noqa: E402
 from app.core.security import COLOMBIA, hashear_password  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.main import app  # noqa: E402
@@ -116,3 +116,8 @@ def test_sin_restriccion_el_estudiante_entra_a_las_23(client, hora_fija, monkeyp
     assert r.status_code == 200, r.text
     me = client.get(f"{API}/usuarios/me", headers={"Authorization": f"Bearer {r.json()['access_token']}"})
     assert me.status_code == 200, me.text
+
+
+def test_por_defecto_el_parqueadero_funciona_24_7():
+    # Desde el 2026-11-27 el horario esta desactivado en el codigo; se reactiva con HORARIO_RESTRINGIDO=true.
+    assert Settings.model_fields["HORARIO_RESTRINGIDO"].default is False

@@ -25,7 +25,8 @@ class Settings(BaseSettings):
     # Horario del parqueadero en hora de Colombia; debe coincidir con el de identidad.
     HORARIO_APERTURA: time = time(5, 45)
     HORARIO_CIERRE: time = time(22, 0)
-    HORARIO_RESTRINGIDO: bool = True
+    # 24/7 desde el 2026-11-27: el horario esta desactivado; se reactiva con HORARIO_RESTRINGIDO=true.
+    HORARIO_RESTRINGIDO: bool = False
 
     # Paginas que pueden llamar a esta API desde el navegador.
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
