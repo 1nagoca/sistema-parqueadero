@@ -62,9 +62,10 @@ export const ANCHO = 746;
 export const ALTO = 1620;
 export const PLANO: Rectangulo = { x: 100, y: 0, ancho: ANCHO, alto: ALTO };
 
-// Inicio y cantidad de las columnas del bloque de arriba y de los de abajo.
-const ARRIBA = { y: 60, cantidad: 42 };
-const ABAJO = { y: 768, cantidad: 46 };
+// Inicio y cantidad de las columnas del bloque de arriba y de los de abajo (800 puestos en total,
+// punto 5); paredes y pasillos llegan hasta el ultimo puesto.
+const ARRIBA = { y: 60, cantidad: 33 };
+const ABAJO = { y: 768, cantidad: 37 };
 // Primer y ultimo y de cada bloque, para paredes y flechas.
 const ARRIBA_FIN = ARRIBA.y + ARRIBA.cantidad * PASO - (PASO - PUESTO);
 const ABAJO_FIN = ABAJO.y + ABAJO.cantidad * PASO - (PASO - PUESTO);
@@ -98,7 +99,9 @@ const COLUMNAS_ABAJO: Array<[string, number]> = [
 ];
 
 // Filas del fondo: W bajo abajo centro y X bajo abajo derecha, a cada lado de la via central.
-const FONDO = { y: 1554, cantidad: 10 };
+const FONDO = { y: 1554, cantidad: 9 };
+// Largo de cada fila del fondo, para la pared de debajo.
+const FONDO_LARGO = FONDO.cantidad * PASO - (PASO - PUESTO);
 
 export const FILAS: Fila[] = [
   ...COLUMNAS_ARRIBA.map(([letra, x]) => ({ letra, vertical: true, tramos: [{ x, y: ARRIBA.y, cantidad: ARRIBA.cantidad }] })),
@@ -125,8 +128,8 @@ export const PAREDES: Pared[] = [
   // Bloques de abajo: I | J, K | L, | M, N | O, P | Q, R | S, T | U, V |
   ...[159, 229, 279, 349, 419, 509, 579, 649].map((x) => vertical(x, ABAJO.y - 10, ABAJO_FIN + 4)),
   // Debajo de las filas del fondo.
-  { x1: 278, y1: 1574, x2: 436, y2: 1574 },
-  { x1: 490, y1: 1574, x2: 648, y2: 1574 },
+  { x1: 278, y1: 1574, x2: 278 + FONDO_LARGO, y2: 1574 },
+  { x1: 490, y1: 1574, x2: 490 + FONDO_LARGO, y2: 1574 },
 ];
 
 // Pasillo entre dos bordes: baja por su tercio izquierdo y sube por su tercio derecho.

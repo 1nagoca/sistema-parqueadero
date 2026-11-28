@@ -8,7 +8,7 @@ Hay **una base de datos por microservicio**:
 |---|---|---|---|
 | `parqueadero_identidad` | `backend-identidad` | `usuarios`, `vehiculos`, `documentos`, `auditoria_identidad` | `backend-identidad/alembic/versions` (0001 y 0002) |
 | `parqueadero` | `backend-accesos` | `accesos`, `auditoria_accesos` | `backend-accesos/alembic/versions` (0001 a 0006) |
-| `parqueadero_zonas` | `backend-parqueadero` | `zonas`, `espacios`, `mantenimientos`, `auditoria_parqueadero` | `backend-parqueadero/alembic/versions` (0001 a 0003) |
+| `parqueadero_zonas` | `backend-parqueadero` | `zonas`, `espacios`, `mantenimientos`, `auditoria_parqueadero` | `backend-parqueadero/alembic/versions` (0001 a 0004) |
 
 Entre bases no hay llaves foráneas. `accesos` y `auditoria_accesos` guardan identificadores de vehículos y usuarios (base de identidad) y de zonas y espacios (base de parqueadero); la consistencia la cuida el código.
 
@@ -199,7 +199,7 @@ Restricciones: `ck_zonas_capacidad_positiva`, `ck_zonas_cupos_en_rango`.
 | `id` | uuid | No | `gen_random_uuid()` | PK |
 | `zona_id` | uuid | No | | FK a `zonas` |
 | `codigo` | varchar(20) | No | | Código del puesto, único dentro de la zona |
-| `estado` | `espacio_estado_enum` | No | `libre` | libre, ocupado, mantenimiento |
+| `estado` | `espacio_estado_enum` | No | `libre` | libre, ocupado, mantenimiento, retirado (fuera del plano de 800: no se lista en `GET /espacios`, no se ocupa ni entra en mantenimiento, pero conserva su código para el historial) |
 | `tipo_espacio` | varchar(20) | Sí | | |
 | `creado_en` | timestamptz | No | `now()` | |
 | `actualizado_en` | timestamptz | No | `now()` | |
@@ -249,4 +249,4 @@ Bitácora del servicio de parqueadero, con las mismas columnas que `auditoria_ac
 | `documento_tipo_enum` | `parqueadero_identidad` | carnet, foto_placa, tarjeta_propiedad, foto_serial |
 | `auditoria_accion_enum` | `parqueadero_identidad`, `parqueadero` y `parqueadero_zonas` | creacion, actualizacion, eliminacion |
 | `acceso_tipo_enum` | `parqueadero` | normal, visitante |
-| `espacio_estado_enum` | `parqueadero_zonas` | libre, ocupado, mantenimiento |
+| `espacio_estado_enum` | `parqueadero_zonas` | libre, ocupado, mantenimiento, retirado |

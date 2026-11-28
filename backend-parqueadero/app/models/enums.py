@@ -18,6 +18,13 @@ class EstadoEspacio(str, enum.Enum):
     LIBRE = "libre"
     OCUPADO = "ocupado"
     MANTENIMIENTO = "mantenimiento"
+    # Fuera del plano de 800 (punto 5): se conserva para el historial, no se lista ni se ocupa.
+    RETIRADO = "retirado"
+
+
+# Estados de los puestos del plano (sin los retirados). Se filtra por estos y no por "distinto de
+# retirado" para que la consulta sirva tambien en una base que aun no tiene la migracion 0004.
+ESTADOS_DEL_PLANO = (EstadoEspacio.LIBRE, EstadoEspacio.OCUPADO, EstadoEspacio.MANTENIMIENTO)
 
 
 # Acciones que quedan en la auditoria (coinciden con auditoria_accion_enum de la migracion 0003).

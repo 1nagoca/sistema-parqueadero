@@ -52,6 +52,7 @@ Enum espacio_estado_enum {
   libre
   ocupado
   mantenimiento
+  retirado [note: 'Fuera del plano de 800 (migración 0004): se conserva para el historial, no se lista ni se ocupa']
 }
 
 // ---------- Base parqueadero_identidad ----------

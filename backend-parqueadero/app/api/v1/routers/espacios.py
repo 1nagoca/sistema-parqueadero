@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, s
 from sqlalchemy.orm import Session
 
 from app.api.deps import UsuarioToken, get_current_user, get_db, require_role
-from app.models.enums import RolUsuario
+from app.models.enums import ESTADOS_DEL_PLANO, RolUsuario
 from app.models.espacio import Espacio
 from app.models.zona import Zona
 from app.schemas.auditoria_parqueadero import AuditoriaParqueaderoPagina, AuditoriaParqueaderoRead
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/espacios", tags=["espacios"])
 logger = logging.getLogger(__name__)
 
 
-# GET /espacios (cualquier usuario): espacios, opcionalmente de una zona.
+# GET /espacios (cualquier usuario): espacios del plano (sin los retirados), opcionalmente de una zona.
 @router.get("", response_model=list[EspacioRead])
 def listar_espacios(
     zona_id: uuid.UUID | None = None,
@@ -26,7 +26,7 @@ def listar_espacios(
     _: UsuarioToken = Depends(get_current_user),
 ):
     """Sin restriccion de rol: alimenta el mismo mapa interactivo que /zonas."""
-    consulta = db.query(Espacio)
+    consulta = db.query(Espacio).filter(Espacio.estado.in_(ESTADOS_DEL_PLANO))
     if zona_id is not None:
         consulta = consulta.filter(Espacio.zona_id == zona_id)
     return consulta.all()
